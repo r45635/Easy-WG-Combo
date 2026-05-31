@@ -222,6 +222,118 @@ app.get('/api/clients/:id/config', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Filter change (AdGuard per-client settings) ───────────────────────────────
+
+// AdGuard per-client settings per filter preset
+const AG_PER_CLIENT = {
+  filtered: {
+    use_global_settings:        true,
+    filtering_enabled:          true,
+    safebrowsing_enabled:       true,
+    parental_enabled:           false,
+    use_global_blocked_services: true,
+    safe_search:                { enabled: false },
+    upstreams:                  [],
+  },
+  malware: {
+    use_global_settings:        false,
+    filtering_enabled:          false,
+    safebrowsing_enabled:       false,
+    parental_enabled:           false,
+    use_global_blocked_services: true,
+    safe_search:                { enabled: false },
+    upstreams:                  ['1.1.1.2', '1.0.0.2'],
+  },
+  none: {
+    use_global_settings:        false,
+    filtering_enabled:          false,
+    safebrowsing_enabled:       false,
+    parental_enabled:           false,
+    use_global_blocked_services: false,
+    safe_search:                { enabled: false },
+    upstreams:                  ['1.1.1.1', '8.8.8.8'],
+  },
+};
+
+async function agSetClientFilter(clientName, clientIp, preset) {
+  const settings = AG_PER_CLIENT[preset] || AG_PER_CLIENT.filtered;
+
+  // Check if AdGuard already has a client entry for this IP
+  const listRes = await agFetch('/control/clients');
+  const list    = await listRes.json();
+  const exists  = (list.clients || []).find(c => c.ids?.includes(clientIp));
+
+  const payload = { name: clientName, ids: [clientIp], tags: [], ...settings };
+
+  if (exists) {
+    await agFetch('/control/clients/update', {
+      method: 'POST',
+      body:   JSON.stringify({ name: exists.name, data: payload }),
+    });
+  } else {
+    await agFetch('/control/clients/add', {
+      method: 'POST',
+      body:   JSON.stringify(payload),
+    });
+  }
+}
+
+app.post('/api/clients/:id/filter', auth, async (req, res) => {
+  const { preset } = req.body;
+  if (!preset || !AG_PER_CLIENT[preset])
+    return res.status(400).json({ error: 'Invalid preset' });
+
+  try {
+    // Get client details from wg-easy
+    const listRes = await wgFetch('/api/wireguard/client');
+    const clients = await listRes.json();
+    const client  = clients.find(c => c.id === req.params.id);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const store = loadStore();
+    const dns   = store[client.id]?.dns || '10.8.0.1';
+
+    if (dns !== '10.8.0.1')
+      return res.status(422).json({
+        error:   'non_adguard',
+        message: 'Ce client n\'utilise pas AdGuard DNS (10.8.0.1). Regénérez sa config pour changer son filtre.',
+      });
+
+    // Apply per-client filter in AdGuard
+    await agSetClientFilter(client.name, client.address, preset);
+
+    // Persist in portal store
+    setClientDns(client.id, preset, '10.8.0.1');
+
+    res.json({ success: true, preset, label: dnsToPreset('10.8.0.1').label });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Patch DNS on existing client config (for non-AdGuard → AdGuard migration)
+app.post('/api/clients/:id/patch-dns', auth, async (req, res) => {
+  const { preset } = req.body;
+  const presetDef  = DNS_PRESETS.find(p => p.id === preset);
+  if (!presetDef) return res.status(400).json({ error: 'Invalid preset' });
+
+  try {
+    const configRes = await wgFetch(`/api/wireguard/client/${req.params.id}/configuration`);
+    let config = await configRes.text();
+    config = config.replace(/^DNS = .*/m, `DNS = ${presetDef.value}`);
+
+    // If switching to AdGuard, also set per-client filter
+    if (presetDef.value === '10.8.0.1') {
+      const listRes = await wgFetch('/api/wireguard/client');
+      const client  = (await listRes.json()).find(c => c.id === req.params.id);
+      if (client) await agSetClientFilter(client.name, client.address, preset);
+    }
+
+    setClientDns(req.params.id, preset, presetDef.value);
+
+    const qrcode = await QRCode.toDataURL(config, { width: 256, margin: 2 });
+    res.json({ config, qrcode, preset });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── AdGuard ───────────────────────────────────────────────────────────────────
 
 app.get('/api/adguard/stats', auth, async (_req, res) => {

@@ -186,6 +186,9 @@ function renderClientTable(clients, showAll) {
                   title="${c.enabled !== false ? 'Désactiver' : 'Activer'}">
             ${c.enabled !== false ? '⏸' : '▶'}
           </button>
+          <button class="btn-icon" data-action="filter" data-id="${c.id}"
+                  data-name="${esc(c.name)}" data-preset="${c.dnsPreset || ''}"
+                  data-dns="${esc(c.dns || '')}" title="Changer le filtre DNS">⚙</button>
           <button class="btn-icon danger" data-action="delete" data-id="${c.id}"
                   data-name="${esc(c.name)}" title="Supprimer">✕</button>
         </div>
@@ -208,6 +211,9 @@ function bindClientActions(container) {
     if (!btn) return;
     const { action, id, name, enabled } = btn.dataset;
 
+    if (action === 'filter') {
+      openFilterModal({ id, name, preset: btn.dataset.preset, dns: btn.dataset.dns });
+    }
     if (action === 'qr') {
       const data = await GET(`/api/clients/${id}/config`);
       if (data) showQrModal(data.config, data.qrcode);
@@ -371,6 +377,141 @@ function showQrModal(config, qrcode) {
   });
 }
 
+// ── Filter modal ─────────────────────────────────────────────────────────────
+
+let _filterClient = null;
+
+function openFilterModal(client) {
+  _filterClient = client;
+  const isAdGuard = client.dns === '10.8.0.1';
+
+  // Info client
+  document.getElementById('filter-client-info').innerHTML =
+    `<strong>${esc(client.name)}</strong> — DNS actuel : <code>${esc(client.dns || '—')}</code>`;
+
+  // Reset
+  document.getElementById('filter-result').classList.add('hidden');
+  document.getElementById('filter-regen-result').classList.add('hidden');
+  document.getElementById('filter-error').classList.add('hidden');
+  document.getElementById('filter-footer').innerHTML = `
+    <button class="btn-ghost" id="filter-cancel-btn">Annuler</button>
+    <button class="btn-primary" id="filter-submit-btn">${isAdGuard ? 'Appliquer' : 'Générer nouvelle config'}</button>
+  `;
+  document.getElementById('filter-cancel-btn').addEventListener('click', closeFilterModal);
+  document.getElementById('filter-submit-btn').addEventListener('click', submitFilter);
+
+  if (isAdGuard) {
+    document.getElementById('filter-form').classList.remove('hidden');
+    document.getElementById('filter-non-adguard').classList.add('hidden');
+    renderFilterOptions('filter-dns-options', client.preset || 'filtered');
+  } else {
+    document.getElementById('filter-form').classList.add('hidden');
+    document.getElementById('filter-non-adguard').classList.remove('hidden');
+    renderFilterOptions('filter-regen-options', client.preset || 'filtered');
+  }
+
+  document.getElementById('filter-overlay').classList.remove('hidden');
+}
+
+function renderFilterOptions(containerId, selectedPreset) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = DNS_PRESETS.map(p => `
+    <label class="dns-option${p.id === selectedPreset ? ' selected' : ''}">
+      <input type="radio" name="${containerId}" value="${p.id}" ${p.id === selectedPreset ? 'checked' : ''}>
+      <div class="dns-option-text">
+        <div class="dns-option-label">${p.label}</div>
+        <div class="dns-option-desc">${p.desc}</div>
+        <div class="dns-option-value">${p.value}</div>
+      </div>
+    </label>
+  `).join('');
+  container.querySelectorAll('.dns-option').forEach(el => {
+    el.addEventListener('click', () => {
+      container.querySelectorAll('.dns-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      el.querySelector('input').checked = true;
+    });
+  });
+}
+
+function closeFilterModal() {
+  document.getElementById('filter-overlay').classList.add('hidden');
+  _filterClient = null;
+}
+
+async function submitFilter() {
+  const client   = _filterClient;
+  const isAdGuard = client.dns === '10.8.0.1';
+  const optionsId = isAdGuard ? 'filter-dns-options' : 'filter-regen-options';
+  const checked  = document.querySelector(`input[name="${optionsId}"]:checked`);
+  const preset   = checked?.value || 'filtered';
+  const errEl    = document.getElementById('filter-error');
+  errEl.classList.add('hidden');
+
+  const btn = document.getElementById('filter-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'En cours…';
+
+  let data;
+  if (isAdGuard) {
+    data = await POST(`/api/clients/${client.id}/filter`, { preset });
+  } else {
+    data = await POST(`/api/clients/${client.id}/patch-dns`, { preset });
+  }
+
+  btn.disabled = false;
+
+  if (!data || data.error) {
+    errEl.textContent = data?.message || data?.error || 'Erreur.';
+    errEl.classList.remove('hidden');
+    btn.textContent = isAdGuard ? 'Appliquer' : 'Générer nouvelle config';
+    return;
+  }
+
+  // Show result
+  const resultMsg = isAdGuard
+    ? `Filtre mis à jour : ${DNS_PRESETS.find(p => p.id === preset)?.label}`
+    : `Nouvelle config générée avec : ${DNS_PRESETS.find(p => p.id === preset)?.label}`;
+
+  document.getElementById('filter-result-msg').textContent = resultMsg;
+  document.getElementById('filter-result').classList.remove('hidden');
+
+  if (!isAdGuard && data.config) {
+    document.getElementById('filter-qr').src = data.qrcode;
+    document.getElementById('filter-config').textContent = data.config;
+    document.getElementById('filter-regen-result').classList.remove('hidden');
+  }
+
+  document.getElementById('filter-footer').innerHTML = `
+    ${!isAdGuard && data.config ? '<button class="btn-ghost" id="filter-dl-btn">↓ Télécharger .conf</button>' : ''}
+    <button class="btn-primary" id="filter-done-btn">Fermer</button>
+  `;
+  document.getElementById('filter-done-btn').addEventListener('click', () => {
+    closeFilterModal();
+    if (state.tab === 'clients') loadClients(); else loadDashboard();
+  });
+  if (!isAdGuard && data.config) {
+    document.getElementById('filter-dl-btn').addEventListener('click', () => {
+      const blob = new Blob([data.config], { type: 'text/plain' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), {
+        href: url, download: `wireguard-${client.name.replace(/\s+/g, '-')}.conf`
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+}
+
+// ── Help modal ────────────────────────────────────────────────────────────────
+
+function openHelpModal() {
+  document.getElementById('help-overlay').classList.remove('hidden');
+}
+function closeHelpModal() {
+  document.getElementById('help-overlay').classList.add('hidden');
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function esc(str) {
@@ -423,6 +564,16 @@ document.querySelectorAll('.nav-item').forEach(el => {
 document.getElementById('new-client-btn').addEventListener('click', openNewClientModal);
 document.getElementById('dash-new-btn').addEventListener('click', openNewClientModal);
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+document.getElementById('filter-close-btn').addEventListener('click', closeFilterModal);
+document.getElementById('open-help-btn').addEventListener('click', openHelpModal);
+document.getElementById('help-close-btn').addEventListener('click', closeHelpModal);
+document.getElementById('help-ok-btn').addEventListener('click', closeHelpModal);
+document.getElementById('filter-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('filter-overlay')) closeFilterModal();
+});
+document.getElementById('help-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('help-overlay')) closeHelpModal();
+});
 document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
 
 document.getElementById('modal-overlay').addEventListener('click', e => {

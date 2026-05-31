@@ -235,6 +235,46 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .result-footer { margin-top: 1rem; display: flex; gap: .5rem; flex-wrap: wrap; }
 
+/* Help button */
+.btn-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--primary)88;
+  background: var(--primary)15; color: var(--primary); font-size: .72rem; font-weight: 700;
+  margin-left: .5rem; cursor: pointer; vertical-align: middle; flex-shrink: 0;
+  transition: all var(--trans);
+}
+.btn-help:hover { background: var(--primary); color: #fff; }
+
+/* Filter client info */
+.filter-client-info {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .65rem 1rem;
+  margin-bottom: 1.25rem; font-size: .88rem; color: var(--text-dim);
+}
+.filter-client-info strong { color: var(--text); }
+
+/* Notice */
+.notice { border-radius: var(--radius); padding: .85rem 1rem; font-size: .85rem; margin-bottom: 1rem; }
+.notice-warn { background: var(--yellow)18; border: 1px solid var(--yellow)44; color: var(--text); }
+
+/* Help modal */
+.modal-help { max-width: 520px; }
+.help-section { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.help-section:last-of-type { border-bottom: none; }
+.help-section p { margin: .4rem 0 0; font-size: .88rem; }
+.help-detail { color: var(--text-dim) !important; font-size: .82rem !important; }
+.text-dim { color: var(--text-dim); }
+.help-badge {
+  display: inline-block; font-size: .82rem; padding: .2rem .65rem;
+  border-radius: 4px; font-weight: 600; margin-bottom: .35rem;
+}
+.help-note {
+  margin-top: 1rem; padding: .85rem 1rem;
+  background: var(--surface2); border-radius: var(--radius);
+  font-size: .82rem; color: var(--text-dim);
+}
+.help-note code { color: var(--primary); font-family: monospace; }
+
 /* Misc */
 .loading { color: var(--text-dim); padding: 1.5rem 0; text-align: center; }
 .error { color: var(--red); font-size: .82rem; margin-top: .5rem; }
