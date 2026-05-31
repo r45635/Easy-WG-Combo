@@ -565,7 +565,8 @@ document.getElementById('new-client-btn').addEventListener('click', openNewClien
 document.getElementById('dash-new-btn').addEventListener('click', openNewClientModal);
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 document.getElementById('filter-close-btn').addEventListener('click', closeFilterModal);
-document.getElementById('open-help-btn').addEventListener('click', openHelpModal);
+document.getElementById('help-dns-btn').addEventListener('click', openHelpModal);
+document.getElementById('help-dns-btn2').addEventListener('click', openHelpModal);
 document.getElementById('help-close-btn').addEventListener('click', closeHelpModal);
 document.getElementById('help-ok-btn').addEventListener('click', closeHelpModal);
 document.getElementById('filter-overlay').addEventListener('click', e => {

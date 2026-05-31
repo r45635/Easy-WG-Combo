@@ -78,7 +78,10 @@
         </div>
         <div class="section-header">
           <h3>Clients récents</h3>
-          <button class="btn-primary btn-sm" id="dash-new-btn">+ Nouveau client</button>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn-ghost btn-sm" id="help-dns-btn" title="Aide sur les filtres DNS">? Filtres DNS</button>
+            <button class="btn-primary btn-sm" id="dash-new-btn">+ Nouveau client</button>
+          </div>
         </div>
         <div id="dash-client-list" class="client-table-wrap">
           <div class="loading">Chargement…</div>
@@ -89,7 +92,10 @@
       <section id="tab-clients" class="tab-content hidden">
         <div class="page-header">
           <h2>Clients VPN</h2>
-          <button class="btn-primary" id="new-client-btn">+ Nouveau client</button>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn-ghost btn-sm" id="help-dns-btn2" title="Aide sur les filtres DNS">? Filtres DNS</button>
+            <button class="btn-primary" id="new-client-btn">+ Nouveau client</button>
+          </div>
         </div>
         <div id="client-table-wrap" class="client-table-wrap">
           <div class="loading">Chargement…</div>
@@ -159,9 +165,7 @@
   <div id="filter-overlay" class="hidden">
     <div class="modal">
       <div class="modal-header">
-        <h3>Changer le filtre DNS
-          <button class="btn-help" id="open-help-btn" title="Aide">?</button>
-        </h3>
+        <h3>Changer le filtre DNS</h3>
         <button class="modal-close" id="filter-close-btn">✕</button>
       </div>
       <div class="modal-body">
