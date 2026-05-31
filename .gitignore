@@ -5,3 +5,4 @@ adguard/work/
 .env
 *.conf
 *.log
+portal/data/

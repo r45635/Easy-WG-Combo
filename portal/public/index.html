@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Easy-WG-Combo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="login-screen">
+    <div class="login-box">
+      <div class="login-logo">
+        <span class="logo-icon">⬡</span>
+        <h1>Easy-WG-Combo</h1>
+        <p>Admin Portal</p>
+      </div>
+      <form id="login-form">
+        <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password">
+        <button type="submit">Connexion</button>
+        <p id="login-error" class="error hidden">Mot de passe incorrect</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">⬡</span>
+        <span>Easy-WG-Combo</span>
+      </div>
+      <nav>
+        <a href="#" class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon">◈</span> Dashboard
+        </a>
+        <a href="#" class="nav-item" data-tab="clients">
+          <span class="nav-icon">◉</span> Clients VPN
+        </a>
+        <a href="#" class="nav-item" data-tab="wireguard">
+          <span class="nav-icon">◎</span> WireGuard
+        </a>
+        <a href="#" class="nav-item" data-tab="adguard">
+          <span class="nav-icon">◐</span> AdGuard Home
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="btn-ghost">Déconnexion</button>
+      </div>
+    </aside>
+
+    <main class="content">
+
+      <!-- Dashboard -->
+      <section id="tab-dashboard" class="tab-content">
+        <div class="page-header">
+          <h2>Dashboard</h2>
+          <button class="btn-ghost btn-sm" id="refresh-btn">↻ Actualiser</button>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Clients total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value green" id="stat-connected">—</div>
+            <div class="stat-label">Connectés</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-queries">—</div>
+            <div class="stat-label">Requêtes DNS aujourd'hui</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value orange" id="stat-blocked">—</div>
+            <div class="stat-label">Bloquées <span id="stat-pct" class="stat-pct"></span></div>
+          </div>
+        </div>
+        <div class="section-header">
+          <h3>Clients récents</h3>
+          <button class="btn-primary btn-sm" id="dash-new-btn">+ Nouveau client</button>
+        </div>
+        <div id="dash-client-list" class="client-table-wrap">
+          <div class="loading">Chargement…</div>
+        </div>
+      </section>
+
+      <!-- Clients -->
+      <section id="tab-clients" class="tab-content hidden">
+        <div class="page-header">
+          <h2>Clients VPN</h2>
+          <button class="btn-primary" id="new-client-btn">+ Nouveau client</button>
+        </div>
+        <div id="client-table-wrap" class="client-table-wrap">
+          <div class="loading">Chargement…</div>
+        </div>
+      </section>
+
+      <!-- WireGuard iframe -->
+      <section id="tab-wireguard" class="tab-content hidden iframe-tab">
+        <iframe id="wg-iframe" src="about:blank" title="wg-easy"></iframe>
+      </section>
+
+      <!-- AdGuard iframe -->
+      <section id="tab-adguard" class="tab-content hidden iframe-tab">
+        <iframe id="ag-iframe" src="about:blank" title="AdGuard Home"></iframe>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modal nouveau client -->
+  <div id="modal-overlay" class="hidden">
+    <div class="modal" id="modal-create">
+      <div class="modal-header">
+        <h3 id="modal-title">Nouveau client WireGuard</h3>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+
+        <!-- Étape 1 : formulaire -->
+        <div id="modal-form">
+          <label class="field-label">Nom du client</label>
+          <input type="text" id="client-name-input" placeholder="iPhone-Vincent, Mac-Bureau…">
+
+          <label class="field-label" style="margin-top:1.5rem">Protection DNS</label>
+          <div class="dns-options" id="dns-options"></div>
+
+          <p id="create-error" class="error hidden"></p>
+        </div>
+
+        <!-- Étape 2 : résultat -->
+        <div id="modal-result" class="hidden">
+          <div class="result-success">
+            <span class="result-check">✓</span>
+            <span id="result-name"></span> créé
+          </div>
+          <div class="result-body">
+            <div class="qr-wrap">
+              <img id="result-qr" src="" alt="QR Code">
+              <div class="qr-hint">Scanner avec l'app WireGuard</div>
+            </div>
+            <div class="config-wrap">
+              <pre id="result-config"></pre>
+              <button class="btn-ghost btn-sm" id="copy-config-btn">⎘ Copier</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn-ghost" id="modal-cancel-btn">Annuler</button>
+        <button class="btn-primary" id="modal-submit-btn">Créer →</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
