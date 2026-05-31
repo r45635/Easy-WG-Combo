@@ -1,0 +1,7 @@
+node_modules/
+wireguard/
+adguard/conf/
+adguard/work/
+.env
+*.conf
+*.log
