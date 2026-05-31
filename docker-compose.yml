@@ -4,10 +4,12 @@ services:
     image: ghcr.io/wg-easy/wg-easy:14
     container_name: wg-easy
     restart: unless-stopped
+    env_file:
+      - .env.wgeasy
     environment:
       - LANG=fr
       - WG_HOST=${WG_HOST}
-      # PASSWORD_HASH: set via docker-compose.override.yml to avoid $-interpolation issues
+      # PASSWORD_HASH loaded from .env.wgeasy (env_file bypasses $ interpolation)
       - PORT=${WG_EASY_PORT:-51821}
       - WG_PORT=${WG_PORT:-51820}
       - WG_DEFAULT_DNS=${WG_DEFAULT_DNS:-10.8.0.1}
