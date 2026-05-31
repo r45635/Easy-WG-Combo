@@ -164,8 +164,8 @@ function renderClientTable(clients, showAll) {
         ? `<span class="badge badge-green"><span class="dot"></span>Connecté</span>`
         : `<span class="badge badge-dim"><span class="dot"></span>Inactif</span>`;
 
-    const dnsBadge = c.dnsPreset
-      ? `<span class="dns-badge">${DNS_PRESETS.find(p => p.id === c.dnsPreset)?.label || c.dnsPreset}</span>`
+    const dnsBadge = c.dnsLabel
+      ? `<span class="dns-badge dns-${c.dnsPreset || 'custom'}">${esc(c.dnsLabel)}</span>`
       : `<span class="dns-badge unknown">—</span>`;
 
     const lastSeen = c.latestHandshakeAt
@@ -230,13 +230,20 @@ function bindClientActions(container) {
 // ── New client modal ──────────────────────────────────────────────────────────
 
 function openNewClientModal() {
-  // Reset state
+  // Restaurer le footer (peut avoir été remplacé par le résultat de création)
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn-ghost" id="modal-cancel-btn">Annuler</button>
+    <button class="btn-primary" id="modal-submit-btn">Créer →</button>
+  `;
+  document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+  document.getElementById('modal-submit-btn').addEventListener('click', submitNewClient);
+
+  // Reset état
   document.getElementById('modal-form').classList.remove('hidden');
   document.getElementById('modal-result').classList.add('hidden');
   document.getElementById('modal-footer').classList.remove('hidden');
+  document.querySelector('.result-success').style.display = '';
   document.getElementById('modal-title').textContent = 'Nouveau client WireGuard';
-  document.getElementById('modal-submit-btn').textContent = 'Créer →';
-  document.getElementById('modal-submit-btn').disabled = false;
   document.getElementById('client-name-input').value = '';
   document.getElementById('create-error').classList.add('hidden');
 
@@ -416,8 +423,6 @@ document.querySelectorAll('.nav-item').forEach(el => {
 document.getElementById('new-client-btn').addEventListener('click', openNewClientModal);
 document.getElementById('dash-new-btn').addEventListener('click', openNewClientModal);
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
-document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
-document.getElementById('modal-submit-btn').addEventListener('click', submitNewClient);
 document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
 
 document.getElementById('modal-overlay').addEventListener('click', e => {

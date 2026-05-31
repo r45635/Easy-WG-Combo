@@ -19,6 +19,16 @@ const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
 const WG_EXT_PORT  = process.env.WG_EASY_EXTERNAL_PORT  || '51821';
 const AG_EXT_PORT  = process.env.ADGUARD_EXTERNAL_PORT  || '3000';
 
+const DNS_PRESETS = [
+  { id: 'filtered', label: 'Filtré complet',    value: '10.8.0.1' },
+  { id: 'malware',  label: 'Malware seulement', value: '1.1.1.2, 1.0.0.2' },
+  { id: 'none',     label: 'Sans filtre',        value: '1.1.1.1, 8.8.8.8' },
+];
+
+function dnsToPreset(dns) {
+  return DNS_PRESETS.find(p => p.value === dns?.trim()) || { id: 'custom', label: dns || '—' };
+}
+
 const DATA_FILE = '/data/client-dns.json';
 
 // ── Persistence ─────────────────────────────────────────────────────────────
@@ -126,13 +136,32 @@ app.get('/api/clients', auth, async (_req, res) => {
   try {
     const r       = await wgFetch('/api/wireguard/client');
     const clients = await r.json();
-    const store   = loadStore();
-    const enriched = clients.map(c => ({
+    let store     = loadStore();
+
+    // Auto-discover DNS for clients not yet in the store
+    const unknown = clients.filter(c => !store[c.id]);
+    if (unknown.length) {
+      await Promise.all(unknown.map(async c => {
+        try {
+          const cr  = await wgFetch(`/api/wireguard/client/${c.id}/configuration`);
+          const cfg = await cr.text();
+          const m   = cfg.match(/^DNS\s*=\s*(.+)$/m);
+          if (m) {
+            const dns    = m[1].trim();
+            const preset = dnsToPreset(dns);
+            setClientDns(c.id, preset.id, dns);
+          }
+        } catch { /* ignore individual failures */ }
+      }));
+      store = loadStore();
+    }
+
+    res.json(clients.map(c => ({
       ...c,
       dnsPreset: store[c.id]?.preset || null,
-      dns:       store[c.id]?.dns    || null,
-    }));
-    res.json(enriched);
+      dnsLabel:  store[c.id] ? dnsToPreset(store[c.id].dns).label : null,
+      dns:       store[c.id]?.dns || null,
+    })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

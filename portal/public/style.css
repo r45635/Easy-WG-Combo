@@ -130,9 +130,12 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-red   { background: var(--red)22; color: var(--red); }
 
 /* DNS badge */
-.dns-badge { font-size: .75rem; padding: .15rem .5rem; border-radius: 4px;
-             background: var(--primary)1a; color: var(--primary); font-family: monospace; }
-.dns-badge.unknown { background: var(--text-faint)22; color: var(--text-faint); }
+.dns-badge { font-size: .75rem; padding: .15rem .5rem; border-radius: 4px; font-family: monospace; }
+.dns-badge.dns-filtered { background: var(--green)22;   color: var(--green); }
+.dns-badge.dns-malware  { background: var(--yellow)22;  color: var(--yellow); }
+.dns-badge.dns-none     { background: var(--text-faint)22; color: var(--text-dim); }
+.dns-badge.dns-custom   { background: var(--primary)1a; color: var(--primary); }
+.dns-badge.unknown      { background: var(--text-faint)22; color: var(--text-faint); }
 
 /* Actions */
 .actions { display: flex; gap: .35rem; }
