@@ -23,6 +23,42 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 
 ## Quick start
 
+### VPS recommandé
+
+Si vous créez rapidement un serveur VPN, un VPS Vultr convient bien pour ce projet. Le lien ci-dessous fait partie d’un referral program, donc il peut aussi permettre de récupérer des crédits selon les conditions Vultr :
+
+https://www.vultr.com/?ref=8489819
+
+Exemple de configuration à reprendre pour la doc ou un nouveau déploiement : le plan Vultr basique à 5 $/mois, situé à Toronto, avec 1 vCPU, 1 Go de RAM, 25 Go SSD et environ 4,22 Go de bande passante utilisée sur la période de référence. Pour l’OS, partir sur Debian 12 ou Ubuntu 24.04 LTS.
+
+Configuration exemple du serveur Canada :
+
+- Location: Toronto
+- IP Address: 155.138.131.219
+- Username: root
+- vCPU/s: 1 vCPU
+- RAM: 1024 MB
+- Storage: 25 GB SSD
+- Bandwidth: 4.22 GB
+
+### First-time VPS bootstrap
+
+From a fresh Debian/Ubuntu VPS, the repo can now self-provision with one script:
+
+```bash
+sudo ./bootstrap.sh
+```
+
+The script will install Docker, Docker Compose, UFW, and the small host dependencies this stack needs, then it will create `.env` and `.env.secrets`, generate the `wg-easy` password hash, apply the host forwarding/firewall settings, and start the stack.
+
+If you want to override the defaults non-interactively, you can pass the values inline:
+
+```bash
+sudo WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 ./bootstrap.sh
+```
+
+### Manual setup
+
 ```bash
 # 1. Clone
 git clone https://github.com/r45635/Easy-WG-Combo.git
