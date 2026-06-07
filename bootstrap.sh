@@ -54,6 +54,36 @@ existing_install_detected() {
   dir_has_content "$SCRIPT_DIR/adguard/work"
 }
 
+resolve_existing_install_action() {
+  local action="${EXISTING_CONFIG_ACTION:-}"
+
+  if [ -z "$action" ]; then
+    if [ -t 0 ]; then
+      printf '%s\n' "Existing Easy-WG-Combo configuration detected."
+      printf '%s\n' "Choose an action:"
+      printf '%s\n' "  [k] keep existing configuration and start/restart services"
+      printf '%s\n' "  [n] start new configuration (creates backup first)"
+
+      while true; do
+        read -r -p "Action (k/n): " action
+        case "${action,,}" in
+          k|keep) action="keep"; break ;;
+          n|new)  action="new"; break ;;
+          *) printf '%s\n' "Please answer 'k' (keep) or 'n' (new)." ;;
+        esac
+      done
+    else
+      die "Existing configuration detected in non-interactive mode. Set EXISTING_CONFIG_ACTION=keep or EXISTING_CONFIG_ACTION=new."
+    fi
+  fi
+
+  case "${action,,}" in
+    k|keep) printf '%s' "keep" ;;
+    n|new)  printf '%s' "new" ;;
+    *) die "Invalid EXISTING_CONFIG_ACTION value '$action'. Use 'keep' or 'new'." ;;
+  esac
+}
+
 backup_existing_state() {
   local backup_root="${BACKUP_DIR:-$SCRIPT_DIR/backups}"
   local timestamp backup_dir
@@ -210,42 +240,51 @@ main() {
   configure_sysctl
   configure_firewall
 
-  if existing_install_detected; then
-    if [ "${ALLOW_REPLACE:-no}" != "yes" ]; then
-      die "Existing containers/data detected. Refusing to replace automatically. Re-run with ALLOW_REPLACE=yes (backup will be created first)."
-    fi
+  local has_existing="no"
+  local existing_action=""
 
-    log "Existing installation detected. Creating backup before replacement..."
-    backup_existing_state
-    log "Removing existing containers..."
-    replace_existing_containers
+  if existing_install_detected; then
+    has_existing="yes"
+    existing_action="$(resolve_existing_install_action)"
+
+    if [ "$existing_action" = "new" ]; then
+      log "Existing installation detected. Creating backup before replacement..."
+      backup_existing_state
+      log "Removing existing containers..."
+      replace_existing_containers
+    else
+      log "Keeping existing configuration and containers."
+    fi
   fi
 
   local wg_host="${WG_HOST:-${1:-}}"
-  if [ -z "$wg_host" ]; then
-    wg_host="$(default_wg_host)"
-  fi
-  if [ -z "$wg_host" ]; then
-    read -r -p "VPS public IP or hostname for WG_HOST: " wg_host
-  fi
-  [ -n "$wg_host" ] || die "WG_HOST is required."
-
   local admin_password="${ADMIN_PASSWORD:-${2:-}}"
-  if [ -z "$admin_password" ]; then
-    read -r -s -p "Admin password for the portal and wg-easy: " admin_password
-    printf '\n'
+
+  if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
+    if [ -z "$wg_host" ]; then
+      wg_host="$(default_wg_host)"
+    fi
+    if [ -z "$wg_host" ]; then
+      read -r -p "VPS public IP or hostname for WG_HOST: " wg_host
+    fi
+    [ -n "$wg_host" ] || die "WG_HOST is required."
+
+    if [ -z "$admin_password" ]; then
+      read -r -s -p "Admin password for the portal and wg-easy: " admin_password
+      printf '\n'
+    fi
+    [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
+
+    local password_hash
+    log "Generating WireGuard password hash..."
+    password_hash="$(generate_password_hash "$admin_password")"
+    [ -n "$password_hash" ] || die "Failed to generate PASSWORD_HASH."
+
+    log "Writing configuration files..."
+    set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
+    set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
+    set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
-  [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
-
-  local password_hash
-  log "Generating WireGuard password hash..."
-  password_hash="$(generate_password_hash "$admin_password")"
-  [ -n "$password_hash" ] || die "Failed to generate PASSWORD_HASH."
-
-  log "Writing configuration files..."
-  set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
-  set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
-  set_password_hash_secret "$SECRETS_FILE" "$password_hash"
 
   log "Starting the stack..."
   exec "$SCRIPT_DIR/compose.sh" up -d

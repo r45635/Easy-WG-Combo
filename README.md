@@ -76,11 +76,14 @@ If you already cloned the repository on the VPS, you can run the bootstrap direc
 sudo ./bootstrap.sh
 ```
 
-By default, the bootstrap now **refuses to replace** an existing stack if containers/data are already detected.
-To replace an existing install, explicitly allow it (a backup is created first):
+When existing containers/data are detected, the bootstrap now asks what to do:
+- `keep` — keep existing configuration and just start/restart the stack
+- `new` — start a new configuration (a backup is created first)
+
+For non-interactive runs, set the action explicitly:
 
 ```bash
-export ALLOW_REPLACE=yes
+export EXISTING_CONFIG_ACTION=new
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
 ```
 
