@@ -8,11 +8,32 @@ log() {
   printf '%s\n' "$*"
 }
 
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
 require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || {
-    printf 'ERROR: Missing required command: %s\n' "$1" >&2
-    exit 1
-  }
+  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
+}
+
+run_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  else
+    command -v sudo >/dev/null 2>&1 || die "sudo is required when not running as root."
+    sudo "$@"
+  fi
+}
+
+ensure_git() {
+  if command -v git >/dev/null 2>&1; then
+    return
+  fi
+
+  log "git is missing, installing it..."
+  run_root apt-get update
+  run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y git ca-certificates
 }
 
 run_bootstrap() {
@@ -27,7 +48,12 @@ run_bootstrap() {
 }
 
 main() {
-  require_cmd git
+  require_cmd apt-get
+  ensure_git
+
+  if [ ! -t 0 ] && { [ -z "${WG_HOST:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; }; then
+    die "Non-interactive mode detected. Please set WG_HOST and ADMIN_PASSWORD (and optionally SSH_PORT)."
+  fi
 
   if [ -d "$APP_DIR/.git" ]; then
     log "Updating existing checkout in $APP_DIR..."

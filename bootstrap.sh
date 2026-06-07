@@ -68,15 +68,23 @@ ensure_linux() {
 }
 
 install_packages() {
+  local packages=(ca-certificates curl git ufw)
+
+  if ! command -v docker >/dev/null 2>&1; then
+    packages+=(docker.io)
+  fi
+
+  if ! docker compose version >/dev/null 2>&1; then
+    packages+=(docker-compose-plugin)
+  fi
+
   log "Installing host dependencies..."
   run_root apt-get update
-  run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    ca-certificates \
-    curl \
-    git \
-    ufw \
-    docker.io \
-    docker-compose-plugin
+
+  if [ "${#packages[@]}" -gt 0 ]; then
+    run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+  fi
+
   run_root systemctl enable --now docker
 }
 

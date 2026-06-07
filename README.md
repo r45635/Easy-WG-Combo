@@ -57,14 +57,16 @@ Example baseline server sizing:
 From a fresh Debian/Ubuntu VPS, you can run everything with a single download-and-execute command:
 
 ```bash
+export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
 ```
 
-Optional non-interactive mode:
+If you prefer interactive prompts, download then run the script locally on the VPS:
 
 ```bash
-WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 \
-curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+curl -fsSLO https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh
+chmod +x install.sh
+./install.sh
 ```
 
 If you already cloned the repository on the VPS, you can run the bootstrap directly:
