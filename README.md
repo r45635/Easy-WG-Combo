@@ -90,6 +90,11 @@ curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.s
 Backups are written to `./backups/<timestamp>` inside the project directory by default.
 You can override the destination with `BACKUP_DIR=/your/path`.
 
+Before deployment, the bootstrap now verifies free disk space and can run a Docker prune cleanup.
+- Interactive mode: asks `Run Docker prune cleanup before deployment? [Y/n]` (default: Yes)
+- Non-interactive mode: controlled by `PRUNE_BEFORE_DEPLOY` (default: `yes`)
+- Minimum free space threshold: `MIN_FREE_MB` (default: `2048`)
+
 The script will install Docker, Docker Compose, UFW, and the small host dependencies this stack needs, then it will create `.env` and `.env.secrets`, generate the `wg-easy` password hash, apply the host forwarding/firewall settings, and start the stack.
 
 If you want to override the defaults non-interactively, you can pass the values inline:

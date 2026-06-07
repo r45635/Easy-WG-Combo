@@ -29,6 +29,59 @@ run_root() {
   fi
 }
 
+available_space_mb() {
+  local target_dir="$1"
+  df -Pm "$target_dir" | awk 'NR==2 {print $4}'
+}
+
+maybe_prune_docker() {
+  local default_choice="${PRUNE_BEFORE_DEPLOY:-yes}"
+  local do_prune="yes"
+
+  if ! command -v docker >/dev/null 2>&1; then
+    return
+  fi
+
+  if [ -t 0 ]; then
+    read -r -p "Run Docker prune cleanup before deployment? [Y/n]: " do_prune
+    do_prune="${do_prune:-Y}"
+    case "${do_prune,,}" in
+      y|yes) do_prune="yes" ;;
+      n|no)  do_prune="no" ;;
+      *)     do_prune="yes" ;;
+    esac
+  else
+    case "${default_choice,,}" in
+      y|yes|true|1) do_prune="yes" ;;
+      *)            do_prune="no" ;;
+    esac
+  fi
+
+  if [ "$do_prune" = "yes" ]; then
+    log "Running Docker prune cleanup..."
+    docker system prune -af --volumes >/dev/null 2>&1 || true
+  else
+    log "Skipping Docker prune cleanup."
+  fi
+}
+
+ensure_disk_space() {
+  local min_free_mb="${MIN_FREE_MB:-2048}"
+  local before_mb after_mb
+
+  before_mb="$(available_space_mb "$SCRIPT_DIR")"
+  log "Available disk space before deployment: ${before_mb} MB"
+
+  maybe_prune_docker
+
+  after_mb="$(available_space_mb "$SCRIPT_DIR")"
+  log "Available disk space after cleanup: ${after_mb} MB"
+
+  if [ "$after_mb" -lt "$min_free_mb" ]; then
+    die "Insufficient disk space (${after_mb} MB). Need at least ${min_free_mb} MB free."
+  fi
+}
+
 container_exists() {
   local name="$1"
   docker ps -a --format '{{.Names}}' | grep -Fxq "$name"
@@ -236,6 +289,7 @@ main() {
   require_cmd apt-get
 
   install_packages
+  ensure_disk_space
   ensure_env_files
   configure_sysctl
   configure_firewall
