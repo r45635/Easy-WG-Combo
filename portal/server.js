@@ -23,6 +23,7 @@ const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
 const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
+const FAIL2BAN_LOG     = process.env.FAIL2BAN_LOG     || '/var/log/fail2ban.log';
 const runCmd = promisify(execFile);
 
 const DNS_PRESETS = [
@@ -60,6 +61,8 @@ function loadSettings() {
 function saveSettings(data) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
 }
+
+let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
 
 function getServerName() {
   return loadSettings().serverName || sanitizeServerName(DEFAULT_SERVER_NAME);
@@ -150,6 +153,24 @@ function isValidIp(value) {
   return ipv4.test(raw) || ipv6.test(raw);
 }
 
+function isValidIpOrCidr(value) {
+  const raw = String(value || '').trim();
+  const ipv4 = /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)(\/([0-9]|[12]\d|3[0-2]))?$/;
+  const ipv6 = /^[0-9a-fA-F:]+(?:\/\d+)?$/;
+  return ipv4.test(raw) || ipv6.test(raw);
+}
+
+const sessionRegistry = new Map(); // sessionId → {ip, ua, loginAt, lastSeen}
+
+function clientIp(req) {
+  return (
+    req.headers['x-real-ip'] ||
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.socket.remoteAddress ||
+    'unknown'
+  ).replace(/^::ffff:/, '');
+}
+
 async function fail2banStatus() {
   const { stdout } = await runCmd('fail2ban-client', ['status', FAIL2BAN_JAIL], { timeout: 4000 });
   return parseFail2banStatus(stdout);
@@ -167,7 +188,12 @@ app.use(session({
   cookie:            { maxAge: 24 * 60 * 60 * 1000 },
 }));
 
-const auth = (req, res, next) => req.session.ok ? next() : res.status(401).json({ error: 'Unauthorized' });
+const auth = (req, res, next) => {
+  if (!req.session.ok) return res.status(401).json({ error: 'Unauthorized' });
+  const meta = sessionRegistry.get(req.sessionID);
+  if (meta) meta.lastSeen = Date.now();
+  next();
+};
 
 function rewriteSetCookiePath(cookie, basePath) {
   if (!cookie) return cookie;
@@ -280,15 +306,25 @@ app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
-  if (req.body.password === PORTAL_PASS) {
+  if (req.body.password === currentPortalPass) {
     req.session.ok = true;
+    sessionRegistry.set(req.sessionID, {
+      ip:       clientIp(req),
+      ua:       (req.headers['user-agent'] || '').slice(0, 120),
+      loginAt:  Date.now(),
+      lastSeen: Date.now(),
+    });
     res.json({ success: true });
   } else {
     res.status(401).json({ error: 'Wrong password' });
   }
 });
 
-app.post('/api/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
+app.post('/api/logout', (req, res) => {
+  sessionRegistry.delete(req.sessionID);
+  req.session.destroy();
+  res.json({ success: true });
+});
 
 app.get('/api/me', (req, res) => res.json({ authenticated: !!req.session.ok }));
 
@@ -637,6 +673,184 @@ app.get('/api/fail2ban/logs', auth, (req, res) => {
                    : filter === 'errors' ? parsed.filter(l => l.status >= 400)
                    : parsed;
     res.json({ lines: filtered.slice(-n).reverse(), total: filtered.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── My IP ────────────────────────────────────────────────────────────────────
+
+app.get('/api/myip', (req, res) => {
+  res.json({ ip: clientIp(req) });
+});
+
+// ── Fail2Ban whitelist ────────────────────────────────────────────────────────
+
+app.get('/api/fail2ban/ignoreip', auth, async (_req, res) => {
+  try {
+    const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
+    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
+  try {
+    await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'addignoreip', ip], { timeout: 4000 });
+    const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
+    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
+  try {
+    await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'delignoreip', ip], { timeout: 4000 });
+    const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
+    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Fail2Ban live config edit ─────────────────────────────────────────────────
+
+app.post('/api/fail2ban/set-config', auth, async (req, res) => {
+  const { bantime, findtime, maxretry } = req.body;
+  const cmds = [];
+  if (bantime  !== undefined) cmds.push(runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'bantime',  String(bantime)],  { timeout: 4000 }));
+  if (findtime !== undefined) cmds.push(runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'findtime', String(findtime)], { timeout: 4000 }));
+  if (maxretry !== undefined) cmds.push(runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'maxretry', String(maxretry)], { timeout: 4000 }));
+  if (!cmds.length) return res.status(400).json({ error: 'Nothing to update.' });
+  try {
+    await Promise.all(cmds);
+    const [bt, ft, mr] = await Promise.all([
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'bantime'],  { timeout: 4000 }),
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'findtime'], { timeout: 4000 }),
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'maxretry'], { timeout: 4000 }),
+    ]);
+    res.json({
+      jail:     FAIL2BAN_JAIL,
+      bantime:  parseInt(bt.stdout.trim(),  10),
+      findtime: parseInt(ft.stdout.trim(), 10),
+      maxretry: parseInt(mr.stdout.trim(), 10),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Fail2Ban jail log ─────────────────────────────────────────────────────────
+
+app.get('/api/fail2ban/jaillog', auth, (req, res) => {
+  const n = Math.min(parseInt(req.query.n || '100', 10), 500);
+  try {
+    if (!fs.existsSync(FAIL2BAN_LOG))
+      return res.json({ lines: [], error: 'Fail2Ban log file not found.' });
+    const raw   = fs.readFileSync(FAIL2BAN_LOG, 'utf8');
+    const lines = raw.trim().split('\n')
+      .filter(l => l.includes(FAIL2BAN_JAIL))
+      .slice(-n).reverse();
+    res.json({ lines });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Password change ───────────────────────────────────────────────────────────
+
+app.post('/api/auth/password', auth, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || currentPassword !== currentPortalPass)
+    return res.status(403).json({ error: 'Current password is incorrect.' });
+  if (!newPassword || newPassword.length < 8)
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+  const settings = loadSettings();
+  settings.adminPassword = newPassword;
+  saveSettings(settings);
+  currentPortalPass = newPassword;
+  res.json({ success: true });
+});
+
+// ── System service status ─────────────────────────────────────────────────────
+
+async function checkService(name, url, okStatuses = [200, 401]) {
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 2500);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
+    clearTimeout(timer);
+    return { name, up: okStatuses.includes(r.status), code: r.status };
+  } catch (e) {
+    clearTimeout(timer);
+    return { name, up: false, error: e.message };
+  }
+}
+
+app.get('/api/system/status', auth, async (_req, res) => {
+  const [wg, ag, caddy] = await Promise.all([
+    checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
+    checkService('adguard',  `${AG_URL}/control/status`, [200]),
+    checkService('caddy',    'http://127.0.0.1:2019/',   [200]),
+  ]);
+  res.json({ 'wg-easy': wg, adguard: ag, caddy, portal: { name: 'portal', up: true } });
+});
+
+// ── TLS certificate info ──────────────────────────────────────────────────────
+
+app.get('/api/tls/cert', auth, (req, res) => {
+  const tls = require('tls');
+  let resolved = false;
+  const done = (payload) => { if (!resolved) { resolved = true; res.json(payload); } };
+  const sock  = tls.connect(
+    { host: '127.0.0.1', port: 443, rejectUnauthorized: false, servername: 'localhost' },
+    () => {
+      try {
+        const cert = sock.getPeerCertificate();
+        sock.destroy();
+        done({
+          subject:     cert.subject?.CN || cert.subject?.O || '—',
+          issuer:      cert.issuer?.CN  || cert.issuer?.O  || '—',
+          validFrom:   cert.valid_from  || '—',
+          validTo:     cert.valid_to    || '—',
+          fingerprint: cert.fingerprint256 || cert.fingerprint || '—',
+          isInternal:  (cert.issuer?.O || '').toLowerCase().includes('caddy') ||
+                       (cert.issuer?.CN || '').toLowerCase().includes('local'),
+        });
+      } catch (e) { sock.destroy(); done({ error: e.message }); }
+    },
+  );
+  sock.on('error', e => { sock.destroy(); done({ error: e.message }); });
+  setTimeout(() => { sock.destroy(); done({ error: 'TLS connection timeout.' }); }, 3000);
+});
+
+// ── Session management ────────────────────────────────────────────────────────
+
+app.get('/api/sessions', auth, (req, res) => {
+  const sessions = [...sessionRegistry.entries()].map(([id, m]) => ({
+    id,
+    ip:        m.ip,
+    ua:        m.ua,
+    loginAt:   m.loginAt,
+    lastSeen:  m.lastSeen,
+    isCurrent: id === req.sessionID,
+  })).sort((a, b) => b.loginAt - a.loginAt);
+  res.json({ sessions });
+});
+
+app.delete('/api/sessions/:id', auth, (req, res) => {
+  const id = req.params.id;
+  if (id === req.sessionID) return res.status(400).json({ error: 'Cannot revoke your current session.' });
+  sessionRegistry.delete(id);
+  req.sessionStore.destroy(id, () => res.json({ success: true }));
+});
+
+// ── GeoIP proxy ───────────────────────────────────────────────────────────────
+
+app.get('/api/geoip/:ip', auth, async (req, res) => {
+  if (!isValidIp(req.params.ip)) return res.status(400).json({ error: 'Invalid IP.' });
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 3000);
+    const r = await fetch(
+      `http://ip-api.com/json/${encodeURIComponent(req.params.ip)}?fields=status,country,countryCode`,
+      { signal: ctrl.signal },
+    );
+    res.json(await r.json());
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

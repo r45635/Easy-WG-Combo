@@ -168,9 +168,27 @@
               <code id="security-jail-name">—</code>
             </div>
           </div>
-          <button class="btn-ghost btn-sm" id="security-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="sec-edit-config-btn" data-i18n="security.config.edit">✎ Edit config</button>
+            <button class="btn-ghost btn-sm" id="security-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+          </div>
         </div>
 
+        <!-- Status bar: My IP + service health -->
+        <div class="sec-status-bar">
+          <div class="sec-my-ip">
+            <span class="sec-my-ip-label" data-i18n="security.myip">Your IP</span>
+            <code id="sec-my-ip-val">…</code>
+          </div>
+          <div class="sec-services" id="sec-services">
+            <span class="svc-badge" id="svc-portal"><span class="dot"></span> portal</span>
+            <span class="svc-badge" id="svc-wgeasy"><span class="dot"></span> wg-easy</span>
+            <span class="svc-badge" id="svc-adguard"><span class="dot"></span> adguard</span>
+            <span class="svc-badge" id="svc-caddy"><span class="dot"></span> caddy</span>
+          </div>
+        </div>
+
+        <!-- Fail2Ban stats (clickable / editable) -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-value" id="sec-bantime">—</div>
@@ -190,6 +208,35 @@
           </div>
         </div>
 
+        <!-- Inline config edit form -->
+        <div id="sec-config-edit-panel" class="security-panel hidden">
+          <div class="section-header">
+            <h3 data-i18n="security.config.editTitle">Edit Fail2Ban config</h3>
+          </div>
+          <div class="sec-edit-form">
+            <label class="sec-edit-field">
+              <span data-i18n="security.config.bantime">Ban duration</span>
+              <span class="sec-edit-unit" data-i18n="security.config.seconds">seconds</span>
+              <input type="number" id="edit-bantime" class="input-field" min="60" max="864000" style="width:110px">
+            </label>
+            <label class="sec-edit-field">
+              <span data-i18n="security.config.findtime">Detection window</span>
+              <span class="sec-edit-unit" data-i18n="security.config.seconds">seconds</span>
+              <input type="number" id="edit-findtime" class="input-field" min="60" max="86400" style="width:110px">
+            </label>
+            <label class="sec-edit-field">
+              <span data-i18n="security.config.maxretry">Max attempts</span>
+              <input type="number" id="edit-maxretry" class="input-field" min="1" max="100" style="width:80px">
+            </label>
+            <div class="ban-input-row" style="margin-top:.75rem">
+              <button class="btn-primary btn-sm" id="sec-config-save-btn" data-i18n="security.config.save">Save</button>
+              <button class="btn-ghost btn-sm" id="sec-config-cancel-btn" data-i18n="common.cancel">Cancel</button>
+              <span id="sec-config-msg" class="text-dim" style="font-size:.82rem;margin-left:.5rem"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active bans -->
         <div class="security-panel">
           <div class="section-header">
             <h3 data-i18n="security.bans.title">Active bans</h3>
@@ -203,7 +250,71 @@
           <div id="security-bans-list" class="fail2ban-list" style="margin-top:.75rem"></div>
         </div>
 
-        <div class="security-panel" style="margin-top:1rem">
+        <!-- IP Whitelist -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="security.whitelist.title">IP Whitelist</h3>
+            <span class="text-dim" style="font-size:.8rem" data-i18n="security.whitelist.subtitle">Never banned</span>
+          </div>
+          <div class="ban-input-row">
+            <input type="text" id="whitelist-ip-input" class="input-field" data-i18n-placeholder="security.whitelist.placeholder" placeholder="1.2.3.4 or 10.0.0.0/8">
+            <button class="btn-ghost btn-sm" id="whitelist-add-btn" data-i18n="security.whitelist.add">+ Add</button>
+          </div>
+          <div id="whitelist-list" class="fail2ban-list" style="margin-top:.75rem">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Fail2Ban log -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="security.jaillog.title">Fail2Ban log</h3>
+            <button class="btn-ghost btn-sm" id="jaillog-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+          </div>
+          <div id="jaillog-wrap" class="jaillog-wrap">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Active sessions -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="security.sessions.title">Active sessions</h3>
+            <button class="btn-ghost btn-sm" id="sessions-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+          </div>
+          <div id="sessions-list">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
+
+        <!-- TLS + Change password (side by side) -->
+        <div class="sec-info-row">
+          <div class="security-panel">
+            <div class="section-header">
+              <h3 data-i18n="security.tls.title">TLS Certificate</h3>
+            </div>
+            <div id="tls-info">
+              <div class="loading" data-i18n="common.loading">Loading…</div>
+            </div>
+          </div>
+          <div class="security-panel">
+            <div class="section-header">
+              <h3 data-i18n="security.password.title">Change password</h3>
+            </div>
+            <form id="password-form" autocomplete="off">
+              <div style="display:flex;flex-direction:column;gap:.5rem">
+                <input type="password" id="pw-current" class="input-field" autocomplete="current-password" data-i18n-placeholder="security.password.current" placeholder="Current password">
+                <input type="password" id="pw-new"     class="input-field" autocomplete="new-password"     data-i18n-placeholder="security.password.new"     placeholder="New password (min 8)">
+                <input type="password" id="pw-confirm" class="input-field" autocomplete="new-password"     data-i18n-placeholder="security.password.confirm"  placeholder="Confirm new password">
+                <div id="pw-msg" class="hidden" style="font-size:.82rem;margin-top:.1rem"></div>
+                <button type="submit" class="btn-primary btn-sm" style="align-self:flex-start" data-i18n="security.password.save">Change password</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Access log -->
+        <div class="security-panel">
           <div class="section-header">
             <h3 data-i18n="security.logs.title">Access log</h3>
             <label class="auto-refresh-label">

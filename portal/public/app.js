@@ -131,6 +131,54 @@ const I18N = {
     'security.logs.uri': 'Path',
     'security.logs.status': 'Status',
     'security.logs.duration': 'Duration',
+    // status bar
+    'security.myip': 'Your IP',
+    'security.status.title': 'Services',
+    'service.up': 'Online',
+    'service.down': 'Offline',
+    // config edit
+    'security.config.edit': '✎ Edit config',
+    'security.config.editTitle': 'Edit Fail2Ban config',
+    'security.config.seconds': 'seconds',
+    'security.config.save': 'Save',
+    'security.config.savedOk': 'Configuration saved.',
+    // whitelist
+    'security.whitelist.title': 'IP Whitelist',
+    'security.whitelist.subtitle': 'Never banned',
+    'security.whitelist.placeholder': 'e.g. 1.2.3.4 or 10.0.0.0/8',
+    'security.whitelist.add': '+ Add',
+    'security.whitelist.none': 'No whitelisted IPs.',
+    'security.whitelist.remove': 'Remove',
+    // fail2ban log
+    'security.jaillog.title': 'Fail2Ban log',
+    'security.jaillog.empty': 'No entries for this jail.',
+    'security.jaillog.noFile': 'Fail2Ban log file not found.',
+    // sessions
+    'security.sessions.title': 'Active sessions',
+    'security.sessions.revoke': 'Revoke',
+    'security.sessions.current': '● Current',
+    'security.sessions.none': 'No active sessions.',
+    // tls
+    'security.tls.title': 'TLS Certificate',
+    'security.tls.subject': 'Domain',
+    'security.tls.issuer': 'Issuer',
+    'security.tls.validTo': 'Expires',
+    'security.tls.type': 'Type',
+    'security.tls.internal': 'Internal (self-signed)',
+    'security.tls.acme': 'ACME (Let\'s Encrypt)',
+    'security.tls.daysLeft': '{n} days left',
+    'security.tls.expired': 'EXPIRED',
+    'security.tls.error': 'Unable to read certificate.',
+    // password
+    'security.password.title': 'Change password',
+    'security.password.current': 'Current password',
+    'security.password.new': 'New password (min 8 chars)',
+    'security.password.confirm': 'Confirm new password',
+    'security.password.save': 'Change password',
+    'security.password.mismatch': 'Passwords do not match.',
+    'security.password.tooShort': 'Minimum 8 characters.',
+    'security.password.success': 'Password changed successfully.',
+    'security.password.wrongCurrent': 'Current password is incorrect.',
   },
   fr: {
     'lang.label': 'Langue',
@@ -262,6 +310,54 @@ const I18N = {
     'security.logs.uri': 'Chemin',
     'security.logs.status': 'Statut',
     'security.logs.duration': 'Durée',
+    // barre de statut
+    'security.myip': 'Votre IP',
+    'security.status.title': 'Services',
+    'service.up': 'En ligne',
+    'service.down': 'Hors ligne',
+    // édition config
+    'security.config.edit': '✎ Modifier la config',
+    'security.config.editTitle': 'Modifier la config Fail2Ban',
+    'security.config.seconds': 'secondes',
+    'security.config.save': 'Enregistrer',
+    'security.config.savedOk': 'Configuration enregistrée.',
+    // liste blanche
+    'security.whitelist.title': 'Liste blanche IP',
+    'security.whitelist.subtitle': 'Jamais banni',
+    'security.whitelist.placeholder': 'ex. 1.2.3.4 ou 10.0.0.0/8',
+    'security.whitelist.add': '+ Ajouter',
+    'security.whitelist.none': 'Aucune IP en liste blanche.',
+    'security.whitelist.remove': 'Supprimer',
+    // journal fail2ban
+    'security.jaillog.title': 'Journal Fail2Ban',
+    'security.jaillog.empty': 'Aucune entrée pour cette prison.',
+    'security.jaillog.noFile': 'Fichier de log Fail2Ban introuvable.',
+    // sessions
+    'security.sessions.title': 'Sessions actives',
+    'security.sessions.revoke': 'Révoquer',
+    'security.sessions.current': '● Courante',
+    'security.sessions.none': 'Aucune session active.',
+    // tls
+    'security.tls.title': 'Certificat TLS',
+    'security.tls.subject': 'Domaine',
+    'security.tls.issuer': 'Émetteur',
+    'security.tls.validTo': 'Expiration',
+    'security.tls.type': 'Type',
+    'security.tls.internal': 'Interne (auto-signé)',
+    'security.tls.acme': 'ACME (Let\'s Encrypt)',
+    'security.tls.daysLeft': '{n} jours restants',
+    'security.tls.expired': 'EXPIRÉ',
+    'security.tls.error': 'Impossible de lire le certificat.',
+    // mot de passe
+    'security.password.title': 'Changer le mot de passe',
+    'security.password.current': 'Mot de passe actuel',
+    'security.password.new': 'Nouveau mot de passe (min 8 car.)',
+    'security.password.confirm': 'Confirmer le nouveau mot de passe',
+    'security.password.save': 'Changer le mot de passe',
+    'security.password.mismatch': 'Les mots de passe ne correspondent pas.',
+    'security.password.tooShort': 'Minimum 8 caractères.',
+    'security.password.success': 'Mot de passe changé avec succès.',
+    'security.password.wrongCurrent': 'Mot de passe actuel incorrect.',
   },
   zh: {
     'lang.label': '语言',
@@ -393,6 +489,54 @@ const I18N = {
     'security.logs.uri': '路径',
     'security.logs.status': '状态',
     'security.logs.duration': '耗时',
+    // status bar
+    'security.myip': '当前 IP',
+    'security.status.title': '服务状态',
+    'service.up': '在线',
+    'service.down': '离线',
+    // config edit
+    'security.config.edit': '✎ 编辑配置',
+    'security.config.editTitle': '编辑 Fail2Ban 配置',
+    'security.config.seconds': '秒',
+    'security.config.save': '保存',
+    'security.config.savedOk': '配置已保存。',
+    // whitelist
+    'security.whitelist.title': 'IP 白名单',
+    'security.whitelist.subtitle': '永不封禁',
+    'security.whitelist.placeholder': '如 1.2.3.4 或 10.0.0.0/8',
+    'security.whitelist.add': '+ 添加',
+    'security.whitelist.none': '暂无白名单 IP。',
+    'security.whitelist.remove': '移除',
+    // fail2ban log
+    'security.jaillog.title': 'Fail2Ban 日志',
+    'security.jaillog.empty': '该 jail 暂无日志。',
+    'security.jaillog.noFile': '未找到 Fail2Ban 日志文件。',
+    // sessions
+    'security.sessions.title': '活跃会话',
+    'security.sessions.revoke': '撤销',
+    'security.sessions.current': '● 当前',
+    'security.sessions.none': '暂无活跃会话。',
+    // tls
+    'security.tls.title': 'TLS 证书',
+    'security.tls.subject': '域名',
+    'security.tls.issuer': '颁发者',
+    'security.tls.validTo': '到期时间',
+    'security.tls.type': '类型',
+    'security.tls.internal': '内部（自签名）',
+    'security.tls.acme': 'ACME（Let\'s Encrypt）',
+    'security.tls.daysLeft': '剩余 {n} 天',
+    'security.tls.expired': '已过期',
+    'security.tls.error': '无法读取证书信息。',
+    // password
+    'security.password.title': '修改密码',
+    'security.password.current': '当前密码',
+    'security.password.new': '新密码（至少 8 位）',
+    'security.password.confirm': '确认新密码',
+    'security.password.save': '修改密码',
+    'security.password.mismatch': '两次密码不一致。',
+    'security.password.tooShort': '至少需要 8 个字符。',
+    'security.password.success': '密码修改成功。',
+    'security.password.wrongCurrent': '当前密码不正确。',
   },
 };
 
@@ -413,6 +557,10 @@ const state = {
   security:         { config: null, bans: null },
   securityLogFilter: '',
   logAutoRefreshId: null,
+  systemStatus:     null,
+  whitelist:        null,
+  sessions:         null,
+  tlsCert:          null,
   serverName:       'vpn-server',
   lang:             'en',
 };
@@ -1125,6 +1273,10 @@ async function loadSecurity() {
     document.getElementById('sec-bantime').textContent  = fmtSeconds(config.bantime);
     document.getElementById('sec-findtime').textContent = fmtSeconds(config.findtime);
     document.getElementById('sec-maxretry').textContent = String(config.maxretry);
+    // Pre-fill edit form
+    document.getElementById('edit-bantime').value  = config.bantime;
+    document.getElementById('edit-findtime').value = config.findtime;
+    document.getElementById('edit-maxretry').value = config.maxretry;
   }
 
   if (bans) {
@@ -1133,7 +1285,16 @@ async function loadSecurity() {
     document.getElementById('sec-current-bans').textContent = String(bans.currentlyBanned || 0);
   }
 
-  await loadLogs(state.securityLogFilter);
+  // Load all additional panels in parallel
+  await Promise.all([
+    loadLogs(state.securityLogFilter),
+    loadSystemStatus(),
+    loadWhitelist(),
+    loadJailLog(),
+    loadSessions(),
+    loadTlsCert(),
+    loadMyIp(),
+  ]);
 }
 
 async function loadLogs(filter) {
@@ -1163,10 +1324,14 @@ function renderSecurityBans(data) {
 
   listEl.innerHTML = ips.map(ip => `
     <div class="fail2ban-item">
-      <code>${esc(ip)}</code>
+      <div style="display:flex;align-items:center;gap:.6rem;flex:1;min-width:0">
+        <code>${esc(ip)}</code>
+        <span class="geo-tag" data-geo-ip="${esc(ip)}"></span>
+      </div>
       <button class="btn-ghost btn-sm" style="color:var(--orange)" data-action="sec-unban" data-ip="${esc(ip)}">${esc(t('fail2ban.unban'))}</button>
     </div>
   `).join('');
+  loadGeoForBans();
 }
 
 function renderLogTable(data) {
@@ -1211,10 +1376,164 @@ function renderLogTable(data) {
   `;
 }
 
-async function banIp(ip) {
+// ── My IP ────────────────────────────────────────────────────────────────────
+
+async function loadMyIp() {
+  const data = await GET('/api/myip');
+  const el = document.getElementById('sec-my-ip-val');
+  if (el) el.textContent = data?.ip || '—';
+}
+
+// ── Service status ────────────────────────────────────────────────────────────
+
+async function loadSystemStatus() {
+  const data = await GET('/api/system/status');
+  if (!data) return;
+  state.systemStatus = data;
+  const map = { portal: 'svc-portal', 'wg-easy': 'svc-wgeasy', adguard: 'svc-adguard', caddy: 'svc-caddy' };
+  for (const [key, elId] of Object.entries(map)) {
+    const el = document.getElementById(elId);
+    if (!el) continue;
+    const svc = data[key];
+    el.classList.toggle('svc-up',   !!svc?.up);
+    el.classList.toggle('svc-down', !svc?.up);
+    const dot = el.querySelector('.dot');
+    if (dot) dot.style.color = svc?.up ? 'var(--green)' : 'var(--red)';
+    el.title = svc?.up ? t('service.up') : (svc?.error || t('service.down'));
+  }
+}
+
+// ── Whitelist ─────────────────────────────────────────────────────────────────
+
+async function loadWhitelist() {
+  const data = await GET('/api/fail2ban/ignoreip');
+  if (data) renderWhitelist(data.ips || []);
+}
+
+function renderWhitelist(ips) {
+  state.whitelist = ips;
+  const el = document.getElementById('whitelist-list');
+  if (!el) return;
+  if (!ips.length) {
+    el.innerHTML = `<div class="text-dim" style="font-size:.85rem;padding:.4rem 0">${esc(t('security.whitelist.none'))}</div>`;
+    return;
+  }
+  el.innerHTML = ips.map(ip => `
+    <div class="fail2ban-item">
+      <code>${esc(ip)}</code>
+      <button class="btn-ghost btn-sm" data-action="whitelist-remove" data-ip="${esc(ip)}">${esc(t('security.whitelist.remove'))}</button>
+    </div>
+  `).join('');
+}
+
+async function addWhitelistIp(ip) {
   ip = (ip || '').trim();
   if (!ip) return;
-  const data = await POST('/api/fail2ban/ban', { ip });
+  const data = await POST('/api/fail2ban/ignoreip', { ip });
+  if (!data || data.error) { window.alert(data?.error || 'Error'); return; }
+  renderWhitelist(data.ips || []);
+  document.getElementById('whitelist-ip-input').value = '';
+}
+
+async function removeWhitelistIp(ip) {
+  const data = await DEL('/api/fail2ban/ignoreip', { ip });
+  if (!data || data.error) { window.alert(data?.error || 'Error'); return; }
+  renderWhitelist(data.ips || []);
+}
+
+// ── Fail2Ban jail log ─────────────────────────────────────────────────────────
+
+async function loadJailLog() {
+  const data = await GET('/api/fail2ban/jaillog?n=100');
+  const el = document.getElementById('jaillog-wrap');
+  if (!el) return;
+  if (!data) return;
+  if (data.error && !data.lines?.length) {
+    el.innerHTML = `<div class="text-dim" style="padding:.5rem 0;font-size:.82rem">${esc(data.error || t('security.jaillog.noFile'))}</div>`;
+    return;
+  }
+  const lines = data.lines || [];
+  if (!lines.length) {
+    el.innerHTML = `<div class="text-dim" style="padding:.5rem 0;font-size:.82rem">${esc(t('security.jaillog.empty'))}</div>`;
+    return;
+  }
+  el.innerHTML = `<pre class="jaillog-pre">${esc(lines.join('\n'))}</pre>`;
+}
+
+// ── Active sessions ───────────────────────────────────────────────────────────
+
+async function loadSessions() {
+  const data = await GET('/api/sessions');
+  const el = document.getElementById('sessions-list');
+  if (!el || !data) return;
+  const sessions = data.sessions || [];
+  if (!sessions.length) {
+    el.innerHTML = `<div class="text-dim" style="font-size:.85rem;padding:.4rem 0">${esc(t('security.sessions.none'))}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="log-table-wrap"><table class="log-table">
+    <thead><tr>
+      <th>IP</th><th>User-Agent</th><th data-i18n="security.sessions.title">Login</th><th></th>
+    </tr></thead>
+    <tbody>${sessions.map(s => `<tr>
+      <td><code class="log-ip">${esc(s.ip)}</code></td>
+      <td class="log-uri" style="max-width:220px" title="${esc(s.ua)}">${esc(s.ua.length > 50 ? s.ua.slice(0, 50) + '…' : s.ua)}</td>
+      <td class="log-time">${esc(new Date(s.loginAt).toLocaleString())}</td>
+      <td>${s.isCurrent
+        ? `<span style="color:var(--green);font-size:.78rem;font-weight:600">${esc(t('security.sessions.current'))}</span>`
+        : `<button class="btn-ghost btn-sm" style="color:var(--red)" data-action="revoke-session" data-id="${esc(s.id)}">${esc(t('security.sessions.revoke'))}</button>`
+      }</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ── TLS certificate ───────────────────────────────────────────────────────────
+
+async function loadTlsCert() {
+  const data = await GET('/api/tls/cert');
+  const el = document.getElementById('tls-info');
+  if (!el) return;
+  if (!data || data.error) {
+    el.innerHTML = `<div class="text-dim" style="font-size:.85rem">${esc(data?.error || t('security.tls.error'))}</div>`;
+    return;
+  }
+  state.tlsCert = data;
+
+  const expiryDate = new Date(data.validTo);
+  const daysLeft   = Math.ceil((expiryDate - Date.now()) / 86400000);
+  const expired    = daysLeft <= 0;
+  const expiryColor = expired ? 'var(--red)' : daysLeft < 30 ? 'var(--orange)' : 'var(--green)';
+  const expiryLabel = expired ? t('security.tls.expired') : t('security.tls.daysLeft', { n: daysLeft });
+
+  el.innerHTML = `<div class="tls-grid">
+    <div class="tls-row"><span class="tls-key">${esc(t('security.tls.subject'))}</span><span class="tls-val"><code>${esc(data.subject)}</code></span></div>
+    <div class="tls-row"><span class="tls-key">${esc(t('security.tls.issuer'))}</span><span class="tls-val">${esc(data.issuer)}</span></div>
+    <div class="tls-row"><span class="tls-key">${esc(t('security.tls.type'))}</span><span class="tls-val">${esc(data.isInternal ? t('security.tls.internal') : t('security.tls.acme'))}</span></div>
+    <div class="tls-row"><span class="tls-key">${esc(t('security.tls.validTo'))}</span><span class="tls-val" style="color:${expiryColor};font-weight:600">${esc(data.validTo)} <span style="font-size:.78rem">(${esc(expiryLabel)})</span></span></div>
+  </div>`;
+}
+
+// ── GeoIP flag ────────────────────────────────────────────────────────────────
+
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+async function loadGeoForBans() {
+  const flags = document.querySelectorAll('[data-geo-ip]');
+  for (const el of flags) {
+    const ip = el.dataset.geoIp;
+    const data = await GET(`/api/geoip/${encodeURIComponent(ip)}`);
+    if (data?.status === 'success') {
+      el.textContent = `${countryFlag(data.countryCode)} ${data.country}`;
+    } else {
+      el.textContent = '';
+    }
+  }
+}
+
+async function banIp(ip) {
   if (!data || data.error) { window.alert(data?.error || 'Error banning IP.'); return; }
   state.security.bans = data;
   renderSecurityBans(data);
@@ -1314,4 +1633,97 @@ document.getElementById('log-auto-refresh').addEventListener('change', e => {
   if (e.target.checked) {
     state.logAutoRefreshId = setInterval(() => loadLogs(state.securityLogFilter), 5000);
   }
+});
+
+// ── Security: config edit ─────────────────────────────────────────────────────
+
+document.getElementById('sec-edit-config-btn').addEventListener('click', () => {
+  document.getElementById('sec-config-edit-panel').classList.toggle('hidden');
+});
+
+document.getElementById('sec-config-cancel-btn').addEventListener('click', () => {
+  document.getElementById('sec-config-edit-panel').classList.add('hidden');
+});
+
+document.getElementById('sec-config-save-btn').addEventListener('click', async () => {
+  const bantime  = parseInt(document.getElementById('edit-bantime').value, 10);
+  const findtime = parseInt(document.getElementById('edit-findtime').value, 10);
+  const maxretry = parseInt(document.getElementById('edit-maxretry').value, 10);
+  const msgEl = document.getElementById('sec-config-msg');
+  msgEl.textContent = t('common.processing');
+  const data = await POST('/api/fail2ban/set-config', { bantime, findtime, maxretry });
+  if (!data || data.error) { msgEl.style.color = 'var(--red)'; msgEl.textContent = data?.error || 'Error'; return; }
+  state.security.config = data;
+  document.getElementById('sec-bantime').textContent  = fmtSeconds(data.bantime);
+  document.getElementById('sec-findtime').textContent = fmtSeconds(data.findtime);
+  document.getElementById('sec-maxretry').textContent = String(data.maxretry);
+  msgEl.style.color = 'var(--green)';
+  msgEl.textContent = t('security.config.savedOk');
+  setTimeout(() => { msgEl.textContent = ''; document.getElementById('sec-config-edit-panel').classList.add('hidden'); }, 1500);
+});
+
+// ── Security: whitelist ───────────────────────────────────────────────────────
+
+document.getElementById('whitelist-add-btn').addEventListener('click', () =>
+  addWhitelistIp(document.getElementById('whitelist-ip-input').value));
+
+document.getElementById('whitelist-ip-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addWhitelistIp(e.target.value);
+});
+
+document.getElementById('whitelist-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="whitelist-remove"]');
+  if (!btn) return;
+  await removeWhitelistIp(btn.dataset.ip);
+});
+
+// ── Security: jail log ────────────────────────────────────────────────────────
+
+document.getElementById('jaillog-refresh-btn').addEventListener('click', loadJailLog);
+
+// ── Security: sessions ────────────────────────────────────────────────────────
+
+document.getElementById('sessions-refresh-btn').addEventListener('click', loadSessions);
+
+document.getElementById('sessions-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="revoke-session"]');
+  if (!btn) return;
+  const data = await DEL(`/api/sessions/${encodeURIComponent(btn.dataset.id)}`);
+  if (!data || data.error) { window.alert(data?.error || 'Error'); return; }
+  loadSessions();
+});
+
+// ── Security: change password ─────────────────────────────────────────────────
+
+document.getElementById('password-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const current  = document.getElementById('pw-current').value;
+  const newPw    = document.getElementById('pw-new').value;
+  const confirm  = document.getElementById('pw-confirm').value;
+  const msgEl    = document.getElementById('pw-msg');
+  msgEl.className = '';
+
+  if (newPw.length < 8) {
+    msgEl.textContent = t('security.password.tooShort');
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+  if (newPw !== confirm) {
+    msgEl.textContent = t('security.password.mismatch');
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+  const data = await POST('/api/auth/password', { currentPassword: current, newPassword: newPw });
+  if (!data || data.error) {
+    msgEl.textContent = data?.error === 'Current password is incorrect.'
+      ? t('security.password.wrongCurrent')
+      : (data?.error || 'Error');
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+  msgEl.textContent = t('security.password.success');
+  msgEl.style.color = 'var(--green)';
+  document.getElementById('pw-current').value = '';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-confirm').value = '';
 });

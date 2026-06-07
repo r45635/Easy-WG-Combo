@@ -399,3 +399,56 @@ tbody tr:last-child td { border-bottom: none; }
 .log-uri  { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             color: var(--text-dim); font-size: .8rem; font-family: monospace; }
 .log-dur  { color: var(--text-faint); font-family: monospace; font-size: .76rem; white-space: nowrap; }
+
+/* ── Security: status bar ── */
+.sec-status-bar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: .6rem 1.2rem; padding: .6rem 1rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  margin-bottom: 1.2rem; font-size: .84rem;
+}
+.sec-my-ip { display: flex; align-items: center; gap: .5rem; }
+.sec-my-ip-label { color: var(--text-dim); font-size: .8rem; }
+.sec-my-ip code  { color: var(--primary); font-size: .88rem; }
+.sec-services { display: flex; flex-wrap: wrap; gap: .4rem; }
+.svc-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .2rem .65rem; border-radius: 99px;
+  border: 1px solid var(--border); font-size: .78rem; color: var(--text-dim);
+  transition: all var(--trans);
+}
+.svc-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+.svc-up   { color: var(--green); border-color: var(--green)44; background: var(--green)0d; }
+.svc-down { color: var(--red);   border-color: var(--red)44;   background: var(--red)0d;   }
+
+/* ── Security: config edit form ── */
+.sec-edit-form {
+  display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-end; margin-top: .25rem;
+}
+.sec-edit-field {
+  display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; color: var(--text-dim);
+}
+.sec-edit-unit { font-size: .74rem; color: var(--text-faint); }
+
+/* ── Security: geo tag ── */
+.geo-tag { font-size: .8rem; color: var(--text-dim); white-space: nowrap; }
+
+/* ── Security: Fail2Ban jail log ── */
+.jaillog-wrap { max-height: 260px; overflow-y: auto; margin-top: .4rem; }
+.jaillog-pre {
+  font-family: monospace; font-size: .76rem; color: var(--text-dim);
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .65rem .85rem; overflow-x: auto; white-space: pre; line-height: 1.55;
+}
+
+/* ── Security: TLS info grid ── */
+.tls-grid { display: flex; flex-direction: column; gap: .45rem; font-size: .85rem; }
+.tls-row  { display: flex; gap: .75rem; align-items: baseline; }
+.tls-key  { color: var(--text-dim); min-width: 90px; font-size: .8rem; flex-shrink: 0; }
+.tls-val  { color: var(--text); }
+
+/* ── Security: TLS + password side-by-side ── */
+.sec-info-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+}
+@media (max-width: 720px) { .sec-info-row { grid-template-columns: 1fr; } }
