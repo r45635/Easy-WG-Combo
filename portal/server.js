@@ -187,21 +187,41 @@ function buildUpstreamPath(req, basePath) {
   return pathValue || '/';
 }
 
-function proxyTo(basePath, targetBaseUrl) {
+function proxyTo(basePath, targetBaseUrl, opts = {}) {
   return async (req, res) => {
     try {
+      // Ensure wg-easy session is active before proxying
+      if (opts.wgAuth && !wgCookie) await wgAuth();
+
       const upstreamPath = buildUpstreamPath(req, basePath);
       const upstreamUrl = new URL(upstreamPath, targetBaseUrl);
 
+      const headers = forwardReqHeaders(req);
+
+      // Inject managed wg-easy session cookie (replaces browser cookies)
+      if (opts.wgAuth) headers.cookie = wgCookie || '';
+
+      // Inject AdGuard Basic auth (overrides any browser auth header)
+      if (opts.agAuth) {
+        delete headers.authorization;
+        Object.assign(headers, agAuth());
+      }
+
       const init = {
         method: req.method,
-        headers: forwardReqHeaders(req),
+        headers,
         redirect: 'manual',
       };
 
       if (!['GET', 'HEAD'].includes(req.method)) {
-        init.body = req;
-        init.duplex = 'half';
+        const ct = (req.headers['content-type'] || '').toLowerCase();
+        if (ct.includes('application/json')) {
+          // express.json() already consumed the stream — re-serialize from req.body
+          init.body = JSON.stringify(req.body ?? {});
+        } else {
+          init.body = req;
+          init.duplex = 'half';
+        }
       }
 
       const upstream = await fetch(upstreamUrl, init);
@@ -243,8 +263,15 @@ function proxyTo(basePath, targetBaseUrl) {
   };
 }
 
-app.use('/wireguard', auth, proxyTo('/wireguard', WG_URL));
-app.use('/adguard', auth, proxyTo('/adguard', AG_URL));
+// wg-easy iframe SPA: its JS makes absolute calls to /api/session and /api/wireguard/*
+// These must be declared BEFORE the portal's own /api/* routes
+app.use('/api/session',   auth, proxyTo('/api/session',   WG_URL, { wgAuth: true }));
+app.use('/api/wireguard', auth, proxyTo('/api/wireguard', WG_URL, { wgAuth: true }));
+app.use('/wireguard',     auth, proxyTo('/wireguard',     WG_URL, { wgAuth: true }));
+
+// AdGuard iframe SPA: its JS makes absolute calls to /control/*
+app.use('/control', auth, proxyTo('/control', AG_URL, { agAuth: true }));
+app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
