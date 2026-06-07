@@ -233,6 +233,8 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
         if (key.toLowerCase() === 'set-cookie') return;
         if (key.toLowerCase() === 'x-frame-options') return;
         if (key.toLowerCase() === 'content-security-policy') return;
+        if (key.toLowerCase() === 'content-encoding') return;  // body is decompressed by fetch
+        if (key.toLowerCase() === 'content-length') return;    // length changes after decompression
         if (key.toLowerCase() === 'location' && value.startsWith('/')) {
           res.setHeader('location', `${basePath}${value}`);
           return;
