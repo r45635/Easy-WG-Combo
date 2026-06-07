@@ -21,6 +21,7 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Auto DNS discovery** — existing clients' DNS presets detected on first load
 - **WireGuard & AdGuard UIs** — embedded as iframes for advanced config
 - **Multilingual portal UI** — language switcher with full interface coverage in **English, French, and Chinese**
+- **Server name support** — prompted during deployment, shown in the dashboard, editable later from the UI, and embedded in generated `.conf` filenames
 
 ## Screenshots
 
@@ -58,7 +59,7 @@ Example baseline server sizing:
 From a fresh Debian/Ubuntu VPS, you can run everything with a single download-and-execute command:
 
 ```bash
-export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22
+export WG_HOST=YOUR_VPS_IP SERVER_NAME=vpn_toronto ADMIN_PASSWORD='yourpassword' SSH_PORT=22
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
 ```
 
@@ -79,6 +80,11 @@ sudo ./bootstrap.sh
 When existing containers/data are detected, the bootstrap now asks what to do:
 - `keep` — keep existing configuration and just start/restart the stack
 - `new` — start a new configuration (a backup is created first)
+
+The bootstrap also asks for a short server name.
+- Default on a fresh install: the VPS hostname
+- Default on an existing install: the current saved server name
+- Allowed characters: letters, numbers, `-` and `_` only
 
 For non-interactive runs, set the action explicitly:
 

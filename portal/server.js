@@ -4,6 +4,7 @@ const express    = require('express');
 const session    = require('express-session');
 const QRCode     = require('qrcode');
 const fs         = require('fs');
+const os         = require('os');
 const path       = require('path');
 
 const app  = express();
@@ -18,6 +19,7 @@ const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
 
 const WG_EXT_PORT  = process.env.WG_EASY_EXTERNAL_PORT  || '51821';
 const AG_EXT_PORT  = process.env.ADGUARD_EXTERNAL_PORT  || '3000';
+const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 
 const DNS_PRESETS = [
   { id: 'filtered', label: 'Filtré complet',    value: '10.8.0.1' },
@@ -30,6 +32,40 @@ function dnsToPreset(dns) {
 }
 
 const DATA_FILE = '/data/client-dns.json';
+const SETTINGS_FILE = '/data/portal-config.json';
+
+function sanitizeServerName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+    || 'vpn-server';
+}
+
+function isValidServerName(value) {
+  return /^[A-Za-z0-9_-]+$/.test(String(value || ''));
+}
+
+function loadSettings() {
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); }
+  catch { return {}; }
+}
+
+function saveSettings(data) {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
+}
+
+function getServerName() {
+  return loadSettings().serverName || sanitizeServerName(DEFAULT_SERVER_NAME);
+}
+
+function setServerName(serverName) {
+  const settings = loadSettings();
+  settings.serverName = serverName;
+  saveSettings(settings);
+}
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
@@ -128,7 +164,18 @@ app.get('/api/me', (req, res) => res.json({ authenticated: !!req.session.ok }));
 app.get('/api/config', auth, (_req, res) => res.json({
   wgEasyPort:  WG_EXT_PORT,
   adguardPort: AG_EXT_PORT,
+  serverName:  getServerName(),
 }));
+
+app.post('/api/server-name', auth, (req, res) => {
+  const serverName = String(req.body.serverName || '').trim();
+  if (!isValidServerName(serverName)) {
+    return res.status(400).json({ error: 'Invalid server name. Use only letters, numbers, - or _.' });
+  }
+
+  setServerName(serverName);
+  res.json({ success: true, serverName });
+});
 
 // ── WireGuard clients ─────────────────────────────────────────────────────────
 

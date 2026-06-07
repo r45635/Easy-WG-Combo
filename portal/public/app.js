@@ -3,6 +3,7 @@
 const I18N = {
   en: {
     'lang.label': 'Language',
+    'portal.subtitle': 'Admin Portal',
     'login.passwordPlaceholder': 'Password',
     'login.submit': 'Sign in',
     'login.invalid': 'Invalid password',
@@ -17,6 +18,10 @@ const I18N = {
     'dashboard.dnsQueries': 'DNS queries today',
     'dashboard.blocked': 'Blocked',
     'dashboard.recentClients': 'Recent clients',
+    'server.label': 'Server',
+    'server.rename': '✎ Rename server',
+    'server.prompt': 'Server name (letters, numbers, - and _ only):',
+    'server.invalid': 'Invalid server name. Use only letters, numbers, - or _.',
     'dns.helpButton': '? DNS Filters',
     'common.loading': 'Loading…',
     'common.cancel': 'Cancel',
@@ -94,6 +99,7 @@ const I18N = {
   },
   fr: {
     'lang.label': 'Langue',
+    'portal.subtitle': 'Portail admin',
     'login.passwordPlaceholder': 'Mot de passe',
     'login.submit': 'Connexion',
     'login.invalid': 'Mot de passe incorrect',
@@ -108,6 +114,10 @@ const I18N = {
     'dashboard.dnsQueries': 'Requêtes DNS aujourd\'hui',
     'dashboard.blocked': 'Bloquées',
     'dashboard.recentClients': 'Clients récents',
+    'server.label': 'Serveur',
+    'server.rename': '✎ Renommer le serveur',
+    'server.prompt': 'Nom du serveur (lettres, chiffres, - et _ uniquement) :',
+    'server.invalid': 'Nom invalide. Utilisez uniquement des lettres, chiffres, - ou _.',
     'dns.helpButton': '? Filtres DNS',
     'common.loading': 'Chargement…',
     'common.cancel': 'Annuler',
@@ -185,6 +195,7 @@ const I18N = {
   },
   zh: {
     'lang.label': '语言',
+    'portal.subtitle': '管理门户',
     'login.passwordPlaceholder': '密码',
     'login.submit': '登录',
     'login.invalid': '密码错误',
@@ -199,6 +210,10 @@ const I18N = {
     'dashboard.dnsQueries': '今日 DNS 请求',
     'dashboard.blocked': '已拦截',
     'dashboard.recentClients': '最近客户端',
+    'server.label': '服务器',
+    'server.rename': '✎ 重命名服务器',
+    'server.prompt': '服务器名称（仅允许字母、数字、- 和 _）：',
+    'server.invalid': '服务器名称无效。仅允许字母、数字、- 和 _。',
     'dns.helpButton': '? DNS 过滤说明',
     'common.loading': '加载中…',
     'common.cancel': '取消',
@@ -289,6 +304,7 @@ const state = {
   clients:       [],
   iframesLoaded: { wireguard: false, adguard: false },
   iframePorts:   { wg: '51821', ag: '3000' },
+  serverName:    'vpn-server',
   lang:          'en',
 };
 
@@ -332,6 +348,8 @@ function applyI18n() {
     el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
   });
 
+  renderServerName();
+
   if (state.tab === 'dashboard') {
     renderDashClientList(state.clients.slice(0, 6));
   }
@@ -354,6 +372,25 @@ function setLanguage(lang) {
   localStorage.setItem('portalLang', lang);
   syncLangSelectors();
   applyI18n();
+}
+
+function renderServerName() {
+  ['login-server-name', 'sidebar-server-name', 'dashboard-server-name'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = state.serverName || 'vpn-server';
+  });
+}
+
+function isValidServerName(name) {
+  return /^[A-Za-z0-9_-]+$/.test(String(name || '').trim());
+}
+
+function safeFileToken(name) {
+  return String(name || '')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'config';
 }
 
 async function api(method, path, body) {
@@ -418,6 +455,28 @@ async function loadConfig() {
   if (!cfg) return;
   state.iframePorts.wg = cfg.wgEasyPort || '51821';
   state.iframePorts.ag = cfg.adguardPort || '3000';
+  state.serverName = cfg.serverName || 'vpn-server';
+  renderServerName();
+}
+
+async function renameServer() {
+  const nextName = window.prompt(t('server.prompt'), state.serverName || 'vpn-server');
+  if (nextName === null) return;
+
+  const trimmed = nextName.trim();
+  if (!isValidServerName(trimmed)) {
+    window.alert(t('server.invalid'));
+    return;
+  }
+
+  const data = await POST('/api/server-name', { serverName: trimmed });
+  if (!data || data.error) {
+    window.alert(data?.error || t('server.invalid'));
+    return;
+  }
+
+  state.serverName = data.serverName;
+  renderServerName();
 }
 
 async function loadDashboard() {
@@ -679,7 +738,7 @@ function downloadConfigFile(config, name) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), {
     href: url,
-    download: `wireguard-${String(name).replace(/\s+/g, '-')}.conf`,
+    download: `wireguard-${safeFileToken(state.serverName)}-${safeFileToken(name)}.conf`,
   });
   a.click();
   URL.revokeObjectURL(url);
@@ -846,6 +905,7 @@ document.getElementById('help-dns-btn2').addEventListener('click', openHelpModal
 document.getElementById('help-close-btn').addEventListener('click', closeHelpModal);
 document.getElementById('help-ok-btn').addEventListener('click', closeHelpModal);
 document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
+document.getElementById('rename-server-btn').addEventListener('click', renameServer);
 
 document.getElementById('filter-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('filter-overlay')) closeFilterModal();

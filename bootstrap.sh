@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 SECRETS_FILE="$SCRIPT_DIR/.env.secrets"
+PORTAL_SETTINGS_FILE="$SCRIPT_DIR/portal/data/portal-config.json"
 
 log() {
   printf '%s\n' "$*"
@@ -185,6 +186,32 @@ escape_sed_replacement() {
   printf '%s' "$1" | sed -e 's/[&|\\]/\\&/g'
 }
 
+sanitize_server_name() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g'
+}
+
+validate_server_name() {
+  [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]
+}
+
+current_server_name() {
+  local current_name=""
+
+  if [ -f "$PORTAL_SETTINGS_FILE" ]; then
+    current_name="$(sed -n 's/.*"serverName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$PORTAL_SETTINGS_FILE" | head -n 1)"
+  fi
+
+  if [ -z "$current_name" ] && [ -f "$ENV_FILE" ]; then
+    current_name="$(sed -n 's/^SERVER_NAME=//p' "$ENV_FILE" | head -n 1)"
+  fi
+
+  if [ -z "$current_name" ]; then
+    current_name="$(sanitize_server_name "$(hostname 2>/dev/null || printf 'vpn-server')")"
+  fi
+
+  printf '%s' "$current_name"
+}
+
 set_env_value() {
   local file="$1"
   local key="$2"
@@ -210,6 +237,40 @@ set_password_hash_secret() {
   grep -vE '^(export[[:space:]]+)?PASSWORD_HASH=' "$file" > "$tmp_file" || true
   printf "export PASSWORD_HASH='%s'\n" "$hash" >> "$tmp_file"
   mv "$tmp_file" "$file"
+}
+
+set_portal_server_name() {
+  local server_name="$1"
+
+  mkdir -p "$(dirname "$PORTAL_SETTINGS_FILE")"
+  printf '{\n  "serverName": "%s"\n}\n' "$server_name" > "$PORTAL_SETTINGS_FILE"
+}
+
+resolve_server_name() {
+  local server_name="${SERVER_NAME:-}"
+  local default_name
+
+  default_name="$(current_server_name)"
+
+  if [ -n "$server_name" ]; then
+    validate_server_name "$server_name" || die "Invalid SERVER_NAME '$server_name'. Use only letters, numbers, '-' or '_' without spaces."
+    printf '%s' "$server_name"
+    return
+  fi
+
+  if [ -t 0 ]; then
+    while true; do
+      read -r -p "Server name [$default_name]: " server_name
+      server_name="${server_name:-$default_name}"
+      if validate_server_name "$server_name"; then
+        printf '%s' "$server_name"
+        return
+      fi
+      printf '%s\n' "Server name must be short and use only letters, numbers, '-' or '_' without spaces."
+    done
+  fi
+
+  printf '%s' "$default_name"
 }
 
 default_wg_host() {
@@ -313,6 +374,9 @@ main() {
 
   local wg_host="${WG_HOST:-${1:-}}"
   local admin_password="${ADMIN_PASSWORD:-${2:-}}"
+  local server_name
+
+  server_name="$(resolve_server_name)"
 
   if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
     if [ -z "$wg_host" ]; then
@@ -337,6 +401,13 @@ main() {
     log "Writing configuration files..."
     set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
     set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
+  fi
+
+  log "Saving server name..."
+  set_env_value "$ENV_FILE" "SERVER_NAME" "$server_name"
+  set_portal_server_name "$server_name"
+
+  if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
 
