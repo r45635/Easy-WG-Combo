@@ -30,6 +30,121 @@ has_tty() {
   [ -t 0 ] || [ -r /dev/tty ]
 }
 
+read_prompt() {
+  local prompt="$1"
+  local __var_name="$2"
+  local value=""
+
+  if [ -t 0 ]; then
+    read -r -p "$prompt" value
+  else
+    read -r -p "$prompt" value </dev/tty
+  fi
+
+  printf -v "$__var_name" '%s' "$value"
+}
+
+resolve_install_dir() {
+  local answer=""
+  local default_dir="$APP_DIR"
+
+  if [ -n "${APP_DIR_OVERRIDE_LOCK:-}" ]; then
+    return
+  fi
+
+  if has_tty; then
+    read_prompt "Installation path [$default_dir]: " answer
+    answer="${answer:-$default_dir}"
+    APP_DIR="$answer"
+  fi
+}
+
+path_has_existing_install() {
+  local dir="$1"
+
+  if [ -d "$dir/.git" ]; then
+    return 0
+  fi
+
+  [ -d "$dir" ] && [ -n "$(find "$dir" -mindepth 1 -print -quit 2>/dev/null)" ]
+}
+
+remove_installation_completely() {
+  local dir="$1"
+
+  log "Removing existing Easy-WG-Combo installation from $dir..."
+
+  if [ -x "$dir/compose.sh" ]; then
+    (
+      cd "$dir"
+      ./compose.sh down --remove-orphans >/dev/null 2>&1 || true
+    )
+  fi
+
+  run_root docker rm -f wg-easy adguard portal caddy >/dev/null 2>&1 || true
+  run_root rm -rf "$dir"
+
+  log "Removal completed."
+}
+
+handle_existing_installation() {
+  local action=""
+  local new_dir=""
+
+  if ! path_has_existing_install "$APP_DIR"; then
+    return
+  fi
+
+  if ! has_tty; then
+    return
+  fi
+
+  log ""
+  log "Existing installation detected at: $APP_DIR"
+  log "Choose an action:"
+  log "  [upgrade] Update existing installation in this path"
+  log "  [new]     Install to a different path"
+  log "  [remove]  Remove installation completely and exit"
+
+  while true; do
+    read_prompt "Action (upgrade/new/remove) [upgrade]: " action
+    action="${action:-upgrade}"
+
+    case "${action,,}" in
+      u|upgrade)
+        return
+        ;;
+      n|new)
+        while true; do
+          read_prompt "New installation path: " new_dir
+          [ -n "$new_dir" ] || { log "Please provide a path."; continue; }
+          if [ "$new_dir" = "$APP_DIR" ]; then
+            log "Please choose a different path than the current installation."
+            continue
+          fi
+          APP_DIR="$new_dir"
+          if path_has_existing_install "$APP_DIR"; then
+            log "Path already contains files. Choose another path or use upgrade/remove."
+            continue
+          fi
+          return
+        done
+        ;;
+      r|remove)
+        read_prompt "Confirm complete removal? Type 'yes' to continue: " action
+        if [ "${action,,}" = "yes" ]; then
+          remove_installation_completely "$APP_DIR"
+          exit 0
+        fi
+        log "Removal cancelled."
+        ;;
+      *)
+        log "Please answer upgrade, new, or remove."
+        ;;
+    esac
+  done
+}
+
 ensure_git() {
   if command -v git >/dev/null 2>&1; then
     return
@@ -54,6 +169,8 @@ run_bootstrap() {
 main() {
   require_cmd apt-get
   ensure_git
+  resolve_install_dir
+  handle_existing_installation
 
   if ! has_tty && { [ -z "${WG_HOST:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; }; then
     die "Non-interactive mode detected. Set WG_HOST and ADMIN_PASSWORD (optional: SERVER_NAME, ADMIN_DOMAIN, TLS_EMAIL, PUBLIC_HTTPS_ENABLED, SSH_PORT, BACKUP_DIR=/path, EXISTING_CONFIG_ACTION=keep|new)."

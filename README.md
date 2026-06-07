@@ -73,6 +73,14 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Interactive installer UX (user-friendly defaults):
+- Prompts for installation path (default: `~/Easy-WG-Combo`).
+- Detects an existing installation in that path.
+- Offers explicit actions:
+  - `upgrade` (default): update and continue in the same path
+  - `new`: pick another path for a fresh install
+  - `remove`: complete removal of the installation and containers, then exit
+
 If you already cloned the repository on the VPS, you can run the bootstrap directly:
 
 ```bash
@@ -90,6 +98,8 @@ The default interactive path was validated on a real VPS. Prompt order and defau
   - `n` = create a backup first, then initialize a new configuration
 3. `Server name [current-or-hostname]:`
   - Default (Enter): keep the current saved name, or use sanitized hostname on first install
+4. `WireGuard public UDP port [51820]:`
+  - Default (Enter): `51820`
 
 In the validated default run: prune ran, `k` (keep) was selected, default server name was accepted, and all 3 containers started.
 
