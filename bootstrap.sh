@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+BOOTSTRAP_VERSION="1.0.0"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 SECRETS_FILE="$SCRIPT_DIR/.env.secrets"
@@ -307,36 +309,40 @@ self_update_repo_if_needed() {
   local after_head=""
 
   if ! is_truthy "$self_update_enabled"; then
+    log "Bootstrap self-update: disabled (BOOTSTRAP_SELF_UPDATE=${self_update_enabled})."
     return
   fi
 
   if [ "${BOOTSTRAP_SELF_UPDATED:-0}" = "1" ]; then
+    log "Bootstrap self-update: already applied in this run."
     return
   fi
 
   if ! command -v git >/dev/null 2>&1; then
+    log "Bootstrap self-update: skipped (git not available)."
     return
   fi
 
   if ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    log "Bootstrap self-update: skipped (not a git checkout)."
     return
   fi
 
   if ! git -C "$SCRIPT_DIR" diff --quiet || ! git -C "$SCRIPT_DIR" diff --cached --quiet; then
-    log "Skipping self-update: local git changes detected."
+    log "Bootstrap self-update: skipped (local git changes detected)."
     return
   fi
 
   before_head="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || true)"
 
-  log "Checking for bootstrap updates..."
+  log "Bootstrap self-update: enabled. Checking for updates..."
   if ! git -C "$SCRIPT_DIR" fetch origin main >/dev/null 2>&1; then
-    log "Skipping self-update: unable to reach git remote."
+    log "Bootstrap self-update: skipped (unable to reach git remote)."
     return
   fi
 
   if ! git -C "$SCRIPT_DIR" merge --ff-only origin/main >/dev/null 2>&1; then
-    log "Skipping self-update: fast-forward merge not possible."
+    log "Bootstrap self-update: skipped (fast-forward merge not possible)."
     return
   fi
 
@@ -346,6 +352,8 @@ self_update_repo_if_needed() {
     export BOOTSTRAP_SELF_UPDATED=1
     exec "$SCRIPT_DIR/bootstrap.sh" "$@"
   fi
+
+  log "Bootstrap self-update: no update available ($after_head)."
 }
 
 resolver_has_non_loopback_nameserver() {
@@ -555,6 +563,7 @@ generate_password_hash() {
 }
 
 main() {
+  log "Easy-WG-Combo bootstrap v${BOOTSTRAP_VERSION}"
   ensure_linux
   require_cmd apt-get
 
