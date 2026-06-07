@@ -182,7 +182,8 @@ function forwardReqHeaders(req) {
   return headers;
 }
 
-function buildUpstreamPath(req, basePath) {
+function buildUpstreamPath(req, basePath, keepPrefix = false) {
+  if (keepPrefix) return req.originalUrl || '/';
   const pathValue = req.originalUrl.replace(new RegExp(`^${basePath}`), '');
   return pathValue || '/';
 }
@@ -193,7 +194,7 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
       // Ensure wg-easy session is active before proxying
       if (opts.wgAuth && !wgCookie) await wgAuth();
 
-      const upstreamPath = buildUpstreamPath(req, basePath);
+      const upstreamPath = buildUpstreamPath(req, basePath, opts.keepPrefix);
       const upstreamUrl = new URL(upstreamPath, targetBaseUrl);
 
       const headers = forwardReqHeaders(req);
@@ -269,8 +270,8 @@ app.use('/api/session',   auth, proxyTo('/api/session',   WG_URL, { wgAuth: true
 app.use('/api/wireguard', auth, proxyTo('/api/wireguard', WG_URL, { wgAuth: true }));
 app.use('/wireguard',     auth, proxyTo('/wireguard',     WG_URL, { wgAuth: true }));
 
-// AdGuard iframe SPA: its JS makes absolute calls to /control/*
-app.use('/control', auth, proxyTo('/control', AG_URL, { agAuth: true }));
+// AdGuard iframe SPA: its JS makes absolute calls to /control/* — keep the full path
+app.use('/control', auth, proxyTo('/control', AG_URL, { agAuth: true, keepPrefix: true }));
 app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
