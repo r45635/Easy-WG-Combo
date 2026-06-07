@@ -29,6 +29,15 @@ run_root() {
   fi
 }
 
+cleanup_existing_containers() {
+  local containers=(wg-easy adguard portal)
+  local c
+
+  for c in "${containers[@]}"; do
+    docker rm -f "$c" >/dev/null 2>&1 || true
+  done
+}
+
 escape_sed_replacement() {
   printf '%s' "$1" | sed -e 's/[&|\\]/\\&/g'
 }
@@ -166,6 +175,9 @@ main() {
   set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
   set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
   set_password_hash_secret "$SECRETS_FILE" "$password_hash"
+
+  log "Cleaning up old containers..."
+  cleanup_existing_containers
 
   log "Starting the stack..."
   exec "$SCRIPT_DIR/compose.sh" up -d
