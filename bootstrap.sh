@@ -49,6 +49,17 @@ set_env_value() {
   fi
 }
 
+set_password_hash_secret() {
+  local file="$1"
+  local hash="$2"
+  local tmp_file
+
+  tmp_file="$(mktemp)"
+  grep -vE '^(export[[:space:]]+)?PASSWORD_HASH=' "$file" > "$tmp_file" || true
+  printf "export PASSWORD_HASH='%s'\n" "$hash" >> "$tmp_file"
+  mv "$tmp_file" "$file"
+}
+
 default_wg_host() {
   local host=""
 
@@ -154,7 +165,7 @@ main() {
   log "Writing configuration files..."
   set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
   set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
-  set_env_value "$SECRETS_FILE" "PASSWORD_HASH" "$password_hash"
+  set_password_hash_secret "$SECRETS_FILE" "$password_hash"
 
   log "Starting the stack..."
   exec "$SCRIPT_DIR/compose.sh" up -d
