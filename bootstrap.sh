@@ -421,6 +421,9 @@ configure_fail2ban() {
   local maxretry="${FAIL2BAN_MAXRETRY:-5}"
   local log_path="$SCRIPT_DIR/caddy/logs/access.log"
 
+  mkdir -p "$(dirname "$log_path")"
+  touch "$log_path"
+
   run_root mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
 
   run_root tee /etc/fail2ban/filter.d/easy-wg-portal.conf >/dev/null <<EOF
