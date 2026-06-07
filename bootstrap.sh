@@ -301,6 +301,53 @@ ensure_linux() {
   [ "$(uname -s)" = "Linux" ] || die "This bootstrap script is intended for Linux VPS hosts."
 }
 
+self_update_repo_if_needed() {
+  local self_update_enabled="${BOOTSTRAP_SELF_UPDATE:-yes}"
+  local before_head=""
+  local after_head=""
+
+  if ! is_truthy "$self_update_enabled"; then
+    return
+  fi
+
+  if [ "${BOOTSTRAP_SELF_UPDATED:-0}" = "1" ]; then
+    return
+  fi
+
+  if ! command -v git >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! git -C "$SCRIPT_DIR" diff --quiet || ! git -C "$SCRIPT_DIR" diff --cached --quiet; then
+    log "Skipping self-update: local git changes detected."
+    return
+  fi
+
+  before_head="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+
+  log "Checking for bootstrap updates..."
+  if ! git -C "$SCRIPT_DIR" fetch origin main >/dev/null 2>&1; then
+    log "Skipping self-update: unable to reach git remote."
+    return
+  fi
+
+  if ! git -C "$SCRIPT_DIR" merge --ff-only origin/main >/dev/null 2>&1; then
+    log "Skipping self-update: fast-forward merge not possible."
+    return
+  fi
+
+  after_head="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || true)"
+  if [ -n "$before_head" ] && [ "$before_head" != "$after_head" ]; then
+    log "Bootstrap updated from $before_head to $after_head. Restarting script..."
+    export BOOTSTRAP_SELF_UPDATED=1
+    exec "$SCRIPT_DIR/bootstrap.sh" "$@"
+  fi
+}
+
 resolver_has_non_loopback_nameserver() {
   awk '
     /^nameserver[[:space:]]+/ {
@@ -512,6 +559,7 @@ main() {
   require_cmd apt-get
 
   repair_dns_resolver_if_needed
+  self_update_repo_if_needed "$@"
 
   install_packages
   ensure_disk_space
