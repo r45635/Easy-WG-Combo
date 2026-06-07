@@ -118,7 +118,7 @@ ensure_env_files() {
 generate_password_hash() {
   local admin_password="$1"
 
-  docker run --rm ghcr.io/wg-easy/wg-easy:14 wgpw "$admin_password" | grep -oE '\$2[aby]\$[./A-Za-z0-9]{56}' | head -n 1
+  docker run --rm ghcr.io/wg-easy/wg-easy:14 wgpw "$admin_password" | grep -oE '\$2[aby]\$[./A-Za-z0-9]{53}' | head -n 1
 }
 
 main() {
