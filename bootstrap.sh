@@ -148,13 +148,24 @@ print_final_summary() {
   local server_name="$4"
   local admin_domain="$5"
   local public_https_enabled="$6"
+  local admin_password="$7"
+  local tls_email="$8"
   local ssh_port="${SSH_PORT:-22}"
   local admin_url=""
 
-  if is_truthy "$public_https_enabled" && [ -n "$admin_domain" ]; then
-    admin_url="https://${admin_domain}"
+  if is_truthy "$public_https_enabled"; then
+    if is_ip_address "${admin_domain:-}"; then
+      # IP-mode: Caddy uses tls internal, access via IP directly
+      admin_url="https://${admin_domain}"
+    elif [ -n "${tls_email:-}" ] && [ -n "${admin_domain:-}" ]; then
+      # Real FQDN with ACME cert
+      admin_url="https://${admin_domain}"
+    else
+      # No TLS email or no domain: Caddy uses tls internal, use IP
+      admin_url="https://${wg_host}"
+    fi
   else
-    admin_url="http://127.0.0.1:${PORTAL_PORT:-8080}"
+    admin_url="http://${wg_host}:${PORTAL_PORT:-8080}"
   fi
 
   log ""
@@ -163,6 +174,7 @@ print_final_summary() {
   log "Server name: ${server_name}"
   log "WireGuard endpoint: ${wg_host}:${wg_port}/udp"
   log "Admin URL: ${admin_url}"
+  log "Admin password: ${admin_password}"
   log "SSH port: ${ssh_port}/tcp"
   log "GitHub: ${BOOTSTRAP_REPO_URL}"
   log "Script version: ${BOOTSTRAP_VERSION}"
@@ -818,13 +830,13 @@ main() {
 
   log "Starting the stack (attempting image rebuild first)..."
   if "$SCRIPT_DIR/compose.sh" up -d --build; then
-    print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled"
+    print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}"
     exit 0
   fi
 
   log "Image rebuild failed; retrying without rebuild..."
   "$SCRIPT_DIR/compose.sh" up -d
-  print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled"
+  print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}"
 }
 
 main "$@"
