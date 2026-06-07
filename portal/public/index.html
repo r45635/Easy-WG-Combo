@@ -11,15 +11,23 @@
   <!-- Login -->
   <div id="login-screen">
     <div class="login-box">
+      <div class="lang-switch-wrap login-lang-switch">
+        <label for="lang-login" data-i18n="lang.label">Language</label>
+        <select id="lang-login" class="lang-select" aria-label="Language">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
       <div class="login-logo">
         <span class="logo-icon">⬡</span>
         <h1>Easy-WG-Combo</h1>
         <p>Admin Portal</p>
       </div>
       <form id="login-form">
-        <input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password">
-        <button type="submit">Connexion</button>
-        <p id="login-error" class="error hidden">Mot de passe incorrect</p>
+        <input type="password" id="login-password" data-i18n-placeholder="login.passwordPlaceholder" placeholder="Mot de passe" autocomplete="current-password">
+        <button type="submit" data-i18n="login.submit">Connexion</button>
+        <p id="login-error" class="error hidden" data-i18n="login.invalid">Mot de passe incorrect</p>
       </form>
     </div>
   </div>
@@ -33,20 +41,28 @@
       </div>
       <nav>
         <a href="#" class="nav-item active" data-tab="dashboard">
-          <span class="nav-icon">◈</span> Dashboard
+          <span class="nav-icon">◈</span> <span data-i18n="nav.dashboard">Dashboard</span>
         </a>
         <a href="#" class="nav-item" data-tab="clients">
-          <span class="nav-icon">◉</span> Clients VPN
+          <span class="nav-icon">◉</span> <span data-i18n="nav.clients">Clients VPN</span>
         </a>
         <a href="#" class="nav-item" data-tab="wireguard">
-          <span class="nav-icon">◎</span> WireGuard
+          <span class="nav-icon">◎</span> <span data-i18n="nav.wireguard">WireGuard</span>
         </a>
         <a href="#" class="nav-item" data-tab="adguard">
-          <span class="nav-icon">◐</span> AdGuard Home
+          <span class="nav-icon">◐</span> <span data-i18n="nav.adguard">AdGuard Home</span>
         </a>
       </nav>
       <div class="sidebar-footer">
-        <button id="logout-btn" class="btn-ghost">Déconnexion</button>
+        <div class="lang-switch-wrap">
+          <label for="lang-app" data-i18n="lang.label">Language</label>
+          <select id="lang-app" class="lang-select" aria-label="Language">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+        <button id="logout-btn" class="btn-ghost" data-i18n="auth.logout">Déconnexion</button>
       </div>
     </aside>
 
@@ -55,50 +71,50 @@
       <!-- Dashboard -->
       <section id="tab-dashboard" class="tab-content">
         <div class="page-header">
-          <h2>Dashboard</h2>
-          <button class="btn-ghost btn-sm" id="refresh-btn">↻ Actualiser</button>
+          <h2 data-i18n="nav.dashboard">Dashboard</h2>
+          <button class="btn-ghost btn-sm" id="refresh-btn" data-i18n="dashboard.refresh">↻ Actualiser</button>
         </div>
         <div class="stats-grid" id="stats-grid">
           <div class="stat-card">
             <div class="stat-value" id="stat-total">—</div>
-            <div class="stat-label">Clients total</div>
+            <div class="stat-label" data-i18n="dashboard.totalClients">Clients total</div>
           </div>
           <div class="stat-card">
             <div class="stat-value green" id="stat-connected">—</div>
-            <div class="stat-label">Connectés</div>
+            <div class="stat-label" data-i18n="dashboard.connected">Connectés</div>
           </div>
           <div class="stat-card">
             <div class="stat-value" id="stat-queries">—</div>
-            <div class="stat-label">Requêtes DNS aujourd'hui</div>
+            <div class="stat-label" data-i18n="dashboard.dnsQueries">Requêtes DNS aujourd'hui</div>
           </div>
           <div class="stat-card">
             <div class="stat-value orange" id="stat-blocked">—</div>
-            <div class="stat-label">Bloquées <span id="stat-pct" class="stat-pct"></span></div>
+            <div class="stat-label"><span data-i18n="dashboard.blocked">Bloquées</span> <span id="stat-pct" class="stat-pct"></span></div>
           </div>
         </div>
         <div class="section-header">
-          <h3>Clients récents</h3>
+          <h3 data-i18n="dashboard.recentClients">Clients récents</h3>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <button class="btn-ghost btn-sm" id="help-dns-btn" title="Aide sur les filtres DNS">? Filtres DNS</button>
-            <button class="btn-primary btn-sm" id="dash-new-btn">+ Nouveau client</button>
+            <button class="btn-ghost btn-sm" id="help-dns-btn" data-i18n="dns.helpButton" title="Aide sur les filtres DNS">? Filtres DNS</button>
+            <button class="btn-primary btn-sm" id="dash-new-btn" data-i18n="client.new">+ Nouveau client</button>
           </div>
         </div>
         <div id="dash-client-list" class="client-table-wrap">
-          <div class="loading">Chargement…</div>
+          <div class="loading" data-i18n="common.loading">Chargement…</div>
         </div>
       </section>
 
       <!-- Clients -->
       <section id="tab-clients" class="tab-content hidden">
         <div class="page-header">
-          <h2>Clients VPN</h2>
+          <h2 data-i18n="nav.clients">Clients VPN</h2>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <button class="btn-ghost btn-sm" id="help-dns-btn2" title="Aide sur les filtres DNS">? Filtres DNS</button>
-            <button class="btn-primary" id="new-client-btn">+ Nouveau client</button>
+            <button class="btn-ghost btn-sm" id="help-dns-btn2" data-i18n="dns.helpButton" title="Aide sur les filtres DNS">? Filtres DNS</button>
+            <button class="btn-primary" id="new-client-btn" data-i18n="client.new">+ Nouveau client</button>
           </div>
         </div>
         <div id="client-table-wrap" class="client-table-wrap">
-          <div class="loading">Chargement…</div>
+          <div class="loading" data-i18n="common.loading">Chargement…</div>
         </div>
       </section>
 
@@ -119,17 +135,17 @@
   <div id="modal-overlay" class="hidden">
     <div class="modal" id="modal-create">
       <div class="modal-header">
-        <h3 id="modal-title">Nouveau client WireGuard</h3>
+        <h3 id="modal-title" data-i18n="modal.newClient.title">Nouveau client WireGuard</h3>
         <button class="modal-close" id="modal-close-btn">✕</button>
       </div>
       <div class="modal-body" id="modal-body">
 
         <!-- Étape 1 : formulaire -->
         <div id="modal-form">
-          <label class="field-label">Nom du client</label>
-          <input type="text" id="client-name-input" placeholder="iPhone-Vincent, Mac-Bureau…">
+          <label class="field-label" data-i18n="modal.newClient.clientName">Nom du client</label>
+          <input type="text" id="client-name-input" data-i18n-placeholder="modal.newClient.clientNamePlaceholder" placeholder="iPhone-Vincent, Mac-Bureau…">
 
-          <label class="field-label" style="margin-top:1.5rem">Protection DNS</label>
+          <label class="field-label" style="margin-top:1.5rem" data-i18n="modal.newClient.dnsProtection">Protection DNS</label>
           <div class="dns-options" id="dns-options"></div>
 
           <p id="create-error" class="error hidden"></p>
@@ -144,19 +160,19 @@
           <div class="result-body">
             <div class="qr-wrap">
               <img id="result-qr" src="" alt="QR Code">
-              <div class="qr-hint">Scanner avec l'app WireGuard</div>
+              <div class="qr-hint" data-i18n="modal.newClient.scanHint">Scanner avec l'app WireGuard</div>
             </div>
             <div class="config-wrap">
               <pre id="result-config"></pre>
-              <button class="btn-ghost btn-sm" id="copy-config-btn">⎘ Copier</button>
+              <button class="btn-ghost btn-sm" id="copy-config-btn" data-i18n="common.copy">⎘ Copier</button>
             </div>
           </div>
         </div>
 
       </div>
       <div class="modal-footer" id="modal-footer">
-        <button class="btn-ghost" id="modal-cancel-btn">Annuler</button>
-        <button class="btn-primary" id="modal-submit-btn">Créer →</button>
+        <button class="btn-ghost" id="modal-cancel-btn" data-i18n="common.cancel">Annuler</button>
+        <button class="btn-primary" id="modal-submit-btn" data-i18n="common.createArrow">Créer →</button>
       </div>
     </div>
   </div>
@@ -165,23 +181,22 @@
   <div id="filter-overlay" class="hidden">
     <div class="modal">
       <div class="modal-header">
-        <h3>Changer le filtre DNS</h3>
+        <h3 data-i18n="modal.filter.title">Changer le filtre DNS</h3>
         <button class="modal-close" id="filter-close-btn">✕</button>
       </div>
       <div class="modal-body">
         <div id="filter-client-info" class="filter-client-info"></div>
         <div id="filter-form">
-          <label class="field-label" style="margin-bottom:.5rem">Niveau de protection</label>
+          <label class="field-label" style="margin-bottom:.5rem" data-i18n="modal.filter.protectionLevel">Niveau de protection</label>
           <div class="dns-options" id="filter-dns-options"></div>
           <p id="filter-error" class="error hidden"></p>
         </div>
         <div id="filter-non-adguard" class="hidden">
           <div class="notice notice-warn">
-            <strong>Ce client n'utilise pas AdGuard DNS.</strong><br>
-            Le filtre ne peut pas être changé à la volée. Choisissez un nouveau niveau
-            ci-dessous — une nouvelle config sera générée à réimporter sur l'appareil.
+            <strong data-i18n="modal.filter.nonAdguardTitle">Ce client n'utilise pas AdGuard DNS.</strong><br>
+            <span data-i18n="modal.filter.nonAdguardBody">Le filtre ne peut pas être changé à la volée. Choisissez un nouveau niveau ci-dessous — une nouvelle config sera générée à réimporter sur l'appareil.</span>
           </div>
-          <label class="field-label" style="margin:.75rem 0 .5rem">Nouveau niveau de protection</label>
+          <label class="field-label" style="margin:.75rem 0 .5rem" data-i18n="modal.filter.newProtectionLevel">Nouveau niveau de protection</label>
           <div class="dns-options" id="filter-regen-options"></div>
         </div>
         <div id="filter-result" class="hidden">
@@ -192,7 +207,7 @@
           <div id="filter-regen-result" class="hidden result-body">
             <div class="qr-wrap">
               <img id="filter-qr" src="" alt="QR Code">
-              <div class="qr-hint">Réimporter sur l'appareil</div>
+              <div class="qr-hint" data-i18n="modal.filter.reimportHint">Réimporter sur l'appareil</div>
             </div>
             <div class="config-wrap">
               <pre id="filter-config"></pre>
@@ -201,8 +216,8 @@
         </div>
       </div>
       <div class="modal-footer" id="filter-footer">
-        <button class="btn-ghost" id="filter-cancel-btn">Annuler</button>
-        <button class="btn-primary" id="filter-submit-btn">Appliquer</button>
+        <button class="btn-ghost" id="filter-cancel-btn" data-i18n="common.cancel">Annuler</button>
+        <button class="btn-primary" id="filter-submit-btn" data-i18n="common.apply">Appliquer</button>
       </div>
     </div>
   </div>
@@ -211,35 +226,34 @@
   <div id="help-overlay" class="hidden">
     <div class="modal modal-help">
       <div class="modal-header">
-        <h3>Niveaux de protection DNS</h3>
+        <h3 data-i18n="modal.help.title">Niveaux de protection DNS</h3>
         <button class="modal-close" id="help-close-btn">✕</button>
       </div>
       <div class="modal-body">
         <div class="help-section">
-          <div class="help-badge dns-filtered">Filtré complet</div>
-          <p>Bloque les <strong>publicités</strong>, les <strong>trackers</strong>, les <strong>malwares</strong> et le <strong>phishing</strong>.</p>
-          <p class="help-detail">Via AdGuard Home sur le VPS — listes AdGuard DNS filter, AdAway et Malware filter. Les pages se chargent plus vite, moins d'exposition aux contenus indésirables.</p>
-          <p class="help-detail text-dim">Recommandé pour : tous les appareils du quotidien.</p>
+          <div class="help-badge dns-filtered" data-i18n="dns.filtered.label">Filtré complet</div>
+          <p data-i18n="modal.help.filtered.main">Bloque les <strong>publicités</strong>, les <strong>trackers</strong>, les <strong>malwares</strong> et le <strong>phishing</strong>.</p>
+          <p class="help-detail" data-i18n="modal.help.filtered.detail">Via AdGuard Home sur le VPS — listes AdGuard DNS filter, AdAway et Malware filter. Les pages se chargent plus vite, moins d'exposition aux contenus indésirables.</p>
+          <p class="help-detail text-dim" data-i18n="modal.help.filtered.reco">Recommandé pour : tous les appareils du quotidien.</p>
         </div>
         <div class="help-section">
-          <div class="help-badge dns-malware">Malware seulement</div>
-          <p>Bloque les <strong>malwares et le phishing</strong>. Les publicités et trackers passent.</p>
-          <p class="help-detail">Via Cloudflare for Families (1.1.1.2) comme DNS upstream. Les pubs restent visibles.</p>
-          <p class="help-detail text-dim">Recommandé pour : appareils où un bloqueur de pub est déjà installé (uBlock, etc.).</p>
+          <div class="help-badge dns-malware" data-i18n="dns.malware.label">Malware seulement</div>
+          <p data-i18n="modal.help.malware.main">Bloque les <strong>malwares et le phishing</strong>. Les publicités et trackers passent.</p>
+          <p class="help-detail" data-i18n="modal.help.malware.detail">Via Cloudflare for Families (1.1.1.2) comme DNS upstream. Les pubs restent visibles.</p>
+          <p class="help-detail text-dim" data-i18n="modal.help.malware.reco">Recommandé pour : appareils où un bloqueur de pub est déjà installé (uBlock, etc.).</p>
         </div>
         <div class="help-section">
-          <div class="help-badge dns-none">Sans filtre</div>
-          <p>Aucun blocage — résolution DNS directe via Cloudflare (1.1.1.1).</p>
-          <p class="help-detail">Compatibilité maximale. Utile pour le débogage ou accéder à des ressources normalement filtrées.</p>
-          <p class="help-detail text-dim">Recommandé pour : développeurs, tests, cas spécifiques.</p>
+          <div class="help-badge dns-none" data-i18n="dns.none.label">Sans filtre</div>
+          <p data-i18n="modal.help.none.main">Aucun blocage — résolution DNS directe via Cloudflare (1.1.1.1).</p>
+          <p class="help-detail" data-i18n="modal.help.none.detail">Compatibilité maximale. Utile pour le débogage ou accéder à des ressources normalement filtrées.</p>
+          <p class="help-detail text-dim" data-i18n="modal.help.none.reco">Recommandé pour : développeurs, tests, cas spécifiques.</p>
         </div>
         <div class="help-note">
-          <strong>Note :</strong> Seuls les clients dont la config utilise <code>DNS = 10.8.0.1</code>
-          peuvent changer de filtre à la volée. Les autres nécessitent une nouvelle configuration.
+          <strong data-i18n="modal.help.noteLabel">Note :</strong> <span data-i18n="modal.help.noteBody">Seuls les clients dont la config utilise <code>DNS = 10.8.0.1</code> peuvent changer de filtre à la volée. Les autres nécessitent une nouvelle configuration.</span>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-primary" id="help-ok-btn">Compris</button>
+        <button class="btn-primary" id="help-ok-btn" data-i18n="common.gotIt">Compris</button>
       </div>
     </div>
   </div>
