@@ -21,6 +21,20 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Auto DNS discovery** — existing clients' DNS presets detected on first load
 - **WireGuard & AdGuard UIs** — embedded as iframes for advanced config
 
+## Screenshots
+
+### Aggregated dashboard
+
+![Easy-WG-Combo dashboard](docs/screenshots/dashboard.png)
+
+### Integrated WireGuard view
+
+![Easy-WG-Combo WireGuard view](docs/screenshots/wireguard-view.png)
+
+### Integrated AdGuard Home view
+
+![Easy-WG-Combo AdGuard Home view](docs/screenshots/adguard-view.png)
+
 ## Quick start
 
 ### Recommended VPS
