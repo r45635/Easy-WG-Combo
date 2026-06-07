@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/r45635/Easy-WG-Combo.git}"
 APP_DIR="${APP_DIR:-$HOME/Easy-WG-Combo}"
+INSTALL_VERSION="1.1.0"
 
 log() {
   printf '%s\n' "$*"
@@ -28,6 +29,30 @@ run_root() {
 
 has_tty() {
   [ -t 0 ] || [ -r /dev/tty ]
+}
+
+print_install_header() {
+  log "=============================================="
+  log "Easy-WG-Combo installer v${INSTALL_VERSION}"
+  log "The all-in-one self-hosted VPN + DNS + admin portal."
+  log "Repository: ${REPO_URL}"
+  log "=============================================="
+  log ""
+}
+
+confirm_proceed() {
+  local answer=""
+
+  if ! has_tty; then
+    return
+  fi
+
+  read_prompt "Proceed with installation? [Y/n]: " answer
+  answer="${answer:-Y}"
+  case "${answer,,}" in
+    y|yes) return ;;
+    *) die "Installation cancelled by user." ;;
+  esac
 }
 
 read_prompt() {
@@ -167,6 +192,8 @@ run_bootstrap() {
 }
 
 main() {
+  print_install_header
+  confirm_proceed
   require_cmd apt-get
   ensure_git
   resolve_install_dir
