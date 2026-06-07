@@ -6,6 +6,7 @@ const QRCode     = require('qrcode');
 const fs         = require('fs');
 const os         = require('os');
 const path       = require('path');
+const { Readable } = require('stream');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -16,9 +17,6 @@ const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD
 const AG_USER      = process.env.ADGUARD_USER      || 'admin';
 const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
 const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
-
-const WG_EXT_PORT  = process.env.WG_EASY_EXTERNAL_PORT  || '51821';
-const AG_EXT_PORT  = process.env.ADGUARD_EXTERNAL_PORT  || '3000';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 
 const DNS_PRESETS = [
@@ -136,6 +134,7 @@ async function agFetch(endpoint, opts = {}) {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
+  name:              'portal.sid',
   secret:            process.env.SESSION_SECRET || PORTAL_PASS + '_sess',
   resave:            false,
   saveUninitialized: false,
@@ -143,6 +142,84 @@ app.use(session({
 }));
 
 const auth = (req, res, next) => req.session.ok ? next() : res.status(401).json({ error: 'Unauthorized' });
+
+function rewriteSetCookiePath(cookie, basePath) {
+  if (!cookie) return cookie;
+  if (/;\s*Path=/i.test(cookie)) {
+    return cookie.replace(/;\s*Path=\/[^;]*/i, `; Path=${basePath}/`);
+  }
+  return `${cookie}; Path=${basePath}/`;
+}
+
+function forwardReqHeaders(req) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  return headers;
+}
+
+function buildUpstreamPath(req, basePath) {
+  const pathValue = req.originalUrl.replace(new RegExp(`^${basePath}`), '');
+  return pathValue || '/';
+}
+
+function proxyTo(basePath, targetBaseUrl) {
+  return async (req, res) => {
+    try {
+      const upstreamPath = buildUpstreamPath(req, basePath);
+      const upstreamUrl = new URL(upstreamPath, targetBaseUrl);
+
+      const init = {
+        method: req.method,
+        headers: forwardReqHeaders(req),
+        redirect: 'manual',
+      };
+
+      if (!['GET', 'HEAD'].includes(req.method)) {
+        init.body = req;
+        init.duplex = 'half';
+      }
+
+      const upstream = await fetch(upstreamUrl, init);
+
+      res.status(upstream.status);
+
+      upstream.headers.forEach((value, key) => {
+        if (key.toLowerCase() === 'set-cookie') return;
+        if (key.toLowerCase() === 'x-frame-options') return;
+        if (key.toLowerCase() === 'content-security-policy') return;
+        if (key.toLowerCase() === 'location' && value.startsWith('/')) {
+          res.setHeader('location', `${basePath}${value}`);
+          return;
+        }
+        res.setHeader(key, value);
+      });
+
+      if (typeof upstream.headers.getSetCookie === 'function') {
+        const setCookies = upstream.headers.getSetCookie();
+        if (setCookies.length) {
+          res.setHeader('set-cookie', setCookies.map((cookie) => rewriteSetCookiePath(cookie, basePath)));
+        }
+      } else {
+        const setCookie = upstream.headers.get('set-cookie');
+        if (setCookie) {
+          res.setHeader('set-cookie', rewriteSetCookiePath(setCookie, basePath));
+        }
+      }
+
+      if (!upstream.body) {
+        res.end();
+        return;
+      }
+
+      Readable.fromWeb(upstream.body).pipe(res);
+    } catch (error) {
+      res.status(502).send(`Proxy error: ${error.message}`);
+    }
+  };
+}
+
+app.use('/wireguard', auth, proxyTo('/wireguard', WG_URL));
+app.use('/adguard', auth, proxyTo('/adguard', AG_URL));
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -162,9 +239,9 @@ app.get('/api/me', (req, res) => res.json({ authenticated: !!req.session.ok }));
 // ── Config (iframe ports for browser) ────────────────────────────────────────
 
 app.get('/api/config', auth, (_req, res) => res.json({
-  wgEasyPort:  WG_EXT_PORT,
-  adguardPort: AG_EXT_PORT,
-  serverName:  getServerName(),
+  wgEasyPath: '/wireguard/',
+  adguardPath: '/adguard/',
+  serverName: getServerName(),
 }));
 
 app.post('/api/server-name', auth, (req, res) => {

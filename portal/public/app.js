@@ -303,7 +303,7 @@ const state = {
   tab:           'dashboard',
   clients:       [],
   iframesLoaded: { wireguard: false, adguard: false },
-  iframePorts:   { wg: '51821', ag: '3000' },
+  iframePaths:   { wireguard: '/wireguard/', adguard: '/adguard/' },
   serverName:    'vpn-server',
   lang:          'en',
 };
@@ -444,17 +444,16 @@ function switchTab(name) {
 
 function loadIframe(name) {
   if (state.iframesLoaded[name]) return;
-  const port = name === 'wireguard' ? state.iframePorts.wg : state.iframePorts.ag;
   const id   = name === 'wireguard' ? 'wg-iframe' : 'ag-iframe';
-  document.getElementById(id).src = `http://localhost:${port}`;
+  document.getElementById(id).src = state.iframePaths[name] || '/';
   state.iframesLoaded[name] = true;
 }
 
 async function loadConfig() {
   const cfg = await GET('/api/config');
   if (!cfg) return;
-  state.iframePorts.wg = cfg.wgEasyPort || '51821';
-  state.iframePorts.ag = cfg.adguardPort || '3000';
+  state.iframePaths.wireguard = cfg.wgEasyPath || '/wireguard/';
+  state.iframePaths.adguard = cfg.adguardPath || '/adguard/';
   state.serverName = cfg.serverName || 'vpn-server';
   renderServerName();
 }

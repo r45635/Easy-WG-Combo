@@ -291,6 +291,49 @@ ensure_linux() {
   [ "$(uname -s)" = "Linux" ] || die "This bootstrap script is intended for Linux VPS hosts."
 }
 
+resolver_has_non_loopback_nameserver() {
+  awk '
+    /^nameserver[[:space:]]+/ {
+      ns=$2
+      if (ns != "127.0.0.1" && ns != "::1") {
+        found=1
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  ' /etc/resolv.conf
+}
+
+repair_dns_resolver_if_needed() {
+  local fallback_servers="${DNS_FALLBACK_SERVERS:-1.1.1.1 8.8.8.8}"
+  local resolver_test_host="${DNS_TEST_HOST:-github.com}"
+
+  if getent hosts "$resolver_test_host" >/dev/null 2>&1; then
+    return
+  fi
+
+  if resolver_has_non_loopback_nameserver; then
+    log "DNS lookup for ${resolver_test_host} failed even with non-loopback nameservers."
+    return
+  fi
+
+  log "Detected localhost-only DNS resolver with failed lookups. Applying fallback nameservers..."
+
+  run_root cp /etc/resolv.conf /etc/resolv.conf.easy-wg-combo.bak 2>/dev/null || true
+
+  {
+    printf 'nameserver 127.0.0.1\n'
+    for dns in $fallback_servers; do
+      printf 'nameserver %s\n' "$dns"
+    done
+  } | run_root tee /etc/resolv.conf >/dev/null
+
+  if getent hosts "$resolver_test_host" >/dev/null 2>&1; then
+    log "DNS resolver fallback applied successfully."
+  else
+    log "WARNING: DNS lookup still failing after fallback update."
+  fi
+}
+
 install_packages() {
   local packages=(ca-certificates curl git ufw)
 
@@ -348,6 +391,8 @@ generate_password_hash() {
 main() {
   ensure_linux
   require_cmd apt-get
+
+  repair_dns_resolver_if_needed
 
   install_packages
   ensure_disk_space
@@ -411,7 +456,12 @@ main() {
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
 
-  log "Starting the stack..."
+  log "Starting the stack (attempting image rebuild first)..."
+  if "$SCRIPT_DIR/compose.sh" up -d --build; then
+    exit 0
+  fi
+
+  log "Image rebuild failed; retrying without rebuild..."
   exec "$SCRIPT_DIR/compose.sh" up -d
 }
 
