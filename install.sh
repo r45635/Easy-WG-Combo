@@ -26,6 +26,10 @@ run_root() {
   fi
 }
 
+has_tty() {
+  [ -t 0 ] || [ -r /dev/tty ]
+}
+
 ensure_git() {
   if command -v git >/dev/null 2>&1; then
     return
@@ -51,7 +55,7 @@ main() {
   require_cmd apt-get
   ensure_git
 
-  if [ ! -t 0 ] && { [ -z "${WG_HOST:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; }; then
+  if ! has_tty && { [ -z "${WG_HOST:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; }; then
     die "Non-interactive mode detected. Set WG_HOST and ADMIN_PASSWORD (optional: SERVER_NAME, ADMIN_DOMAIN, TLS_EMAIL, PUBLIC_HTTPS_ENABLED, SSH_PORT, BACKUP_DIR=/path, EXISTING_CONFIG_ACTION=keep|new)."
   fi
 

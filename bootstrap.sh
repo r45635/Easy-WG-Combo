@@ -32,6 +32,38 @@ run_root() {
   fi
 }
 
+has_tty() {
+  [ -t 0 ] || [ -r /dev/tty ]
+}
+
+read_prompt() {
+  local prompt="$1"
+  local __var_name="$2"
+  local value=""
+
+  if [ -t 0 ]; then
+    read -r -p "$prompt" value
+  else
+    read -r -p "$prompt" value </dev/tty
+  fi
+
+  printf -v "$__var_name" '%s' "$value"
+}
+
+read_secret_prompt() {
+  local prompt="$1"
+  local __var_name="$2"
+  local value=""
+
+  if [ -t 0 ]; then
+    read -r -s -p "$prompt" value
+  else
+    read -r -s -p "$prompt" value </dev/tty
+  fi
+
+  printf -v "$__var_name" '%s' "$value"
+}
+
 available_space_mb() {
   local target_dir="$1"
   df -Pm "$target_dir" | awk 'NR==2 {print $4}'
@@ -45,8 +77,8 @@ maybe_prune_docker() {
     return
   fi
 
-  if [ -t 0 ]; then
-    read -r -p "Run Docker prune cleanup before deployment? [Y/n]: " do_prune
+  if has_tty; then
+    read_prompt "Run Docker prune cleanup before deployment? [Y/n]: " do_prune
     do_prune="${do_prune:-Y}"
     case "${do_prune,,}" in
       y|yes) do_prune="yes" ;;
@@ -114,14 +146,14 @@ resolve_existing_install_action() {
   local action="${EXISTING_CONFIG_ACTION:-}"
 
   if [ -z "$action" ]; then
-    if [ -t 0 ]; then
+    if has_tty; then
       printf '%s\n' "Existing Easy-WG-Combo configuration detected."
       printf '%s\n' "Choose an action:"
       printf '%s\n' "  [keep] Keep existing configuration and start/restart services"
       printf '%s\n' "  [new]  Start a new configuration (creates a backup first)"
 
       while true; do
-        read -r -p "Action (keep/new): " action
+        read_prompt "Action (keep/new): " action
         case "${action,,}" in
           k|keep) action="keep"; break ;;
           n|new)  action="new"; break ;;
@@ -260,9 +292,9 @@ resolve_server_name() {
     return
   fi
 
-  if [ -t 0 ]; then
+  if has_tty; then
     while true; do
-      read -r -p "Server name [$default_name]: " server_name
+      read_prompt "Server name [$default_name]: " server_name
       server_name="${server_name:-$default_name}"
       if validate_server_name "$server_name"; then
         printf '%s' "$server_name"
@@ -606,12 +638,20 @@ main() {
       wg_host="$(default_wg_host)"
     fi
     if [ -z "$wg_host" ]; then
-      read -r -p "VPS public IP or hostname for WG_HOST: " wg_host
+      if has_tty; then
+        read_prompt "VPS public IP or hostname for WG_HOST: " wg_host
+      else
+        die "WG_HOST is required in non-interactive mode."
+      fi
     fi
     [ -n "$wg_host" ] || die "WG_HOST is required."
 
     if [ -z "$admin_password" ]; then
-      read -r -s -p "Admin password for the portal and wg-easy: " admin_password
+      if has_tty; then
+        read_secret_prompt "Admin password for the portal and wg-easy: " admin_password
+      else
+        die "ADMIN_PASSWORD is required in non-interactive mode."
+      fi
       printf '\n'
     fi
     [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
