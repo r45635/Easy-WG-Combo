@@ -29,7 +29,67 @@ run_root() {
   fi
 }
 
-cleanup_existing_containers() {
+container_exists() {
+  local name="$1"
+  docker ps -a --format '{{.Names}}' | grep -Fxq "$name"
+}
+
+dir_has_content() {
+  local dir="$1"
+  [ -d "$dir" ] && [ -n "$(find "$dir" -mindepth 1 -print -quit 2>/dev/null)" ]
+}
+
+existing_install_detected() {
+  local containers=(wg-easy adguard portal)
+  local c
+
+  for c in "${containers[@]}"; do
+    if container_exists "$c"; then
+      return 0
+    fi
+  done
+
+  dir_has_content "$SCRIPT_DIR/wireguard" || \
+  dir_has_content "$SCRIPT_DIR/adguard/conf" || \
+  dir_has_content "$SCRIPT_DIR/adguard/work"
+}
+
+backup_existing_state() {
+  local backup_root="${BACKUP_DIR:-$SCRIPT_DIR/backups}"
+  local timestamp backup_dir
+
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  backup_dir="$backup_root/$timestamp"
+
+  mkdir -p "$backup_dir"
+
+  if [ -d "$SCRIPT_DIR/wireguard" ]; then
+    mkdir -p "$backup_dir/host"
+    cp -a "$SCRIPT_DIR/wireguard" "$backup_dir/host/"
+  fi
+  if [ -d "$SCRIPT_DIR/adguard/conf" ]; then
+    mkdir -p "$backup_dir/host/adguard"
+    cp -a "$SCRIPT_DIR/adguard/conf" "$backup_dir/host/adguard/"
+  fi
+  if [ -d "$SCRIPT_DIR/adguard/work" ]; then
+    mkdir -p "$backup_dir/host/adguard"
+    cp -a "$SCRIPT_DIR/adguard/work" "$backup_dir/host/adguard/"
+  fi
+
+  if container_exists wg-easy; then
+    mkdir -p "$backup_dir/container/wg-easy"
+    docker cp wg-easy:/etc/wireguard "$backup_dir/container/wg-easy/" >/dev/null 2>&1 || true
+  fi
+  if container_exists adguard; then
+    mkdir -p "$backup_dir/container/adguard"
+    docker cp adguard:/opt/adguardhome/conf "$backup_dir/container/adguard/" >/dev/null 2>&1 || true
+    docker cp adguard:/opt/adguardhome/work "$backup_dir/container/adguard/" >/dev/null 2>&1 || true
+  fi
+
+  log "Backup saved to $backup_dir"
+}
+
+replace_existing_containers() {
   local containers=(wg-easy adguard portal)
   local c
 
@@ -150,6 +210,17 @@ main() {
   configure_sysctl
   configure_firewall
 
+  if existing_install_detected; then
+    if [ "${ALLOW_REPLACE:-no}" != "yes" ]; then
+      die "Existing containers/data detected. Refusing to replace automatically. Re-run with ALLOW_REPLACE=yes (backup will be created first)."
+    fi
+
+    log "Existing installation detected. Creating backup before replacement..."
+    backup_existing_state
+    log "Removing existing containers..."
+    replace_existing_containers
+  fi
+
   local wg_host="${WG_HOST:-${1:-}}"
   if [ -z "$wg_host" ]; then
     wg_host="$(default_wg_host)"
@@ -175,9 +246,6 @@ main() {
   set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
   set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
   set_password_hash_secret "$SECRETS_FILE" "$password_hash"
-
-  log "Cleaning up old containers..."
-  cleanup_existing_containers
 
   log "Starting the stack..."
   exec "$SCRIPT_DIR/compose.sh" up -d

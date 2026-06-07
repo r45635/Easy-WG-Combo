@@ -20,6 +20,7 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **DNS presets** — Filtered / Malware-only / No filter, with help modal
 - **Auto DNS discovery** — existing clients' DNS presets detected on first load
 - **WireGuard & AdGuard UIs** — embedded as iframes for advanced config
+- **Multilingual portal UI** — language switcher with full interface coverage in **English, French, and Chinese**
 
 ## Screenshots
 
@@ -74,6 +75,17 @@ If you already cloned the repository on the VPS, you can run the bootstrap direc
 ```bash
 sudo ./bootstrap.sh
 ```
+
+By default, the bootstrap now **refuses to replace** an existing stack if containers/data are already detected.
+To replace an existing install, explicitly allow it (a backup is created first):
+
+```bash
+export ALLOW_REPLACE=yes
+curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+```
+
+Backups are written to `./backups/<timestamp>` inside the project directory by default.
+You can override the destination with `BACKUP_DIR=/your/path`.
 
 The script will install Docker, Docker Compose, UFW, and the small host dependencies this stack needs, then it will create `.env` and `.env.secrets`, generate the `wg-easy` password hash, apply the host forwarding/firewall settings, and start the stack.
 
