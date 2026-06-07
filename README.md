@@ -62,13 +62,13 @@ From a fresh Debian/Ubuntu VPS, you can run everything with a single download-an
 
 ```bash
 export WG_HOST=YOUR_VPS_IP SERVER_NAME=vpn_toronto ADMIN_PASSWORD='yourpassword' SSH_PORT=22
-curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh | bash
 ```
 
 If you prefer interactive prompts, download then run the script locally on the VPS:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh
+curl -fsSLO https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -106,7 +106,7 @@ For non-interactive runs, set the action explicitly:
 
 ```bash
 export EXISTING_CONFIG_ACTION=new
-curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh | bash
 ```
 
 Non-interactive notes:
