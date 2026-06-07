@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="1.0.0"
+BOOTSTRAP_VERSION="1.1.0"
+BOOTSTRAP_REPO_URL="https://github.com/r45635/Easy-WG-Combo"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
@@ -33,7 +34,7 @@ run_root() {
 }
 
 has_tty() {
-  [ -t 0 ] || [ -r /dev/tty ]
+  [ -t 0 ] || { [ -r /dev/tty ] && { : </dev/tty; } >/dev/null 2>&1; }
 }
 
 read_prompt() {
@@ -62,6 +63,117 @@ read_secret_prompt() {
   fi
 
   printf -v "$__var_name" '%s' "$value"
+}
+
+git_head_short() {
+  git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown'
+}
+
+print_header() {
+  log "=============================================="
+  log "Easy-WG-Combo bootstrap v${BOOTSTRAP_VERSION}"
+  log "Date (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+  log "Revision: $(git_head_short)"
+  log "Repository: ${BOOTSTRAP_REPO_URL}"
+  log "=============================================="
+}
+
+confirm_installation() {
+  local answer=""
+
+  if ! has_tty; then
+    return
+  fi
+
+  read_prompt "Proceed with installation/update now? [Y/n]: " answer
+  answer="${answer:-Y}"
+  case "${answer,,}" in
+    y|yes) return ;;
+    *) die "Installation cancelled by user." ;;
+  esac
+}
+
+validate_port() {
+  local port="$1"
+  [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]
+}
+
+current_wg_port() {
+  local port=""
+
+  if [ -f "$ENV_FILE" ]; then
+    port="$(sed -n 's/^WG_PORT=//p' "$ENV_FILE" | head -n 1)"
+  fi
+
+  if ! validate_port "$port"; then
+    port="51820"
+  fi
+
+  printf '%s' "$port"
+}
+
+resolve_wg_port() {
+  local wg_port="${WG_PORT:-}"
+  local default_port
+
+  default_port="$(current_wg_port)"
+
+  if [ -n "$wg_port" ]; then
+    validate_port "$wg_port" || die "Invalid WG_PORT '$wg_port'. Use a value between 1 and 65535."
+    printf '%s' "$wg_port"
+    return
+  fi
+
+  wg_port="$default_port"
+
+  if has_tty; then
+    while true; do
+      read_prompt "WireGuard public UDP port [$default_port]: " wg_port
+      wg_port="${wg_port:-$default_port}"
+      if validate_port "$wg_port"; then
+        printf '%s' "$wg_port"
+        return
+      fi
+      log "Please enter a valid port between 1 and 65535."
+    done
+  fi
+
+  printf '%s' "$wg_port"
+}
+
+print_final_summary() {
+  local action_label="$1"
+  local wg_host="$2"
+  local wg_port="$3"
+  local server_name="$4"
+  local admin_domain="$5"
+  local public_https_enabled="$6"
+  local ssh_port="${SSH_PORT:-22}"
+  local admin_url=""
+
+  if is_truthy "$public_https_enabled" && [ -n "$admin_domain" ]; then
+    admin_url="https://${admin_domain}"
+  else
+    admin_url="http://127.0.0.1:${PORTAL_PORT:-8080}"
+  fi
+
+  log ""
+  log "===== Deployment Summary ====="
+  log "Mode: ${action_label}"
+  log "Server name: ${server_name}"
+  log "WireGuard endpoint: ${wg_host}:${wg_port}/udp"
+  log "Admin URL: ${admin_url}"
+  log "SSH port: ${ssh_port}/tcp"
+  log "GitHub: ${BOOTSTRAP_REPO_URL}"
+  log "Script version: ${BOOTSTRAP_VERSION}"
+  log "Script revision: $(git_head_short)"
+  log ""
+  log "Survival quick commands:"
+  log "  - docker ps"
+  log "  - ./compose.sh logs -f portal"
+  log "  - fail2ban-client status ${FAIL2BAN_JAIL:-easy-wg-portal}"
+  log "  - tail -f ./caddy/logs/access.log"
+  log "=============================="
 }
 
 available_space_mb() {
@@ -557,12 +669,13 @@ install_packages() {
 }
 
 configure_firewall() {
+  local wg_port="$1"
   local ssh_port="${SSH_PORT:-22}"
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
 
   log "Configuring UFW..."
   run_root ufw allow "${ssh_port}/tcp"
-  run_root ufw allow 51820/udp
+  run_root ufw allow "${wg_port}/udp"
   if is_truthy "$public_https_enabled"; then
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
@@ -595,7 +708,9 @@ generate_password_hash() {
 }
 
 main() {
-  log "Easy-WG-Combo bootstrap v${BOOTSTRAP_VERSION}"
+  print_header
+  confirm_installation
+
   ensure_linux
   require_cmd apt-get
 
@@ -605,8 +720,6 @@ main() {
   install_packages
   ensure_disk_space
   ensure_env_files
-  configure_sysctl
-  configure_firewall
 
   local has_existing="no"
   local existing_action=""
@@ -628,12 +741,17 @@ main() {
   local wg_host="${WG_HOST:-${1:-}}"
   local admin_password="${ADMIN_PASSWORD:-${2:-}}"
   local server_name
+  local wg_port
   local admin_domain
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
+  local action_label="fresh"
+
+  wg_port="$(resolve_wg_port)"
 
   server_name="$(resolve_server_name)"
 
   if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
+    action_label="new"
     if [ -z "$wg_host" ]; then
       wg_host="$(default_wg_host)"
     fi
@@ -664,6 +782,15 @@ main() {
     log "Writing configuration files..."
     set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
     set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
+    set_env_value "$ENV_FILE" "WG_PORT" "$wg_port"
+  else
+    action_label="keep"
+    if [ -z "$wg_host" ]; then
+      wg_host="$(current_wg_host)"
+    fi
+    if [ -n "$wg_port" ]; then
+      set_env_value "$ENV_FILE" "WG_PORT" "$wg_port"
+    fi
   fi
 
   log "Saving server name..."
@@ -679,6 +806,9 @@ main() {
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
 
+  configure_sysctl
+  configure_firewall "$wg_port"
+
   if is_truthy "$public_https_enabled"; then
     log "Configuring Caddy HTTPS reverse proxy..."
     configure_caddy "$admin_domain"
@@ -688,11 +818,13 @@ main() {
 
   log "Starting the stack (attempting image rebuild first)..."
   if "$SCRIPT_DIR/compose.sh" up -d --build; then
+    print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled"
     exit 0
   fi
 
   log "Image rebuild failed; retrying without rebuild..."
-  exec "$SCRIPT_DIR/compose.sh" up -d
+  "$SCRIPT_DIR/compose.sh" up -d
+  print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled"
 }
 
 main "$@"
