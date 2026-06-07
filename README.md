@@ -39,6 +39,8 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 
 ![Easy-WG-Combo security tab](docs/screenshots/security.png)
 
+![Easy-WG-Combo security tab — sessions & TLS](docs/screenshots/security-sessions.png)
+
 ![Easy-WG-Combo security tab — logs](docs/screenshots/security-logs.png)
 
 ### Integrated WireGuard view

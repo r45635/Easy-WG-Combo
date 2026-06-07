@@ -16,15 +16,26 @@ const PASS = process.argv[2] || process.env.ADMIN_PASSWORD || 'changeme';
 
 // CSS selectors of elements that contain confidential data to blur
 const BLUR_SELECTORS = [
+  // Server / client identity
   '#sidebar-server-name',
   '#dashboard-server-name',
   '#security-jail-name',
-  '#sec-my-ip-val',
+  '#login-server-name',
   '.client-name',
   '.client-ip',
-  '#login-server-name',
-  '.log-ip',           // IPs in the access log table
+  // Network addresses
+  '#sec-my-ip-val',
+  '.log-ip',
   'code.log-ip',
+  // Access log: paths only (keep method/status/duration readable)
+  '.log-uri',
+  '.log-time',
+  // Fail2Ban jail log (raw lines with PID, jail name, paths)
+  '.jaillog-pre',
+  // TLS cert details (domain, issuer, fingerprint)
+  '.tls-val',
+  // Active sessions: all cells (IP, UA, login time)
+  '#sessions-list td',
 ];
 
 async function blurConfidential(page) {
@@ -67,8 +78,21 @@ async function main() {
   await blurConfidential(page);
   // Scroll to top to show status bar + stats + bans panels
   await page.evaluate(() => document.querySelector('.content').scrollTo(0, 0));
+  await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/security.png`, fullPage: false });
   console.log('✓ security.png');
+
+  // ── Security (mid — TLS / password / sessions) ────────────────────────────
+  await page.evaluate(() => {
+    const c = document.querySelector('.content');
+    const sessions = document.getElementById('sessions-list');
+    if (sessions) sessions.scrollIntoView({ block: 'start', inline: 'nearest' });
+    else c.scrollTo(0, c.scrollHeight / 2);
+  });
+  await page.waitForTimeout(300);
+  await blurConfidential(page);
+  await page.screenshot({ path: `${OUT}/security-sessions.png`, fullPage: false });
+  console.log('✓ security-sessions.png');
 
   // ── Security (scrolled down — logs section) ──────────────────────────────────
   await page.evaluate(() => {
