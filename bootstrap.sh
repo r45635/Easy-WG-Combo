@@ -115,15 +115,15 @@ resolve_existing_install_action() {
     if [ -t 0 ]; then
       printf '%s\n' "Existing Easy-WG-Combo configuration detected."
       printf '%s\n' "Choose an action:"
-      printf '%s\n' "  [k] keep existing configuration and start/restart services"
-      printf '%s\n' "  [n] start new configuration (creates backup first)"
+      printf '%s\n' "  [keep] Keep existing configuration and start/restart services"
+      printf '%s\n' "  [new]  Start a new configuration (creates a backup first)"
 
       while true; do
-        read -r -p "Action (k/n): " action
+        read -r -p "Action (keep/new): " action
         case "${action,,}" in
           k|keep) action="keep"; break ;;
           n|new)  action="new"; break ;;
-          *) printf '%s\n' "Please answer 'k' (keep) or 'n' (new)." ;;
+          *) printf '%s\n' "Please answer 'keep' or 'new'." ;;
         esac
       done
     else
