@@ -54,7 +54,20 @@ Example baseline server sizing:
 
 ### First-time VPS bootstrap
 
-From a fresh Debian/Ubuntu VPS, the repo can now self-provision with one script:
+From a fresh Debian/Ubuntu VPS, you can run everything with a single download-and-execute command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+```
+
+Optional non-interactive mode:
+
+```bash
+WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 \
+curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
+```
+
+If you already cloned the repository on the VPS, you can run the bootstrap directly:
 
 ```bash
 sudo ./bootstrap.sh
