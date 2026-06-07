@@ -18,6 +18,16 @@ const I18N = {
     'dashboard.dnsQueries': 'DNS queries today',
     'dashboard.blocked': 'Blocked',
     'dashboard.recentClients': 'Recent clients',
+    'fail2ban.title': 'Fail2Ban',
+    'fail2ban.refresh': '↻ Refresh bans',
+    'fail2ban.jail': 'Jail',
+    'fail2ban.current': 'Currently banned',
+    'fail2ban.total': 'Total banned',
+    'fail2ban.loading': 'Loading Fail2Ban status…',
+    'fail2ban.disabled': 'Fail2Ban status is unavailable on this host.',
+    'fail2ban.none': 'No banned IP addresses.',
+    'fail2ban.unban': 'Unban',
+    'fail2ban.unbanError': 'Unable to unban this IP.',
     'server.label': 'Server',
     'server.rename': '✎ Rename server',
     'server.prompt': 'Server name (letters, numbers, - and _ only):',
@@ -114,6 +124,16 @@ const I18N = {
     'dashboard.dnsQueries': 'Requêtes DNS aujourd\'hui',
     'dashboard.blocked': 'Bloquées',
     'dashboard.recentClients': 'Clients récents',
+    'fail2ban.title': 'Fail2Ban',
+    'fail2ban.refresh': '↻ Actualiser les bannissements',
+    'fail2ban.jail': 'Prison',
+    'fail2ban.current': 'Bannis actuellement',
+    'fail2ban.total': 'Total bannis',
+    'fail2ban.loading': 'Chargement de l\'état Fail2Ban…',
+    'fail2ban.disabled': 'L\'état Fail2Ban est indisponible sur cet hôte.',
+    'fail2ban.none': 'Aucune IP bannie.',
+    'fail2ban.unban': 'Débannir',
+    'fail2ban.unbanError': 'Impossible de débannir cette IP.',
     'server.label': 'Serveur',
     'server.rename': '✎ Renommer le serveur',
     'server.prompt': 'Nom du serveur (lettres, chiffres, - et _ uniquement) :',
@@ -210,6 +230,16 @@ const I18N = {
     'dashboard.dnsQueries': '今日 DNS 请求',
     'dashboard.blocked': '已拦截',
     'dashboard.recentClients': '最近客户端',
+    'fail2ban.title': 'Fail2Ban',
+    'fail2ban.refresh': '↻ 刷新封禁',
+    'fail2ban.jail': '监狱',
+    'fail2ban.current': '当前封禁',
+    'fail2ban.total': '累计封禁',
+    'fail2ban.loading': '正在加载 Fail2Ban 状态…',
+    'fail2ban.disabled': '当前主机无法读取 Fail2Ban 状态。',
+    'fail2ban.none': '暂无被封禁 IP。',
+    'fail2ban.unban': '解封',
+    'fail2ban.unbanError': '无法解封该 IP。',
     'server.label': '服务器',
     'server.rename': '✎ 重命名服务器',
     'server.prompt': '服务器名称（仅允许字母、数字、- 和 _）：',
@@ -304,6 +334,7 @@ const state = {
   clients:       [],
   iframesLoaded: { wireguard: false, adguard: false },
   iframePaths:   { wireguard: '/wireguard/', adguard: '/adguard/' },
+  fail2ban:      null,
   serverName:    'vpn-server',
   lang:          'en',
 };
@@ -352,6 +383,7 @@ function applyI18n() {
 
   if (state.tab === 'dashboard') {
     renderDashClientList(state.clients.slice(0, 6));
+    renderFail2ban(state.fail2ban);
   }
   if (state.tab === 'clients') {
     const wrap = document.getElementById('client-table-wrap');
@@ -479,7 +511,11 @@ async function renameServer() {
 }
 
 async function loadDashboard() {
-  const [clients, stats] = await Promise.all([GET('/api/clients'), GET('/api/adguard/stats')]);
+  const [clients, stats, fail2ban] = await Promise.all([
+    GET('/api/clients'),
+    GET('/api/adguard/stats'),
+    GET('/api/fail2ban/status'),
+  ]);
 
   if (clients) {
     state.clients = clients;
@@ -498,6 +534,75 @@ async function loadDashboard() {
     document.getElementById('stat-blocked').textContent = fmtNum(blocked);
     document.getElementById('stat-pct').textContent = total > 0 ? `(${pct}%)` : '';
   }
+
+  if (fail2ban) {
+    state.fail2ban = fail2ban;
+    renderFail2ban(fail2ban);
+  }
+}
+
+function renderFail2ban(data) {
+  const jailEl = document.getElementById('fail2ban-jail');
+  const currentEl = document.getElementById('fail2ban-current');
+  const totalEl = document.getElementById('fail2ban-total');
+  const listEl = document.getElementById('fail2ban-list');
+  const msgEl = document.getElementById('fail2ban-message');
+
+  if (!jailEl || !currentEl || !totalEl || !listEl || !msgEl) return;
+
+  if (data === null) {
+    jailEl.textContent = '—';
+    currentEl.textContent = '0';
+    totalEl.textContent = '0';
+    msgEl.textContent = t('fail2ban.loading');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  if (!data || data.enabled === false) {
+    jailEl.textContent = data?.jail || '—';
+    currentEl.textContent = '0';
+    totalEl.textContent = '0';
+    msgEl.textContent = t('fail2ban.disabled');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  jailEl.textContent = data.jail || '—';
+  currentEl.textContent = String(data.currentlyBanned || 0);
+  totalEl.textContent = String(data.totalBanned || 0);
+
+  const ips = Array.isArray(data.ips) ? data.ips : [];
+  if (!ips.length) {
+    msgEl.textContent = t('fail2ban.none');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  msgEl.textContent = '';
+  listEl.innerHTML = ips.map(ip => `
+    <div class="fail2ban-item">
+      <code>${esc(ip)}</code>
+      <button class="btn-ghost btn-sm" data-action="unban-ip" data-ip="${esc(ip)}">${esc(t('fail2ban.unban'))}</button>
+    </div>
+  `).join('');
+}
+
+async function refreshFail2ban() {
+  const data = await GET('/api/fail2ban/status');
+  if (!data) return;
+  state.fail2ban = data;
+  renderFail2ban(data);
+}
+
+async function unbanIp(ip) {
+  const data = await POST('/api/fail2ban/unban', { ip });
+  if (!data || data.error) {
+    window.alert(data?.error || t('fail2ban.unbanError'));
+    return;
+  }
+  state.fail2ban = data;
+  renderFail2ban(data);
 }
 
 function renderDashClientList(clients) {
@@ -904,7 +1009,14 @@ document.getElementById('help-dns-btn2').addEventListener('click', openHelpModal
 document.getElementById('help-close-btn').addEventListener('click', closeHelpModal);
 document.getElementById('help-ok-btn').addEventListener('click', closeHelpModal);
 document.getElementById('refresh-btn').addEventListener('click', loadDashboard);
+document.getElementById('fail2ban-refresh-btn').addEventListener('click', refreshFail2ban);
 document.getElementById('rename-server-btn').addEventListener('click', renameServer);
+
+document.getElementById('fail2ban-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action="unban-ip"]');
+  if (!btn) return;
+  await unbanIp(btn.dataset.ip);
+});
 
 document.getElementById('filter-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('filter-overlay')) closeFilterModal();

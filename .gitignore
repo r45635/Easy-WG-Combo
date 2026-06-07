@@ -8,3 +8,6 @@ adguard/work/
 *.conf
 *.log
 portal/data/
+caddy/data/
+caddy/config/
+caddy/logs/

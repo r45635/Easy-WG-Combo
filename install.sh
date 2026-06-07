@@ -44,7 +44,7 @@ run_bootstrap() {
     exec ./bootstrap.sh
   fi
 
-  exec sudo --preserve-env=WG_HOST,ADMIN_PASSWORD,SSH_PORT,SERVER_NAME,ALLOW_REPLACE,BACKUP_DIR,EXISTING_CONFIG_ACTION ./bootstrap.sh
+  exec sudo --preserve-env=WG_HOST,ADMIN_PASSWORD,SSH_PORT,SERVER_NAME,ALLOW_REPLACE,BACKUP_DIR,EXISTING_CONFIG_ACTION,ADMIN_DOMAIN,TLS_EMAIL,PUBLIC_HTTPS_ENABLED,FAIL2BAN_JAIL,FAIL2BAN_BANTIME,FAIL2BAN_FINDTIME,FAIL2BAN_MAXRETRY,DNS_FALLBACK_SERVERS,DNS_TEST_HOST ./bootstrap.sh
 }
 
 main() {
@@ -52,7 +52,7 @@ main() {
   ensure_git
 
   if [ ! -t 0 ] && { [ -z "${WG_HOST:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; }; then
-    die "Non-interactive mode detected. Set WG_HOST and ADMIN_PASSWORD (optional: SERVER_NAME, SSH_PORT, BACKUP_DIR=/path, EXISTING_CONFIG_ACTION=keep|new)."
+    die "Non-interactive mode detected. Set WG_HOST and ADMIN_PASSWORD (optional: SERVER_NAME, ADMIN_DOMAIN, TLS_EMAIL, PUBLIC_HTTPS_ENABLED, SSH_PORT, BACKUP_DIR=/path, EXISTING_CONFIG_ACTION=keep|new)."
   fi
 
   if [ -d "$APP_DIR/.git" ]; then

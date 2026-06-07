@@ -22,6 +22,8 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **WireGuard & AdGuard UIs** — embedded as iframes for advanced config
 - **Multilingual portal UI** — language switcher with full interface coverage in **English, French, and Chinese**
 - **Server name support** — prompted during deployment, shown in the dashboard, editable later from the UI, and embedded in generated `.conf` filenames
+- **Auto HTTPS admin access** — Caddy reverse proxy with automatic certificate management (domain) or internal TLS fallback (IP)
+- **Fail2Ban protection** — automatic jail on portal login endpoint with dashboard visibility and unban action
 
 ## Screenshots
 
@@ -111,6 +113,18 @@ Non-interactive notes:
 - If an existing configuration is detected, `EXISTING_CONFIG_ACTION` is required (`keep` or `new`).
 - Optional override variables: `SERVER_NAME`, `PRUNE_BEFORE_DEPLOY`, `MIN_FREE_MB`, `BACKUP_DIR`.
 
+Public admin HTTPS defaults:
+- Enabled by default with `PUBLIC_HTTPS_ENABLED=yes`
+- Uses `ADMIN_DOMAIN` (recommended) or `WG_HOST` fallback
+- `TLS_EMAIL` is optional and used for ACME registration on public domain certificates
+- Opens `80/tcp` and `443/tcp` in UFW when HTTPS public mode is enabled
+
+Fail2Ban defaults:
+- Installed and configured automatically by bootstrap
+- Jail name: `easy-wg-portal` (override with `FAIL2BAN_JAIL`)
+- Default thresholds: `FAIL2BAN_MAXRETRY=5`, `FAIL2BAN_FINDTIME=10m`, `FAIL2BAN_BANTIME=1h`
+- Login failures on `/api/login` are monitored from Caddy access logs
+
 Backups are written to `./backups/<timestamp>` inside the project directory by default.
 You can override the destination with `BACKUP_DIR=/your/path`.
 
@@ -134,6 +148,12 @@ sudo WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 ./bootstrap.s
 - Validation allows letters, numbers, `-`, and `_` only.
 - Downloaded WireGuard files include the server name:
   - `wireguard-<server-name>-<client-name>.conf`
+
+### Dashboard Fail2Ban section
+
+- Shows jail name, currently banned IP count, and total bans.
+- Lists currently banned IPs.
+- Supports one-click unban from the portal UI.
 
 ### Manual setup
 

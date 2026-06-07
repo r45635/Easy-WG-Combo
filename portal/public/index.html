@@ -104,6 +104,21 @@
             <div class="stat-label"><span data-i18n="dashboard.blocked">Bloquées</span> <span id="stat-pct" class="stat-pct"></span></div>
           </div>
         </div>
+
+        <div class="fail2ban-panel">
+          <div class="section-header">
+            <h3 data-i18n="fail2ban.title">Fail2Ban</h3>
+            <button class="btn-ghost btn-sm" id="fail2ban-refresh-btn" data-i18n="fail2ban.refresh">↻ Refresh bans</button>
+          </div>
+          <div class="fail2ban-stats">
+            <span><strong data-i18n="fail2ban.jail">Jail</strong>: <code id="fail2ban-jail">—</code></span>
+            <span><strong data-i18n="fail2ban.current">Currently banned</strong>: <span id="fail2ban-current">0</span></span>
+            <span><strong data-i18n="fail2ban.total">Total banned</strong>: <span id="fail2ban-total">0</span></span>
+          </div>
+          <div id="fail2ban-message" class="text-dim" data-i18n="fail2ban.loading">Loading Fail2Ban status…</div>
+          <div id="fail2ban-list" class="fail2ban-list"></div>
+        </div>
+
         <div class="section-header">
           <h3 data-i18n="dashboard.recentClients">Clients récents</h3>
           <div style="display:flex;gap:.5rem;align-items:center">

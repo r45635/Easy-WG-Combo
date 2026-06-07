@@ -6,10 +6,13 @@ const QRCode     = require('qrcode');
 const fs         = require('fs');
 const os         = require('os');
 const path       = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const { Readable } = require('stream');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
+const HOST = process.env.PORTAL_HOST || '127.0.0.1';
 
 const WG_URL       = process.env.WG_EASY_URL   || 'http://127.0.0.1:51821';
 const AG_URL       = process.env.ADGUARD_URL   || 'http://127.0.0.1:3000';
@@ -18,6 +21,8 @@ const AG_USER      = process.env.ADGUARD_USER      || 'admin';
 const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
 const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
+const FAIL2BAN_JAIL = process.env.FAIL2BAN_JAIL || 'easy-wg-portal';
+const runCmd = promisify(execFile);
 
 const DNS_PRESETS = [
   { id: 'filtered', label: 'Filtré complet',    value: '10.8.0.1' },
@@ -127,6 +132,26 @@ async function agFetch(endpoint, opts = {}) {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...agAuth(), ...opts.headers },
   });
+}
+
+function parseFail2banStatus(output) {
+  const currentlyBanned = Number((output.match(/Currently banned:\s*(\d+)/i) || [])[1] || 0);
+  const totalBanned = Number((output.match(/Total banned:\s*(\d+)/i) || [])[1] || 0);
+  const listRaw = (output.match(/Banned IP list:\s*(.*)/i) || [])[1] || '';
+  const ips = listRaw.trim() ? listRaw.trim().split(/\s+/) : [];
+  return { currentlyBanned, totalBanned, ips };
+}
+
+function isValidIp(value) {
+  const raw = String(value || '').trim();
+  const ipv4 = /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/;
+  const ipv6 = /^[0-9a-fA-F:]+$/;
+  return ipv4.test(raw) || ipv6.test(raw);
+}
+
+async function fail2banStatus() {
+  const { stdout } = await runCmd('fail2ban-client', ['status', FAIL2BAN_JAIL], { timeout: 4000 });
+  return parseFail2banStatus(stdout);
 }
 
 // ── Express setup ────────────────────────────────────────────────────────────
@@ -484,6 +509,39 @@ app.post('/api/adguard/protection', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Fail2Ban ─────────────────────────────────────────────────────────────────
+
+app.get('/api/fail2ban/status', auth, async (_req, res) => {
+  try {
+    const status = await fail2banStatus();
+    res.json({ enabled: true, jail: FAIL2BAN_JAIL, ...status });
+  } catch (e) {
+    res.json({
+      enabled: false,
+      jail: FAIL2BAN_JAIL,
+      currentlyBanned: 0,
+      totalBanned: 0,
+      ips: [],
+      error: e.message,
+    });
+  }
+});
+
+app.post('/api/fail2ban/unban', auth, async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  if (!isValidIp(ip)) {
+    return res.status(400).json({ error: 'Invalid IP address.' });
+  }
+
+  try {
+    await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'unbanip', ip], { timeout: 4000 });
+    const status = await fail2banStatus();
+    res.json({ success: true, jail: FAIL2BAN_JAIL, ...status });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Portal listening on :${PORT}`));
+app.listen(PORT, HOST, () => console.log(`Portal listening on ${HOST}:${PORT}`));

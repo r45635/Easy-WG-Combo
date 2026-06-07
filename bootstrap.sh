@@ -94,7 +94,7 @@ dir_has_content() {
 }
 
 existing_install_detected() {
-  local containers=(wg-easy adguard portal)
+  local containers=(wg-easy adguard portal caddy)
   local c
 
   for c in "${containers[@]}"; do
@@ -174,7 +174,7 @@ backup_existing_state() {
 }
 
 replace_existing_containers() {
-  local containers=(wg-easy adguard portal)
+  local containers=(wg-easy adguard portal caddy)
   local c
 
   for c in "${containers[@]}"; do
@@ -287,6 +287,16 @@ default_wg_host() {
   printf '%s' "$host"
 }
 
+current_wg_host() {
+  local host=""
+
+  if [ -f "$ENV_FILE" ]; then
+    host="$(sed -n 's/^WG_HOST=//p' "$ENV_FILE" | head -n 1)"
+  fi
+
+  printf '%s' "$host"
+}
+
 ensure_linux() {
   [ "$(uname -s)" = "Linux" ] || die "This bootstrap script is intended for Linux VPS hosts."
 }
@@ -334,8 +344,109 @@ repair_dns_resolver_if_needed() {
   fi
 }
 
+is_truthy() {
+  case "${1,,}" in
+    y|yes|true|1|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_ip_address() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$value" == *:* ]]
+}
+
+resolve_admin_domain() {
+  local wg_host_value="$1"
+  local admin_domain="${ADMIN_DOMAIN:-}"
+
+  if [ -z "$admin_domain" ] && [ -f "$ENV_FILE" ]; then
+    admin_domain="$(sed -n 's/^ADMIN_DOMAIN=//p' "$ENV_FILE" | head -n 1)"
+  fi
+
+  if [ -z "$admin_domain" ]; then
+    admin_domain="$wg_host_value"
+  fi
+
+  if [ -z "$admin_domain" ]; then
+    admin_domain="$(current_wg_host)"
+  fi
+
+  printf '%s' "$admin_domain"
+}
+
+configure_caddy() {
+  local admin_domain="$1"
+  local portal_port="${PORTAL_PORT:-8080}"
+  local tls_email="${TLS_EMAIL:-}"
+  local caddy_dir="$SCRIPT_DIR/caddy"
+  local caddy_file="$caddy_dir/Caddyfile"
+
+  mkdir -p "$caddy_dir" "$caddy_dir/data" "$caddy_dir/config" "$caddy_dir/logs"
+
+  if [ -z "$admin_domain" ]; then
+    admin_domain=":443"
+  fi
+
+  {
+    printf '{\n'
+    if [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+      printf '  email %s\n' "$tls_email"
+    fi
+    printf '  admin off\n'
+    printf '}\n\n'
+    printf '%s {\n' "$admin_domain"
+    if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ]; then
+      printf '  tls internal\n'
+    fi
+    printf '  encode zstd gzip\n'
+    printf '  log {\n'
+    printf '    output file /var/log/easy-wg-portal/access.log\n'
+    printf '    format json\n'
+    printf '  }\n'
+    printf '  reverse_proxy 127.0.0.1:%s\n' "$portal_port"
+    printf '  header {\n'
+    printf '    Strict-Transport-Security "max-age=31536000; includeSubDomains"\n'
+    printf '    X-Content-Type-Options "nosniff"\n'
+    printf '    Referrer-Policy "same-origin"\n'
+    printf '  }\n'
+    printf '}\n'
+  } > "$caddy_file"
+}
+
+configure_fail2ban() {
+  local jail_name="${FAIL2BAN_JAIL:-easy-wg-portal}"
+  local bantime="${FAIL2BAN_BANTIME:-1h}"
+  local findtime="${FAIL2BAN_FINDTIME:-10m}"
+  local maxretry="${FAIL2BAN_MAXRETRY:-5}"
+  local log_path="$SCRIPT_DIR/caddy/logs/access.log"
+
+  run_root mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
+
+  run_root tee /etc/fail2ban/filter.d/easy-wg-portal.conf >/dev/null <<EOF
+[Definition]
+failregex = ^.*"remote_ip":"<HOST>".*"uri":"/api/login".*"status":401.*$
+ignoreregex =
+EOF
+
+  run_root tee /etc/fail2ban/jail.d/easy-wg-portal.local >/dev/null <<EOF
+[${jail_name}]
+enabled = true
+port = https,http
+filter = easy-wg-portal
+logpath = ${log_path}
+findtime = ${findtime}
+bantime = ${bantime}
+maxretry = ${maxretry}
+banaction = ufw
+EOF
+
+  run_root systemctl enable --now fail2ban
+  run_root systemctl restart fail2ban
+}
+
 install_packages() {
-  local packages=(ca-certificates curl git ufw)
+  local packages=(ca-certificates curl git ufw fail2ban)
 
   if ! command -v docker >/dev/null 2>&1; then
     packages+=(docker.io)
@@ -357,10 +468,15 @@ install_packages() {
 
 configure_firewall() {
   local ssh_port="${SSH_PORT:-22}"
+  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
 
   log "Configuring UFW..."
   run_root ufw allow "${ssh_port}/tcp"
   run_root ufw allow 51820/udp
+  if is_truthy "$public_https_enabled"; then
+    run_root ufw allow 80/tcp
+    run_root ufw allow 443/tcp
+  fi
   run_root ufw --force enable
 }
 
@@ -420,6 +536,8 @@ main() {
   local wg_host="${WG_HOST:-${1:-}}"
   local admin_password="${ADMIN_PASSWORD:-${2:-}}"
   local server_name
+  local admin_domain
+  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
 
   server_name="$(resolve_server_name)"
 
@@ -452,8 +570,20 @@ main() {
   set_env_value "$ENV_FILE" "SERVER_NAME" "$server_name"
   set_portal_server_name "$server_name"
 
+  admin_domain="$(resolve_admin_domain "$wg_host")"
+  if [ -n "$admin_domain" ]; then
+    set_env_value "$ENV_FILE" "ADMIN_DOMAIN" "$admin_domain"
+  fi
+
   if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
+  fi
+
+  if is_truthy "$public_https_enabled"; then
+    log "Configuring Caddy HTTPS reverse proxy..."
+    configure_caddy "$admin_domain"
+    log "Configuring Fail2Ban protection..."
+    configure_fail2ban
   fi
 
   log "Starting the stack (attempting image rebuild first)..."

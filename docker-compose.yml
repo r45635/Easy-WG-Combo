@@ -44,17 +44,31 @@ services:
     network_mode: host
     environment:
       - PORTAL_PORT=${PORTAL_PORT:-8080}
+      - PORTAL_HOST=${PORTAL_HOST:-127.0.0.1}
       - WG_EASY_URL=http://127.0.0.1:${WG_EASY_PORT:-51821}
       - ADGUARD_URL=http://127.0.0.1:${ADGUARD_PORT:-3000}
-      - WG_EASY_EXTERNAL_PORT=${WG_EASY_EXTERNAL_PORT:-51821}
-      - ADGUARD_EXTERNAL_PORT=${ADGUARD_EXTERNAL_PORT:-3000}
       - SERVER_NAME=${SERVER_NAME:-vpn-server}
+      - FAIL2BAN_JAIL=${FAIL2BAN_JAIL:-easy-wg-portal}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - WG_EASY_PASSWORD=${ADMIN_PASSWORD}
       - ADGUARD_USER=admin
       - ADGUARD_PASSWORD=${ADMIN_PASSWORD}
     volumes:
       - ./portal/data:/data
+      - /var/run/fail2ban:/var/run/fail2ban
     depends_on:
       - wg-easy
       - adguard
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+      - ./caddy/logs:/var/log/easy-wg-portal
+    depends_on:
+      - portal
