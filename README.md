@@ -23,15 +23,15 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 
 ## Quick start
 
-### VPS recommandé
+### Recommended VPS
 
-Si vous créez rapidement un serveur VPN, un VPS Vultr convient bien pour ce projet. Le lien ci-dessous fait partie d’un referral program, donc il peut aussi permettre de récupérer des crédits selon les conditions Vultr :
+If you want to spin up a VPN server quickly, a Vultr VPS is a good fit for this project. The link below is part of a referral program, so it may also help you earn credits depending on Vultr's terms:
 
 https://www.vultr.com/?ref=8489819
 
-Exemple de configuration à reprendre pour la doc ou un nouveau déploiement : le plan Vultr basique à 5 $/mois, situé à Toronto, avec 1 vCPU, 1 Go de RAM, 25 Go SSD et environ 4,22 Go de bande passante utilisée sur la période de référence. Pour l’OS, partir sur Debian 12 ou Ubuntu 24.04 LTS.
+Example configuration to use in the docs or for a new deployment: the basic Vultr plan at $5/month, located in Toronto, with 1 vCPU, 1 GB of RAM, 25 GB SSD, and about 4.22 GB of bandwidth used over the reference period. For the OS, use Debian 12 or Ubuntu 24.04 LTS.
 
-Configuration exemple du serveur Canada :
+Example Canada server configuration:
 
 - Location: Toronto
 - IP Address: 155.138.131.219
