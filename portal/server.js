@@ -21,7 +21,8 @@ const AG_USER      = process.env.ADGUARD_USER      || 'admin';
 const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
 const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
-const FAIL2BAN_JAIL = process.env.FAIL2BAN_JAIL || 'easy-wg-portal';
+const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
+const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
 const runCmd = promisify(execFile);
 
 const DNS_PRESETS = [
@@ -570,6 +571,73 @@ app.post('/api/fail2ban/unban', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Fail2Ban extended ────────────────────────────────────────────────────────
+
+app.post('/api/fail2ban/ban', auth, async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  if (!isValidIp(ip)) return res.status(400).json({ error: 'Invalid IP address.' });
+  try {
+    await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'banip', ip], { timeout: 4000 });
+    const status = await fail2banStatus();
+    res.json({ success: true, jail: FAIL2BAN_JAIL, ...status });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/fail2ban/unban-all', auth, async (_req, res) => {
+  try {
+    const current = await fail2banStatus();
+    await Promise.all(current.ips.map(ip =>
+      runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'unbanip', ip], { timeout: 4000 }).catch(() => {})
+    ));
+    const status = await fail2banStatus();
+    res.json({ success: true, jail: FAIL2BAN_JAIL, ...status });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/fail2ban/config', auth, async (_req, res) => {
+  try {
+    const [bt, ft, mr] = await Promise.all([
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'bantime'],  { timeout: 4000 }),
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'findtime'], { timeout: 4000 }),
+      runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'maxretry'], { timeout: 4000 }),
+    ]);
+    res.json({
+      jail:     FAIL2BAN_JAIL,
+      bantime:  parseInt(bt.stdout.trim(),  10),
+      findtime: parseInt(ft.stdout.trim(), 10),
+      maxretry: parseInt(mr.stdout.trim(), 10),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/fail2ban/logs', auth, (req, res) => {
+  const n      = Math.min(parseInt(req.query.n || '200', 10), 500);
+  const filter = req.query.status || '';
+  try {
+    if (!fs.existsSync(ACCESS_LOG_PATH))
+      return res.json({ lines: [], total: 0, error: 'Log file not available yet.' });
+    const raw    = fs.readFileSync(ACCESS_LOG_PATH, 'utf8');
+    const parsed = raw.trim().split('\n').filter(Boolean).map(line => {
+      try {
+        const o = JSON.parse(line);
+        return {
+          ts:       o.ts,
+          ip:       o.request?.remote_ip || o.request?.client_ip || '',
+          method:   o.request?.method || '',
+          uri:      o.request?.uri || '',
+          status:   o.status || 0,
+          duration: o.duration || 0,
+          ua:       (o.request?.headers?.['User-Agent'] || [])[0] || '',
+        };
+      } catch { return null; }
+    }).filter(Boolean);
+    const filtered = filter === '401'    ? parsed.filter(l => l.status === 401)
+                   : filter === 'errors' ? parsed.filter(l => l.status >= 400)
+                   : parsed;
+    res.json({ lines: filtered.slice(-n).reverse(), total: filtered.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

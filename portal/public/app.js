@@ -106,6 +106,31 @@ const I18N = {
     'modal.help.none.reco': 'Recommended for: developers, tests, specific cases.',
     'modal.help.noteLabel': 'Note:',
     'modal.help.noteBody': 'Only clients whose config uses <code>DNS = 10.8.0.1</code> can switch filters live. Others require a new configuration.',
+    'nav.security': 'Security',
+    'security.refresh': '↻ Refresh',
+    'security.config.bantime': 'Ban duration',
+    'security.config.findtime': 'Detection window',
+    'security.config.maxretry': 'Max attempts',
+    'security.bans.title': 'Active bans',
+    'security.bans.unbanAll': 'Unban all',
+    'security.bans.banBtn': 'Ban',
+    'security.bans.ipPlaceholder': 'e.g. 1.2.3.4',
+    'security.bans.none': 'No banned IP addresses.',
+    'security.bans.confirmUnbanAll': 'Unban all {n} IP address(es)?',
+    'security.logs.title': 'Access log',
+    'security.logs.all': 'All',
+    'security.logs.errors': 'Errors (4xx/5xx)',
+    'security.logs.attempts': '401 only',
+    'security.logs.autoRefresh': 'Auto-refresh',
+    'security.logs.empty': 'No log entries.',
+    'security.logs.noFile': 'Log file not available yet.',
+    'security.logs.entries': '{count} entries shown ({total} matching)',
+    'security.logs.time': 'Time',
+    'security.logs.ip': 'IP',
+    'security.logs.method': 'Method',
+    'security.logs.uri': 'Path',
+    'security.logs.status': 'Status',
+    'security.logs.duration': 'Duration',
   },
   fr: {
     'lang.label': 'Langue',
@@ -212,6 +237,31 @@ const I18N = {
     'modal.help.none.reco': 'Recommandé pour : développeurs, tests, cas spécifiques.',
     'modal.help.noteLabel': 'Note :',
     'modal.help.noteBody': 'Seuls les clients dont la config utilise <code>DNS = 10.8.0.1</code> peuvent changer de filtre à la volée. Les autres nécessitent une nouvelle configuration.',
+    'nav.security': 'Sécurité',
+    'security.refresh': '↻ Actualiser',
+    'security.config.bantime': 'Durée de bannissement',
+    'security.config.findtime': 'Fenêtre de détection',
+    'security.config.maxretry': 'Tentatives max',
+    'security.bans.title': 'Bans actifs',
+    'security.bans.unbanAll': 'Tout débannir',
+    'security.bans.banBtn': 'Bannir',
+    'security.bans.ipPlaceholder': 'ex. 1.2.3.4',
+    'security.bans.none': 'Aucune IP bannie.',
+    'security.bans.confirmUnbanAll': 'Débannir les {n} adresse(s) IP ?',
+    'security.logs.title': 'Journal d’accès',
+    'security.logs.all': 'Tout',
+    'security.logs.errors': 'Erreurs (4xx/5xx)',
+    'security.logs.attempts': '401 seulement',
+    'security.logs.autoRefresh': 'Actualisation auto',
+    'security.logs.empty': 'Aucune entrée.',
+    'security.logs.noFile': 'Fichier de log non disponible.',
+    'security.logs.entries': '{count} entrées affichées ({total} correspondantes)',
+    'security.logs.time': 'Heure',
+    'security.logs.ip': 'IP',
+    'security.logs.method': 'Méthode',
+    'security.logs.uri': 'Chemin',
+    'security.logs.status': 'Statut',
+    'security.logs.duration': 'Durée',
   },
   zh: {
     'lang.label': '语言',
@@ -318,6 +368,31 @@ const I18N = {
     'modal.help.none.reco': '推荐：开发、测试或特定场景。',
     'modal.help.noteLabel': '说明：',
     'modal.help.noteBody': '只有配置中使用 <code>DNS = 10.8.0.1</code> 的客户端才能在线切换过滤。其他客户端需要重新生成配置。',
+    'nav.security': '安全',
+    'security.refresh': '↻ 刷新',
+    'security.config.bantime': '封禁时长',
+    'security.config.findtime': '检测窗口',
+    'security.config.maxretry': '最大尝试次数',
+    'security.bans.title': '当前封禁',
+    'security.bans.unbanAll': '解封全部',
+    'security.bans.banBtn': '封禁',
+    'security.bans.ipPlaceholder': '如 1.2.3.4',
+    'security.bans.none': '暂无被封禁 IP。',
+    'security.bans.confirmUnbanAll': '解封全部 {n} 个 IP 地址？',
+    'security.logs.title': '访问日志',
+    'security.logs.all': '全部',
+    'security.logs.errors': '错误 (4xx/5xx)',
+    'security.logs.attempts': '仅 401',
+    'security.logs.autoRefresh': '自动刷新',
+    'security.logs.empty': '暂无记录。',
+    'security.logs.noFile': '日志文件尚不可用。',
+    'security.logs.entries': '显示 {count} 条（共 {total} 条匹配）',
+    'security.logs.time': '时间',
+    'security.logs.ip': 'IP',
+    'security.logs.method': '方法',
+    'security.logs.uri': '路径',
+    'security.logs.status': '状态',
+    'security.logs.duration': '耗时',
   },
 };
 
@@ -330,13 +405,16 @@ const DNS_PRESETS = [
 ];
 
 const state = {
-  tab:           'dashboard',
-  clients:       [],
-  iframesLoaded: { wireguard: false, adguard: false },
-  iframePaths:   { wireguard: '/wireguard/', adguard: '/adguard/' },
-  fail2ban:      null,
-  serverName:    'vpn-server',
-  lang:          'en',
+  tab:              'dashboard',
+  clients:          [],
+  iframesLoaded:    { wireguard: false, adguard: false },
+  iframePaths:      { wireguard: '/wireguard/', adguard: '/adguard/' },
+  fail2ban:         null,
+  security:         { config: null, bans: null },
+  securityLogFilter: '',
+  logAutoRefreshId: null,
+  serverName:       'vpn-server',
+  lang:             'en',
 };
 
 function detectLang() {
@@ -472,6 +550,13 @@ function switchTab(name) {
   if (name === 'clients')   loadClients();
   if (name === 'wireguard') loadIframe('wireguard');
   if (name === 'adguard')   loadIframe('adguard');
+  if (name !== 'security' && state.logAutoRefreshId) {
+    clearInterval(state.logAutoRefreshId);
+    state.logAutoRefreshId = null;
+    const arEl = document.getElementById('log-auto-refresh');
+    if (arEl) arEl.checked = false;
+  }
+  if (name === 'security')  loadSecurity();
 }
 
 function loadIframe(name) {
@@ -1000,6 +1085,154 @@ document.querySelectorAll('.nav-item').forEach(el => {
   });
 });
 
+// ── Security / Fail2Ban tab ───────────────────────────────────────────────────
+
+function fmtSeconds(s) {
+  s = Math.abs(Number(s) || 0);
+  if (s >= 86400) return `${Math.round(s / 86400)}d`;
+  if (s >= 3600)  return `${Math.round(s / 3600)}h`;
+  if (s >= 60)    return `${Math.round(s / 60)}m`;
+  return `${s}s`;
+}
+
+function fmtDuration(secs) {
+  if (!secs) return '—';
+  if (secs < 0.001) return '<1ms';
+  if (secs < 1) return `${Math.round(secs * 1000)}ms`;
+  return `${secs.toFixed(2)}s`;
+}
+
+function fmtLogTime(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function statusColor(code) {
+  if (code >= 500) return 'var(--red)';
+  if (code >= 400) return 'var(--orange)';
+  if (code >= 300) return 'var(--yellow)';
+  return 'var(--green)';
+}
+
+async function loadSecurity() {
+  const [config, bans] = await Promise.all([
+    GET('/api/fail2ban/config'),
+    GET('/api/fail2ban/status'),
+  ]);
+
+  if (config && !config.error) {
+    state.security.config = config;
+    document.getElementById('security-jail-name').textContent = config.jail || '—';
+    document.getElementById('sec-bantime').textContent  = fmtSeconds(config.bantime);
+    document.getElementById('sec-findtime').textContent = fmtSeconds(config.findtime);
+    document.getElementById('sec-maxretry').textContent = String(config.maxretry);
+  }
+
+  if (bans) {
+    state.security.bans = bans;
+    renderSecurityBans(bans);
+    document.getElementById('sec-current-bans').textContent = String(bans.currentlyBanned || 0);
+  }
+
+  await loadLogs(state.securityLogFilter);
+}
+
+async function loadLogs(filter) {
+  state.securityLogFilter = filter || '';
+  const param = filter === 'errors' || filter === '401' ? `&status=${filter}` : '';
+  const data = await GET(`/api/fail2ban/logs?n=200${param}`);
+  if (data) renderLogTable(data);
+}
+
+function renderSecurityBans(data) {
+  const listEl = document.getElementById('security-bans-list');
+  const msgEl  = document.getElementById('security-bans-msg');
+  if (!listEl) return;
+
+  if (!data || data.enabled === false) {
+    msgEl.textContent = t('fail2ban.disabled');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const ips = Array.isArray(data.ips) ? data.ips : [];
+  msgEl.textContent = '';
+  if (!ips.length) {
+    listEl.innerHTML = `<div class="text-dim" style="font-size:.85rem;padding:.4rem 0">${esc(t('security.bans.none'))}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = ips.map(ip => `
+    <div class="fail2ban-item">
+      <code>${esc(ip)}</code>
+      <button class="btn-ghost btn-sm" style="color:var(--orange)" data-action="sec-unban" data-ip="${esc(ip)}">${esc(t('fail2ban.unban'))}</button>
+    </div>
+  `).join('');
+}
+
+function renderLogTable(data) {
+  const wrap = document.getElementById('security-log-wrap');
+  if (!wrap) return;
+
+  if (data.error && !data.lines?.length) {
+    wrap.innerHTML = `<div class="text-dim" style="padding:.75rem">${esc(data.error || t('security.logs.noFile'))}</div>`;
+    return;
+  }
+
+  const lines = data.lines || [];
+  if (!lines.length) {
+    wrap.innerHTML = `<div class="text-dim" style="padding:.75rem">${esc(t('security.logs.empty'))}</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="log-count">${esc(t('security.logs.entries', { count: lines.length, total: data.total }))}</div>
+    <div class="log-table-wrap">
+      <table class="log-table">
+        <thead><tr>
+          <th>${esc(t('security.logs.time'))}</th>
+          <th>${esc(t('security.logs.ip'))}</th>
+          <th>${esc(t('security.logs.method'))}</th>
+          <th>${esc(t('security.logs.uri'))}</th>
+          <th>${esc(t('security.logs.status'))}</th>
+          <th>${esc(t('security.logs.duration'))}</th>
+        </tr></thead>
+        <tbody>
+          ${lines.map(l => `<tr>
+            <td class="log-time">${esc(fmtLogTime(l.ts))}</td>
+            <td><code class="log-ip">${esc(l.ip)}</code></td>
+            <td><span class="log-method">${esc(l.method)}</span></td>
+            <td class="log-uri" title="${esc(l.uri)}">${esc(l.uri.length > 50 ? l.uri.slice(0, 50) + '…' : l.uri)}</td>
+            <td><span class="log-status" style="color:${statusColor(l.status)};font-weight:700">${l.status}</span></td>
+            <td class="log-dur">${esc(fmtDuration(l.duration))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function banIp(ip) {
+  ip = (ip || '').trim();
+  if (!ip) return;
+  const data = await POST('/api/fail2ban/ban', { ip });
+  if (!data || data.error) { window.alert(data?.error || 'Error banning IP.'); return; }
+  state.security.bans = data;
+  renderSecurityBans(data);
+  document.getElementById('sec-current-bans').textContent = String(data.currentlyBanned || 0);
+  document.getElementById('ban-ip-input').value = '';
+}
+
+async function unbanAllIps() {
+  const n = state.security.bans?.currentlyBanned || 0;
+  if (n === 0) return;
+  if (!confirm(t('security.bans.confirmUnbanAll', { n }))) return;
+  const data = await POST('/api/fail2ban/unban-all', {});
+  if (!data || data.error) { window.alert(data?.error || 'Error unbanning all IPs.'); return; }
+  state.security.bans = data;
+  renderSecurityBans(data);
+  document.getElementById('sec-current-bans').textContent = '0';
+}
+
 document.getElementById('new-client-btn').addEventListener('click', openNewClientModal);
 document.getElementById('dash-new-btn').addEventListener('click', openNewClientModal);
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
@@ -1045,3 +1278,40 @@ state.lang = detectLang();
 syncLangSelectors();
 applyI18n();
 checkAuth();
+
+// ── Security tab events ───────────────────────────────────────────────────────
+document.getElementById('security-refresh-btn').addEventListener('click', loadSecurity);
+
+document.getElementById('ban-ip-btn').addEventListener('click', () =>
+  banIp(document.getElementById('ban-ip-input').value));
+
+document.getElementById('ban-ip-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') banIp(e.target.value);
+});
+
+document.getElementById('unban-all-btn').addEventListener('click', unbanAllIps);
+
+document.getElementById('security-bans-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="sec-unban"]');
+  if (!btn) return;
+  const data = await POST('/api/fail2ban/unban', { ip: btn.dataset.ip });
+  if (!data || data.error) { window.alert(data?.error || t('fail2ban.unbanError')); return; }
+  state.security.bans = data;
+  renderSecurityBans(data);
+  document.getElementById('sec-current-bans').textContent = String(data.currentlyBanned || 0);
+});
+
+document.querySelectorAll('.log-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadLogs(btn.dataset.filter);
+  });
+});
+
+document.getElementById('log-auto-refresh').addEventListener('change', e => {
+  if (state.logAutoRefreshId) { clearInterval(state.logAutoRefreshId); state.logAutoRefreshId = null; }
+  if (e.target.checked) {
+    state.logAutoRefreshId = setInterval(() => loadLogs(state.securityLogFilter), 5000);
+  }
+});

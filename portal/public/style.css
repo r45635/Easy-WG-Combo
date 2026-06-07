@@ -344,3 +344,58 @@ tbody tr:last-child td { border-bottom: none; }
 .error { color: var(--red); font-size: .82rem; margin-top: .5rem; }
 .empty { color: var(--text-dim); text-align: center; padding: 3rem 1rem; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+/* ── Security tab ── */
+.security-panel {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  margin-top: 1.4rem;
+}
+.security-panel .section-header { margin: 0 0 .75rem; }
+
+.ban-input-row {
+  display: flex; gap: .5rem; margin-top: .75rem; align-items: center;
+}
+.input-field {
+  flex: 1;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .42rem .75rem;
+  color: var(--text); font-size: .88rem;
+  outline: none; transition: border-color var(--trans);
+}
+.input-field:focus { border-color: var(--primary); }
+
+.log-filter-bar { display: flex; gap: .4rem; margin: .75rem 0 .5rem; flex-wrap: wrap; }
+.log-filter-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .3rem .75rem;
+  color: var(--text-dim); font-size: .8rem; transition: all var(--trans); cursor: pointer;
+}
+.log-filter-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.log-filter-btn.active { border-color: var(--primary); color: var(--primary); background: var(--primary)15; }
+
+.auto-refresh-label {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .82rem; color: var(--text-dim); cursor: pointer;
+}
+.auto-refresh-label input { accent-color: var(--primary); }
+
+.log-count { font-size: .78rem; color: var(--text-dim); margin-bottom: .4rem; }
+.log-table-wrap { overflow-x: auto; }
+.log-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.log-table thead tr { border-bottom: 1px solid var(--border); }
+.log-table th {
+  color: var(--text-dim); font-size: .74rem; text-transform: uppercase;
+  letter-spacing: .04em; padding: .4rem .55rem; text-align: left; white-space: nowrap;
+}
+.log-table td { padding: .38rem .55rem; border-bottom: 1px solid var(--border)22; vertical-align: middle; }
+.log-table tbody tr:hover { background: var(--surface2)88; }
+.log-table tbody tr:last-child td { border-bottom: none; }
+.log-time { color: var(--text-dim); white-space: nowrap; font-family: monospace; font-size: .78rem; }
+.log-ip   { font-size: .8rem; font-family: monospace; }
+.log-method { font-weight: 700; font-size: .76rem; letter-spacing: .03em; }
+.log-uri  { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: var(--text-dim); font-size: .8rem; font-family: monospace; }
+.log-dur  { color: var(--text-faint); font-family: monospace; font-size: .76rem; white-space: nowrap; }

@@ -55,6 +55,9 @@
         <a href="#" class="nav-item" data-tab="adguard">
           <span class="nav-icon">◐</span> <span data-i18n="nav.adguard">AdGuard Home</span>
         </a>
+        <a href="#" class="nav-item" data-tab="security">
+          <span class="nav-icon">⊘</span> <span data-i18n="nav.security">Security</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="lang-switch-wrap">
@@ -153,6 +156,69 @@
       <!-- AdGuard iframe -->
       <section id="tab-adguard" class="tab-content hidden iframe-tab">
         <iframe id="ag-iframe" src="about:blank" title="AdGuard Home"></iframe>
+      </section>
+
+      <!-- Security / Fail2Ban -->
+      <section id="tab-security" class="tab-content hidden">
+        <div class="page-header">
+          <div>
+            <h2 data-i18n="nav.security">Security</h2>
+            <div class="server-summary">
+              <span class="server-summary-label">Fail2Ban</span>
+              <code id="security-jail-name">—</code>
+            </div>
+          </div>
+          <button class="btn-ghost btn-sm" id="security-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="sec-bantime">—</div>
+            <div class="stat-label" data-i18n="security.config.bantime">Ban duration</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="sec-findtime">—</div>
+            <div class="stat-label" data-i18n="security.config.findtime">Detection window</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="sec-maxretry">—</div>
+            <div class="stat-label" data-i18n="security.config.maxretry">Max attempts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value orange" id="sec-current-bans">0</div>
+            <div class="stat-label" data-i18n="fail2ban.current">Currently banned</div>
+          </div>
+        </div>
+
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="security.bans.title">Active bans</h3>
+            <button class="btn-ghost btn-sm" id="unban-all-btn" style="color:var(--red);border-color:var(--red)44" data-i18n="security.bans.unbanAll">Unban all</button>
+          </div>
+          <div class="ban-input-row">
+            <input type="text" id="ban-ip-input" class="input-field" placeholder="1.2.3.4" data-i18n-placeholder="security.bans.ipPlaceholder">
+            <button class="btn-primary btn-sm" id="ban-ip-btn" data-i18n="security.bans.banBtn">Ban</button>
+          </div>
+          <div id="security-bans-msg" class="text-dim" style="margin-top:.5rem;font-size:.85rem"></div>
+          <div id="security-bans-list" class="fail2ban-list" style="margin-top:.75rem"></div>
+        </div>
+
+        <div class="security-panel" style="margin-top:1rem">
+          <div class="section-header">
+            <h3 data-i18n="security.logs.title">Access log</h3>
+            <label class="auto-refresh-label">
+              <input type="checkbox" id="log-auto-refresh"> <span data-i18n="security.logs.autoRefresh">Auto-refresh</span>
+            </label>
+          </div>
+          <div class="log-filter-bar">
+            <button class="log-filter-btn active" data-filter="" data-i18n="security.logs.all">All</button>
+            <button class="log-filter-btn" data-filter="errors" data-i18n="security.logs.errors">Errors (4xx/5xx)</button>
+            <button class="log-filter-btn" data-filter="401" data-i18n="security.logs.attempts">401 only</button>
+          </div>
+          <div id="security-log-wrap" class="log-table-wrap">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
       </section>
 
     </main>

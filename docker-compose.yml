@@ -53,9 +53,11 @@ services:
       - WG_EASY_PASSWORD=${ADMIN_PASSWORD}
       - ADGUARD_USER=admin
       - ADGUARD_PASSWORD=${ADMIN_PASSWORD}
+      - ACCESS_LOG_PATH=/var/log/easy-wg-portal/access.log
     volumes:
       - ./portal/data:/data
       - /var/run/fail2ban:/var/run/fail2ban
+      - ./caddy/logs:/var/log/easy-wg-portal:ro
     depends_on:
       - wg-easy
       - adguard
