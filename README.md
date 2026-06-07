@@ -14,8 +14,8 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 
 ## Features
 
-- **Dashboard** — connected clients, AdGuard stats (queries, blocked rate)
-- **Create client** — DNS preset choice + QR code displayed immediately
+- **Dashboard** — connected clients, AdGuard stats (queries, blocked rate), Fail2Ban status
+- **VPN Clients** — create/delete clients with DNS preset choice and QR code displayed immediately
 - **Change DNS filter** — instant per-client filter change via AdGuard API (no reconnection needed)
 - **DNS presets** — Filtered / Malware-only / No filter, with help modal
 - **Auto DNS discovery** — existing clients' DNS presets detected on first load
@@ -23,13 +23,23 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Multilingual portal UI** — language switcher with full interface coverage in **English, French, and Chinese**
 - **Server name support** — prompted during deployment, shown in the dashboard, editable later from the UI, and embedded in generated `.conf` filenames
 - **Auto HTTPS admin access** — Caddy reverse proxy with automatic certificate management (domain) or internal TLS fallback (IP)
-- **Fail2Ban protection** — automatic jail on portal login endpoint with dashboard visibility and unban action
+- **Security tab** — full Fail2Ban management: ban/unban IPs, IP whitelist, live config edit, jail log viewer, active session management, TLS certificate info, access log viewer with filters, service health status, password change
 
 ## Screenshots
 
-### Aggregated dashboard
+### Dashboard
 
 ![Easy-WG-Combo dashboard](docs/screenshots/dashboard.png)
+
+### VPN Clients
+
+![Easy-WG-Combo clients view](docs/screenshots/clients.png)
+
+### Security tab
+
+![Easy-WG-Combo security tab](docs/screenshots/security.png)
+
+![Easy-WG-Combo security tab — logs](docs/screenshots/security-logs.png)
 
 ### Integrated WireGuard view
 
@@ -164,6 +174,23 @@ sudo WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 ./bootstrap.s
 - Shows jail name, currently banned IP count, and total bans.
 - Lists currently banned IPs.
 - Supports one-click unban from the portal UI.
+
+### Security tab
+
+Full Fail2Ban management and server security overview accessible from the **Security** sidebar item:
+
+| Section | Description |
+|---|---|
+| **Status bar** | Your current IP (as seen by the server) · Health badges for portal / wg-easy / adguard / caddy |
+| **Fail2Ban stats** | Ban duration · Detection window · Max attempts · Currently banned count |
+| **Edit config** | Live Fail2Ban parameter edit (bantime, findtime, maxretry) without restarting |
+| **Active bans** | List of banned IPs with per-IP unban · Manual ban input · Unban all |
+| **IP Whitelist** | Add/remove IPs or CIDR ranges from `ignoreip` — these are never auto-banned |
+| **Fail2Ban log** | Last 100 entries from `/var/log/fail2ban.log` filtered to the active jail |
+| **Active sessions** | All open portal sessions (IP, user-agent, login time) — revoke any session individually |
+| **TLS Certificate** | Domain, issuer, type (internal / ACME), expiry date with days-left indicator |
+| **Change password** | Change the portal admin password — persisted immediately without restart |
+| **Access log** | Last 200 Caddy access log entries — filter by All / Errors (4xx/5xx) / 401 only · Auto-refresh toggle |
 
 ### Manual setup
 
