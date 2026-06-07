@@ -52,7 +52,7 @@ Example baseline server sizing:
 - vCPU/s: 1 vCPU
 - RAM: 1024 MB
 - Storage: 25 GB SSD
-- Bandwidth: 4.22 GB
+- OS: Debian 12 or Ubuntu 24.04 LTS
 
 ### First-time VPS bootstrap
 
@@ -77,6 +77,20 @@ If you already cloned the repository on the VPS, you can run the bootstrap direc
 sudo ./bootstrap.sh
 ```
 
+### Validated interactive bootstrap flow (default path)
+
+The default interactive path was validated on a real VPS. Prompt order and defaults:
+
+1. `Run Docker prune cleanup before deployment? [Y/n]`
+  - Default (Enter): `Yes`
+2. Existing install detected, then `Action (k/n):`
+  - `k` = keep existing configuration and just start/restart containers
+  - `n` = create a backup first, then initialize a new configuration
+3. `Server name [current-or-hostname]:`
+  - Default (Enter): keep the current saved name, or use sanitized hostname on first install
+
+In the validated default run: prune ran, `k` (keep) was selected, default server name was accepted, and all 3 containers started.
+
 When existing containers/data are detected, the bootstrap now asks what to do:
 - `keep` — keep existing configuration and just start/restart the stack
 - `new` — start a new configuration (a backup is created first)
@@ -93,6 +107,10 @@ export EXISTING_CONFIG_ACTION=new
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/main/install.sh | bash
 ```
 
+Non-interactive notes:
+- If an existing configuration is detected, `EXISTING_CONFIG_ACTION` is required (`keep` or `new`).
+- Optional override variables: `SERVER_NAME`, `PRUNE_BEFORE_DEPLOY`, `MIN_FREE_MB`, `BACKUP_DIR`.
+
 Backups are written to `./backups/<timestamp>` inside the project directory by default.
 You can override the destination with `BACKUP_DIR=/your/path`.
 
@@ -108,6 +126,14 @@ If you want to override the defaults non-interactively, you can pass the values 
 ```bash
 sudo WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword' SSH_PORT=22 ./bootstrap.sh
 ```
+
+### Portal server name behavior
+
+- Displayed in the login subtitle, sidebar title block, and dashboard heading.
+- Editable from the dashboard using the rename server action.
+- Validation allows letters, numbers, `-`, and `_` only.
+- Downloaded WireGuard files include the server name:
+  - `wireguard-<server-name>-<client-name>.conf`
 
 ### Manual setup
 
