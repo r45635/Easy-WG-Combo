@@ -687,7 +687,12 @@ app.get('/api/myip', (req, res) => {
 app.get('/api/fail2ban/ignoreip', auth, async (_req, res) => {
   try {
     const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
-    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+    const raw = stdout.trim();
+    // fail2ban-client outputs "No IP address/network is in the ignore list" when empty
+    const ips = (raw && !raw.startsWith('No '))
+      ? raw.split(/\s+/).filter(s => /^[\d:.\/a-fA-F]+$/.test(s))
+      : [];
+    res.json({ ips });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -697,7 +702,9 @@ app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
   try {
     await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'addignoreip', ip], { timeout: 4000 });
     const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
-    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+    const raw = stdout.trim();
+    const ips = (raw && !raw.startsWith('No ')) ? raw.split(/\s+/).filter(s => /^[\d:.\/a-fA-F]+$/.test(s)) : [];
+    res.json({ ips });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -707,7 +714,9 @@ app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
   try {
     await runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'delignoreip', ip], { timeout: 4000 });
     const { stdout } = await runCmd('fail2ban-client', ['get', FAIL2BAN_JAIL, 'ignoreip'], { timeout: 4000 });
-    res.json({ ips: stdout.trim().split(/\s+/).filter(Boolean) });
+    const raw = stdout.trim();
+    const ips = (raw && !raw.startsWith('No ')) ? raw.split(/\s+/).filter(s => /^[\d:.\/a-fA-F]+$/.test(s)) : [];
+    res.json({ ips });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

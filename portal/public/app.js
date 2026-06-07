@@ -659,9 +659,9 @@ async function api(method, path, body) {
   return r.json().catch(() => null);
 }
 
-const GET  = path      => api('GET', path);
-const POST = (p, body) => api('POST', p, body);
-const DEL  = path      => api('DELETE', path);
+const GET  = path         => api('GET',    path);
+const POST = (p, body)    => api('POST',   p, body);
+const DEL  = (p, body)    => api('DELETE', p, body);
 
 function showLogin() {
   document.getElementById('app').classList.add('hidden');
