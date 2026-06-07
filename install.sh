@@ -140,9 +140,10 @@ handle_existing_installation() {
         return
         ;;
       n|new)
+        local new_default="${APP_DIR}-2"
         while true; do
-          read_prompt "New installation path: " new_dir
-          [ -n "$new_dir" ] || { log "Please provide a path."; continue; }
+          read_prompt "New installation path [$new_default]: " new_dir
+          new_dir="${new_dir:-$new_default}"
           if [ "$new_dir" = "$APP_DIR" ]; then
             log "Please choose a different path than the current installation."
             continue
