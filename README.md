@@ -45,11 +45,8 @@ https://www.vultr.com/?ref=8489819
 
 Example configuration to use in the docs or for a new deployment: the basic Vultr plan at $5/month, located in Toronto, with 1 vCPU, 1 GB of RAM, 25 GB SSD, and about 4.22 GB of bandwidth used over the reference period. For the OS, use Debian 12 or Ubuntu 24.04 LTS.
 
-Example Canada server configuration:
+Example baseline server sizing:
 
-- Location: Toronto
-- IP Address: 155.138.131.219
-- Username: root
 - vCPU/s: 1 vCPU
 - RAM: 1024 MB
 - Storage: 25 GB SSD
