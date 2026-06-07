@@ -567,12 +567,25 @@ is_ip_address() {
   [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$value" == *:* ]]
 }
 
+is_placeholder_domain() {
+  local d="$1"
+  case "$d" in
+    vpn.example.com|example.com|YOUR_DOMAIN|your.domain.com) return 0 ;;
+  esac
+  return 1
+}
+
 resolve_admin_domain() {
   local wg_host_value="$1"
   local admin_domain="${ADMIN_DOMAIN:-}"
 
   if [ -z "$admin_domain" ] && [ -f "$ENV_FILE" ]; then
     admin_domain="$(sed -n 's/^ADMIN_DOMAIN=//p' "$ENV_FILE" | head -n 1)"
+  fi
+
+  # Ignore placeholder values left from .env.example
+  if is_placeholder_domain "$admin_domain"; then
+    admin_domain=""
   fi
 
   if [ -z "$admin_domain" ]; then
@@ -607,7 +620,7 @@ configure_caddy() {
     printf '  admin off\n'
     printf '}\n\n'
     printf '%s {\n' "$admin_domain"
-    if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ]; then
+    if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ] || [ -z "$tls_email" ]; then
       printf '  tls internal\n'
     fi
     printf '  encode zstd gzip\n'
