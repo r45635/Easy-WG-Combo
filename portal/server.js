@@ -2543,9 +2543,32 @@ app.get('/api/monitors', auth, (req, res) => {
   res.json({ monitors: Object.values(monitors) });
 });
 
+app.get('/api/monitors/:id', auth, (req, res) => {
+  const monitors = loadMonitors();
+  const m = monitors[req.params.id];
+  if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  res.json(m);
+});
+
+const MONITOR_VALID_TYPES = ['http', 'https', 'tcp', 'dns', 'docker', 'tls'];
+const MONITOR_SAFE_CONTAINER_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+const MONITOR_SAFE_DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
 app.post('/api/monitors', auth, (req, res) => {
   const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
   if (!name || !type || !target) return res.status(400).json({ error: 'name, type, target required' });
+  if (!MONITOR_VALID_TYPES.includes(type))
+    return res.status(400).json({ error: `type must be one of: ${MONITOR_VALID_TYPES.join(', ')}` });
+  if ((type === 'http' || type === 'https') && !/^https?:\/\/.+/.test(target))
+    return res.status(400).json({ error: 'HTTP/HTTPS monitor target must be a valid URL starting with http:// or https://' });
+  if (type === 'tcp' || type === 'tls') {
+    const p = parseInt(req.body.port || 443);
+    if (!p || p < 1 || p > 65535) return res.status(400).json({ error: 'port must be between 1 and 65535' });
+  }
+  if (type === 'docker' && !MONITOR_SAFE_CONTAINER_RE.test(target))
+    return res.status(400).json({ error: 'docker target must be a valid container name (alphanumeric, dash, dot, underscore)' });
+  if (type === 'dns' && !MONITOR_SAFE_DOMAIN_RE.test(target))
+    return res.status(400).json({ error: 'dns target must be a valid domain name' });
   const monitors = loadMonitors();
   const id = `mon_${Date.now()}`;
   monitors[id] = {
