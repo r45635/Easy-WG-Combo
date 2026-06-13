@@ -2586,6 +2586,7 @@ app.post('/api/monitors/:id/enable', auth, (req, res) => {
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   m.enabled = true;
+  if (m.lastStatus === 'disabled') m.lastStatus = 'unknown';
   m.nextCheckAt = new Date(Date.now() + 30000).toISOString();
   saveMonitors(monitors);
   res.json({ ok: true });
