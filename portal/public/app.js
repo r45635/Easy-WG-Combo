@@ -182,6 +182,46 @@ const I18N = {
     // nav
     'nav.backups': 'Backups',
     'nav.notifications': 'Notifications',
+    'nav.devices': 'Devices',
+    'nav.dnsProfiles': 'DNS Profiles',
+    'nav.gateway': 'Gateway',
+    // devices
+    'devices.add': '+ Add Device',
+    'devices.col.name': 'Name',
+    'devices.col.owner': 'Owner',
+    'devices.col.status': 'Status',
+    'devices.col.dns': 'DNS Profile',
+    'devices.col.routing': 'Routing',
+    'devices.col.expires': 'Expires',
+    'devices.col.actions': 'Actions',
+    'devices.status.online': 'Online',
+    'devices.status.recently_seen': 'Recent',
+    'devices.status.offline': 'Offline',
+    'devices.status.inactive': 'Inactive',
+    'devices.status.revoked': 'Revoked',
+    'devices.status.expired': 'Expired',
+    'devices.status.never_connected': 'Never',
+    'devices.status.unknown': '?',
+    'devices.routing.full_tunnel': 'Full Tunnel',
+    'devices.routing.dns_only': 'DNS Only',
+    'devices.routing.private_access': 'Private',
+    'devices.routing.custom': 'Custom',
+    'devices.bypass.active': 'Bypass active',
+    'devices.expires.never': '—',
+    // dns profiles
+    'dnsProfiles.assignments': 'Device Assignments',
+    'dnsProfiles.bypass': 'Bypass',
+    'dnsProfiles.bypass.set': 'Set Bypass',
+    'dnsProfiles.bypass.revoke': 'Revoke',
+    'dnsProfiles.type.managed': 'Built-in',
+    'dnsProfiles.type.custom': 'Custom',
+    // gateway
+    'gateway.add': '+ Add Service',
+    'gateway.empty': 'No proxy services configured.',
+    'gateway.exposure.vpn_only': 'VPN Only',
+    'gateway.exposure.public': 'Public HTTPS',
+    'gateway.caddy.ok': 'Caddy admin reachable',
+    'gateway.caddy.down': 'Caddy admin not reachable — run ./easywg migrate',
     // health
     'health.cpu': 'CPU Usage',
     'health.ram': 'RAM Usage',
@@ -418,6 +458,43 @@ const I18N = {
     'security.password.wrongCurrent': 'Mot de passe actuel incorrect.',
     'nav.backups': 'Sauvegardes',
     'nav.notifications': 'Notifications',
+    'nav.devices': 'Appareils',
+    'nav.dnsProfiles': 'Profils DNS',
+    'nav.gateway': 'Passerelle',
+    'devices.add': '+ Ajouter',
+    'devices.col.name': 'Nom',
+    'devices.col.owner': 'Propriétaire',
+    'devices.col.status': 'Statut',
+    'devices.col.dns': 'Profil DNS',
+    'devices.col.routing': 'Routage',
+    'devices.col.expires': 'Expiration',
+    'devices.col.actions': 'Actions',
+    'devices.status.online': 'Connecté',
+    'devices.status.recently_seen': 'Récent',
+    'devices.status.offline': 'Hors ligne',
+    'devices.status.inactive': 'Inactif',
+    'devices.status.revoked': 'Révoqué',
+    'devices.status.expired': 'Expiré',
+    'devices.status.never_connected': 'Jamais',
+    'devices.status.unknown': '?',
+    'devices.routing.full_tunnel': 'Tunnel complet',
+    'devices.routing.dns_only': 'DNS seul',
+    'devices.routing.private_access': 'Privé',
+    'devices.routing.custom': 'Personnalisé',
+    'devices.bypass.active': 'Bypass actif',
+    'devices.expires.never': '—',
+    'dnsProfiles.assignments': 'Assignations',
+    'dnsProfiles.bypass': 'Bypass',
+    'dnsProfiles.bypass.set': 'Activer bypass',
+    'dnsProfiles.bypass.revoke': 'Révoquer',
+    'dnsProfiles.type.managed': 'Intégré',
+    'dnsProfiles.type.custom': 'Personnalisé',
+    'gateway.add': '+ Ajouter service',
+    'gateway.empty': 'Aucun service proxy configuré.',
+    'gateway.exposure.vpn_only': 'VPN uniquement',
+    'gateway.exposure.public': 'HTTPS public',
+    'gateway.caddy.ok': 'API Caddy accessible',
+    'gateway.caddy.down': 'API Caddy inaccessible — exécuter ./easywg migrate',
     'health.cpu': 'CPU',
     'health.ram': 'RAM',
     'health.disk': 'Disque',
@@ -650,6 +727,43 @@ const I18N = {
     'security.password.wrongCurrent': '当前密码不正确。',
     'nav.backups': '备份',
     'nav.notifications': '通知',
+    'nav.devices': '设备',
+    'nav.dnsProfiles': 'DNS 配置',
+    'nav.gateway': '网关',
+    'devices.add': '+ 添加设备',
+    'devices.col.name': '名称',
+    'devices.col.owner': '用户',
+    'devices.col.status': '状态',
+    'devices.col.dns': 'DNS 配置',
+    'devices.col.routing': '路由',
+    'devices.col.expires': '到期',
+    'devices.col.actions': '操作',
+    'devices.status.online': '在线',
+    'devices.status.recently_seen': '最近',
+    'devices.status.offline': '离线',
+    'devices.status.inactive': '未激活',
+    'devices.status.revoked': '已吊销',
+    'devices.status.expired': '已过期',
+    'devices.status.never_connected': '从未',
+    'devices.status.unknown': '?',
+    'devices.routing.full_tunnel': '完全隧道',
+    'devices.routing.dns_only': '仅 DNS',
+    'devices.routing.private_access': '私有',
+    'devices.routing.custom': '自定义',
+    'devices.bypass.active': '旁路激活',
+    'devices.expires.never': '—',
+    'dnsProfiles.assignments': '设备分配',
+    'dnsProfiles.bypass': '旁路',
+    'dnsProfiles.bypass.set': '设置旁路',
+    'dnsProfiles.bypass.revoke': '撤销',
+    'dnsProfiles.type.managed': '内置',
+    'dnsProfiles.type.custom': '自定义',
+    'gateway.add': '+ 添加服务',
+    'gateway.empty': '未配置代理服务。',
+    'gateway.exposure.vpn_only': '仅 VPN',
+    'gateway.exposure.public': '公开 HTTPS',
+    'gateway.caddy.ok': 'Caddy 管理 API 可用',
+    'gateway.caddy.down': 'Caddy 管理 API 不可用 — 请运行 ./easywg migrate',
     'health.cpu': 'CPU 使用率',
     'health.ram': '内存使用率',
     'health.disk': '磁盘使用率',
@@ -730,6 +844,9 @@ const state = {
   health:           null,
   backups:          [],
   notifConfig:      null,
+  devices:          [],
+  dnsProfiles:      [],
+  proxyServices:    [],
 };
 
 function detectLang() {
@@ -826,9 +943,10 @@ async function api(method, path, body) {
   return r.json().catch(() => null);
 }
 
-const GET  = path         => api('GET',    path);
-const POST = (p, body)    => api('POST',   p, body);
-const DEL  = (p, body)    => api('DELETE', p, body);
+const GET   = path         => api('GET',    path);
+const POST  = (p, body)   => api('POST',   p, body);
+const DEL   = (p, body)   => api('DELETE', p, body);
+const PATCH = (p, body)   => api('PATCH',  p, body);
 
 function showLogin() {
   document.getElementById('app').classList.add('hidden');
@@ -867,6 +985,9 @@ function switchTab(name) {
   if (name === 'adguard')       loadIframe('adguard');
   if (name === 'backups')       loadBackups();
   if (name === 'notifications') loadNotifications();
+  if (name === 'devices')      loadDevicesTab();
+  if (name === 'dns-profiles') loadDnsProfilesTab();
+  if (name === 'gateway')      loadGatewayTab();
   if (name !== 'security' && state.logAutoRefreshId) {
     clearInterval(state.logAutoRefreshId);
     state.logAutoRefreshId = null;
@@ -2189,3 +2310,327 @@ document.getElementById('backup-list').addEventListener('click', async e => {
 document.getElementById('notif-save-btn').addEventListener('click',         saveNotifConfig);
 document.getElementById('notif-test-btn').addEventListener('click',         sendTestNotification);
 document.getElementById('notif-hist-refresh-btn').addEventListener('click', loadNotifHistory);
+
+// ── Phase 2: Devices (Module C) ───────────────────────────────────────────────
+
+const STATUS_COLORS = {
+  online: '#22c55e', recently_seen: '#84cc16', offline: '#6b7280',
+  inactive: '#f59e0b', revoked: '#ef4444', expired: '#ef4444',
+  never_connected: '#94a3b8', unknown: '#94a3b8',
+};
+const ROUTING_LABELS = {
+  full_tunnel: 'devices.routing.full_tunnel', dns_only: 'devices.routing.dns_only',
+  private_access: 'devices.routing.private_access', custom: 'devices.routing.custom',
+};
+
+function deviceStatusBadge(status) {
+  const color = STATUS_COLORS[status] || '#94a3b8';
+  const label = t(`devices.status.${status}`) || status;
+  return `<span class="status-badge" style="background:${color}20;color:${color};border:1px solid ${color}40">${label}</span>`;
+}
+
+function formatExpiry(dev) {
+  if (!dev.expiresAt) return t('devices.expires.never');
+  const d = new Date(dev.expiresAt);
+  const days = Math.ceil((d - Date.now()) / 86400000);
+  if (days < 0) return `<span style="color:#ef4444">${d.toLocaleDateString()}</span>`;
+  return d.toLocaleDateString();
+}
+
+async function loadDevicesTab() {
+  const loading = document.getElementById('devices-loading');
+  const wrap    = document.getElementById('devices-table-wrap');
+  const summary = document.getElementById('devices-summary');
+  if (loading) loading.classList.remove('hidden');
+  if (wrap)    wrap.classList.add('hidden');
+
+  const data = await GET('/api/devices');
+  if (!data) return;
+  state.devices = data.devices || [];
+
+  if (summary) {
+    const online = state.devices.filter(d => d.status === 'online').length;
+    summary.textContent = `${state.devices.length} devices, ${online} online`;
+  }
+
+  renderDevicesTable();
+  if (loading) loading.classList.add('hidden');
+  if (wrap)    wrap.classList.remove('hidden');
+}
+
+function renderDevicesTable() {
+  const tbody = document.getElementById('devices-tbody');
+  if (!tbody) return;
+  if (!state.devices.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-dim" style="text-align:center;padding:1rem">${t('common.loading')}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = state.devices.map(dev => {
+    const bypassBadge = dev.bypassActive
+      ? `<span class="bypass-badge" title="${t('devices.bypass.active')}">⚡ bypass</span>` : '';
+    const profileLabel = dev.dnsProfile || 'default_filtered';
+    const routingLabel = t(ROUTING_LABELS[dev.routingMode] || 'devices.routing.full_tunnel');
+    return `<tr>
+      <td><strong>${esc(dev.name)}</strong>${bypassBadge}</td>
+      <td>${esc(dev.owner || '—')}</td>
+      <td>${deviceStatusBadge(dev.status)}</td>
+      <td><span class="profile-tag">${esc(profileLabel)}</span></td>
+      <td><span class="routing-tag">${routingLabel}</span></td>
+      <td>${formatExpiry(dev)}</td>
+      <td class="actions">
+        <button class="btn-sm btn-ghost" data-action="dev-config" data-id="${dev.id}" title="Download config">↓</button>
+        <button class="btn-sm btn-ghost" data-action="dev-qr" data-id="${dev.id}" title="QR code">⊡</button>
+        ${dev.revokedAt ? '' : `<button class="btn-sm btn-ghost" data-action="dev-disable" data-id="${dev.id}">${dev.wgClient?.enabled === false ? '▶' : '‖'}</button>`}
+        ${dev.revokedAt ? '' : `<button class="btn-sm btn-danger" data-action="dev-revoke" data-id="${dev.id}">✕</button>`}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('devices-refresh-btn').addEventListener('click', loadDevicesTab);
+
+document.getElementById('device-add-btn').addEventListener('click', async () => {
+  const name = window.prompt('Device name:');
+  if (!name) return;
+  const owner = window.prompt('Owner (optional):') || '';
+  const data = await POST('/api/devices', { name, owner });
+  if (!data || data.error) { window.alert(data?.error || 'Error creating device'); return; }
+  await loadDevicesTab();
+});
+
+document.getElementById('devices-tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+
+  if (action === 'dev-config') {
+    window.open(`/api/devices/${id}/config`, '_blank');
+    return;
+  }
+  if (action === 'dev-qr') {
+    const w = window.open('', '_blank');
+    w.document.write(`<html><body style="background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="/api/devices/${id}/qr" style="max-width:400px"></body></html>`);
+    return;
+  }
+  const dev = state.devices.find(d => d.id === id);
+  if (!dev) return;
+
+  if (action === 'dev-disable') {
+    const endpoint = dev.wgClient?.enabled === false ? 'enable' : 'disable';
+    await POST(`/api/devices/${id}/${endpoint}`, {});
+    await loadDevicesTab();
+    return;
+  }
+  if (action === 'dev-revoke') {
+    if (!confirm(`Revoke device "${dev.name}"? This permanently blocks VPN access.`)) return;
+    const res = await POST(`/api/devices/${id}/revoke`, { confirmed: true });
+    if (res?.error) { window.alert(res.error); return; }
+    await loadDevicesTab();
+    return;
+  }
+});
+
+// ── Phase 2: DNS Profiles (Module A) ─────────────────────────────────────────
+
+async function loadDnsProfilesTab() {
+  const loading = document.getElementById('dns-profiles-loading');
+  const wrap    = document.getElementById('dns-profiles-wrap');
+  if (loading) loading.classList.remove('hidden');
+  if (wrap)    wrap.classList.add('hidden');
+
+  const [profData, devData] = await Promise.all([
+    GET('/api/dns-profiles'),
+    GET('/api/devices'),
+  ]);
+  if (!profData) return;
+  state.dnsProfiles = profData.profiles || [];
+  state.devices = (devData?.devices) || state.devices || [];
+
+  renderProfileCards();
+  renderDnsAssignTable();
+
+  if (loading) loading.classList.add('hidden');
+  if (wrap)    wrap.classList.remove('hidden');
+}
+
+function renderProfileCards() {
+  const container = document.getElementById('profile-cards');
+  if (!container) return;
+  const profiles = Array.isArray(state.dnsProfiles) ? state.dnsProfiles : Object.values(state.dnsProfiles || {});
+  container.innerHTML = profiles.map(p => `
+    <div class="profile-card profile-card-${p.id}">
+      <div class="profile-card-header">
+        <strong>${esc(p.name)}</strong>
+        <span class="profile-type-badge">${t(`dnsProfiles.type.${p.type}`)}</span>
+      </div>
+      <div class="profile-card-desc">${esc(p.description || '')}</div>
+      ${p.type === 'custom' ? `<button class="btn-sm btn-danger" data-action="del-profile" data-id="${p.id}">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderDnsAssignTable() {
+  const tbody = document.getElementById('dns-assign-tbody');
+  if (!tbody) return;
+  const devices = state.devices || [];
+  if (!devices.length) { tbody.innerHTML = ''; return; }
+  tbody.innerHTML = devices.map(dev => {
+    const bypassInfo = dev.bypassActive
+      ? `<span class="bypass-badge">⚡ ${dev.bypassUntil === 'permanent' ? '∞' : new Date(dev.bypassUntil).toLocaleTimeString()}</span>`
+      : '—';
+    return `<tr>
+      <td><strong>${esc(dev.name)}</strong></td>
+      <td>${deviceStatusBadge(dev.status)}</td>
+      <td>
+        <select class="dns-profile-select" data-dev-id="${dev.id}">
+          ${renderProfileOptions(dev.dnsProfile)}
+        </select>
+      </td>
+      <td>${bypassInfo}</td>
+      <td class="actions">
+        <button class="btn-sm btn-ghost" data-action="set-bypass" data-id="${dev.id}">⚡ bypass</button>
+        ${dev.bypassActive ? `<button class="btn-sm btn-ghost" data-action="revoke-bypass" data-id="${dev.id}">✕</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderProfileOptions(selected) {
+  const profiles = Array.isArray(state.dnsProfiles) ? state.dnsProfiles : Object.values(state.dnsProfiles || {});
+  return profiles.map(p => `<option value="${p.id}"${p.id === selected ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+}
+
+document.getElementById('dns-profiles-refresh-btn').addEventListener('click', loadDnsProfilesTab);
+
+document.getElementById('profile-cards').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="del-profile"]');
+  if (!btn) return;
+  if (!confirm('Delete this custom profile?')) return;
+  const res = await DEL(`/api/dns-profiles/${btn.dataset.id}`);
+  if (res?.error) { window.alert(res.error); return; }
+  await loadDnsProfilesTab();
+});
+
+document.getElementById('dns-assign-tbody').addEventListener('change', async e => {
+  const sel = e.target.closest('.dns-profile-select');
+  if (!sel) return;
+  const devId = sel.dataset.devId;
+  const res = await POST(`/api/devices/${devId}/dns-profile`, { profileId: sel.value });
+  if (res?.error) { window.alert(res.error); sel.value = (state.devices.find(d => d.id === devId) || {}).dnsProfile || ''; }
+});
+
+document.getElementById('dns-assign-tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'set-bypass') {
+    const dur = window.prompt('Bypass duration:\n15m | 1h | 4h | 24h | permanent', '1h');
+    if (!dur) return;
+    const res = await POST(`/api/devices/${id}/dns-bypass`, { duration: dur });
+    if (res?.error) { window.alert(res.error); return; }
+    await loadDnsProfilesTab();
+  }
+  if (action === 'revoke-bypass') {
+    await DEL(`/api/devices/${id}/dns-bypass`);
+    await loadDnsProfilesTab();
+  }
+});
+
+// ── Phase 2: Gateway / Reverse Proxy (Module D) ───────────────────────────────
+
+async function loadGatewayTab() {
+  const loading   = document.getElementById('gateway-loading');
+  const listWrap  = document.getElementById('gateway-list-wrap');
+  const statusEl  = document.getElementById('gateway-caddy-status');
+  if (loading)  loading.classList.remove('hidden');
+  if (listWrap) listWrap.classList.add('hidden');
+
+  const [svcData, valData] = await Promise.all([
+    GET('/api/proxy/services'),
+    POST('/api/proxy/validate', {}),
+  ]);
+  if (!svcData) return;
+  state.proxyServices = svcData.services || [];
+
+  if (statusEl && valData) {
+    statusEl.textContent = valData.adminUp ? t('gateway.caddy.ok') : t('gateway.caddy.down');
+    statusEl.style.color = valData.adminUp ? '#22c55e' : '#f59e0b';
+  }
+
+  renderGatewayList();
+  if (loading)  loading.classList.add('hidden');
+  if (listWrap) listWrap.classList.remove('hidden');
+}
+
+function renderGatewayList() {
+  const container = document.getElementById('gateway-list');
+  const emptyEl   = document.getElementById('gateway-empty');
+  if (!container) return;
+  if (!state.proxyServices.length) {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    container.innerHTML = '';
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  container.innerHTML = state.proxyServices.map(svc => {
+    const exposureLabel = t(`gateway.exposure.${svc.exposure}`) || svc.exposure;
+    const exposureClass = svc.exposure === 'vpn_only' ? 'vpn-only' : 'public';
+    const enabledClass  = svc.enabled ? '' : 'service-disabled';
+    return `<div class="service-row ${enabledClass}" data-svc-id="${svc.id}">
+      <div class="service-row-info">
+        <strong>${esc(svc.name)}</strong>
+        <span class="exposure-badge exposure-${exposureClass}">${exposureLabel}</span>
+        <code class="service-domain">${esc(svc.domain)}</code>
+        <span class="text-dim">→</span>
+        <code class="service-target">${esc(svc.target)}</code>
+      </div>
+      <div class="actions">
+        <button class="btn-sm btn-ghost" data-action="svc-toggle" data-id="${svc.id}">${svc.enabled ? '‖' : '▶'}</button>
+        <button class="btn-sm btn-danger" data-action="svc-delete" data-id="${svc.id}">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('gateway-refresh-btn').addEventListener('click', loadGatewayTab);
+
+document.getElementById('gateway-add-btn').addEventListener('click', async () => {
+  const name = window.prompt('Service name:');
+  if (!name) return;
+  const domain = window.prompt('Domain (e.g. app.example.com):');
+  if (!domain) return;
+  const target = window.prompt('Target URL (e.g. http://10.8.0.5:8080):');
+  if (!target) return;
+  const exposureRaw = window.prompt('Exposure:\n1 = VPN only (default)\n2 = Public HTTPS', '1');
+  const exposure = exposureRaw === '2' ? 'public' : 'vpn_only';
+  const confirmed = exposure === 'public' ? true : false;
+  const res = await POST('/api/proxy/services', { name, domain, target, exposure, confirmed });
+  if (!res || res.error) { window.alert(res?.error || 'Error creating service'); return; }
+  await loadGatewayTab();
+});
+
+document.getElementById('gateway-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'svc-toggle') {
+    const svc = state.proxyServices.find(s => s.id === id);
+    const endpoint = svc?.enabled ? 'disable' : 'enable';
+    const res = await POST(`/api/proxy/services/${id}/${endpoint}`, {});
+    if (res?.error) { window.alert(res.error); return; }
+    await loadGatewayTab();
+    return;
+  }
+  if (action === 'svc-delete') {
+    const svc = state.proxyServices.find(s => s.id === id);
+    if (!confirm(`Delete service "${svc?.name}"?`)) return;
+    const res = await DEL(`/api/proxy/services/${id}`);
+    if (res?.error) { window.alert(res.error); return; }
+    await loadGatewayTab();
+    return;
+  }
+});

@@ -64,6 +64,15 @@
         <a href="#" class="nav-item" data-tab="notifications">
           <span class="nav-icon">◌</span> <span data-i18n="nav.notifications">Notifications</span>
         </a>
+        <a href="#" class="nav-item" data-tab="devices">
+          <span class="nav-icon">⊞</span> <span data-i18n="nav.devices">Devices</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="dns-profiles">
+          <span class="nav-icon">⊙</span> <span data-i18n="nav.dnsProfiles">DNS Profiles</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="gateway">
+          <span class="nav-icon">⊕</span> <span data-i18n="nav.gateway">Gateway</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="lang-switch-wrap">
@@ -516,6 +525,87 @@
           <div id="security-log-wrap" class="log-table-wrap">
             <div class="loading" data-i18n="common.loading">Loading…</div>
           </div>
+        </div>
+      </section>
+
+      <!-- ── Devices (Module C) ── -->
+      <section id="tab-devices" class="tab-content hidden">
+        <div class="page-header">
+          <div>
+            <h2 data-i18n="nav.devices">Devices</h2>
+            <div class="server-summary" id="devices-summary"></div>
+          </div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="devices-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+            <button class="btn-primary btn-sm" id="device-add-btn" data-i18n="devices.add">+ Add Device</button>
+          </div>
+        </div>
+        <div id="devices-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="devices-table-wrap" class="hidden">
+          <table class="data-table" id="devices-table">
+            <thead>
+              <tr>
+                <th data-i18n="devices.col.name">Name</th>
+                <th data-i18n="devices.col.owner">Owner</th>
+                <th data-i18n="devices.col.status">Status</th>
+                <th data-i18n="devices.col.dns">DNS Profile</th>
+                <th data-i18n="devices.col.routing">Routing</th>
+                <th data-i18n="devices.col.expires">Expires</th>
+                <th data-i18n="devices.col.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="devices-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── DNS Profiles (Module A) ── -->
+      <section id="tab-dns-profiles" class="tab-content hidden">
+        <div class="page-header">
+          <div>
+            <h2 data-i18n="nav.dnsProfiles">DNS Profiles</h2>
+          </div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="dns-profiles-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="dns-profiles-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="dns-profiles-wrap" class="hidden">
+          <div class="profile-cards" id="profile-cards"></div>
+          <div class="section-header" style="margin-top:1.5rem">
+            <h3 data-i18n="dnsProfiles.assignments">Device Assignments</h3>
+          </div>
+          <table class="data-table" id="dns-assign-table">
+            <thead>
+              <tr>
+                <th data-i18n="devices.col.name">Device</th>
+                <th data-i18n="devices.col.status">Status</th>
+                <th data-i18n="devices.col.dns">Current Profile</th>
+                <th data-i18n="dnsProfiles.bypass">Bypass</th>
+                <th data-i18n="devices.col.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dns-assign-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Gateway / Reverse Proxy (Module D) ── -->
+      <section id="tab-gateway" class="tab-content hidden">
+        <div class="page-header">
+          <div>
+            <h2 data-i18n="nav.gateway">Gateway</h2>
+            <div class="server-summary" id="gateway-caddy-status"></div>
+          </div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="gateway-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+            <button class="btn-primary btn-sm" id="gateway-add-btn" data-i18n="gateway.add">+ Add Service</button>
+          </div>
+        </div>
+        <div id="gateway-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="gateway-list-wrap" class="hidden">
+          <div id="gateway-empty" class="text-dim hidden" data-i18n="gateway.empty">No proxy services configured.</div>
+          <div id="gateway-list"></div>
         </div>
       </section>
 

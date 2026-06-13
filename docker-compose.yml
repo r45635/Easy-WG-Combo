@@ -59,6 +59,7 @@ services:
       - BACKUP_KEEP=${BACKUP_KEEP:-10}
       - ALERT_DISK_THRESHOLD=${ALERT_DISK_THRESHOLD:-85}
       - ALERT_CERT_EXPIRY_DAYS=${ALERT_CERT_EXPIRY_DAYS:-14}
+      - WG_DEFAULT_DNS=${WG_DEFAULT_DNS:-10.8.0.1}
     volumes:
       - ./portal/data:/data
       - /var/run/fail2ban:/var/run/fail2ban
@@ -78,6 +79,8 @@ services:
       - ./docker-compose.yml:/backup-src/docker-compose.yml:ro
       - ./compose.sh:/backup-src/compose.sh:ro
       - ./backups:/backups
+      # Phase 2: portal writes easywg-services.caddy; Caddyfile read for reload
+      - ./caddy:/app-caddy:rw
     depends_on:
       - wg-easy
       - adguard
@@ -89,6 +92,7 @@ services:
     network_mode: host
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/easywg-services.caddy:/etc/caddy/easywg-services.caddy:ro
       - ./caddy/data:/data
       - ./caddy/config:/config
       - ./caddy/logs:/var/log/easy-wg-portal

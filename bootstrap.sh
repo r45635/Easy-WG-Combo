@@ -608,6 +608,12 @@ configure_caddy() {
 
   mkdir -p "$caddy_dir" "$caddy_dir/data" "$caddy_dir/config" "$caddy_dir/logs"
 
+  # Create the managed proxy services file if it doesn't exist
+  local services_file="$caddy_dir/easywg-services.caddy"
+  if [ ! -f "$services_file" ]; then
+    printf '# Easy-WG-Combo managed proxy services — edited by the portal, do not edit manually\n' > "$services_file"
+  fi
+
   if [ -z "$admin_domain" ]; then
     admin_domain=":443"
   fi
@@ -617,7 +623,7 @@ configure_caddy() {
     if [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
       printf '  email %s\n' "$tls_email"
     fi
-    printf '  admin off\n'
+    printf '  admin localhost:2019\n'
     printf '}\n\n'
     printf '%s {\n' "$admin_domain"
     if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ] || [ -z "$tls_email" ]; then
@@ -634,7 +640,8 @@ configure_caddy() {
     printf '    X-Content-Type-Options "nosniff"\n'
     printf '    Referrer-Policy "same-origin"\n'
     printf '  }\n'
-    printf '}\n'
+    printf '}\n\n'
+    printf 'import /etc/caddy/easywg-services.caddy\n'
   } > "$caddy_file"
 }
 

@@ -37,6 +37,33 @@ const ALERT_DISK_THRESHOLD  = parseInt(process.env.ALERT_DISK_THRESHOLD  || '85'
 const ALERT_CERT_EXPIRY_DAYS = parseInt(process.env.ALERT_CERT_EXPIRY_DAYS || '14', 10);
 const runCmd = promisify(execFile);
 
+// ── Phase 2: constants ─────────────────────────────────────────────────────────
+
+const DEVICES_FILE        = '/data/devices.json';
+const DNS_PROFILES_FILE   = '/data/dns-profiles.json';
+const PROXY_SERVICES_FILE = '/data/proxy-services.json';
+const CADDY_SERVICES_FILE = '/app-caddy/easywg-services.caddy';
+const CADDY_FILE          = '/app-caddy/Caddyfile';
+const VPN_DNS_IP          = process.env.WG_DEFAULT_DNS || '10.8.0.1';
+const VPN_SUBNET          = (() => { const p = VPN_DNS_IP.split('.'); p[3] = '0'; return p.join('.') + '/24'; })();
+
+const ROUTING_MODES_DEF = {
+  full_tunnel:    { id: 'full_tunnel',    name: 'Full Tunnel',         allowedIps: ['0.0.0.0/0', '::/0'], description: 'All device traffic routes through the VPS.' },
+  dns_only:       { id: 'dns_only',       name: 'DNS Filtering Only',  allowedIps: [],                    description: 'Only DNS queries route through the VPN. Experimental.', experimental: true },
+  private_access: { id: 'private_access', name: 'Private Access Only', allowedIps: [],                    description: 'Access VPN-only services only. Normal browsing is unaffected.' },
+  custom:         { id: 'custom',         name: 'Custom Split-Tunnel',  allowedIps: [],                    description: 'Specify exactly which CIDRs go through the VPN.' },
+};
+ROUTING_MODES_DEF.dns_only.allowedIps       = [`${VPN_DNS_IP}/32`];
+ROUTING_MODES_DEF.private_access.allowedIps = [VPN_SUBNET];
+
+const BUILTIN_DNS_PROFILES = {
+  default_filtered: { id: 'default_filtered', name: 'Default Filtered', type: 'managed', adguardPolicy: 'default_filtered', dnsIp: VPN_DNS_IP,        description: 'Block ads, trackers, malware and phishing.' },
+  malware_only:     { id: 'malware_only',     name: 'Malware Only',      type: 'managed', adguardPolicy: 'malware_only',     dnsIp: VPN_DNS_IP,        description: 'Block malware and phishing (Cloudflare for Families).' },
+  family_safe:      { id: 'family_safe',      name: 'Family Safe',       type: 'managed', adguardPolicy: 'family_safe',      dnsIp: VPN_DNS_IP,        description: 'Block malware, phishing, adult content and gambling.' },
+  strict:           { id: 'strict',           name: 'Strict',            type: 'managed', adguardPolicy: 'strict',           dnsIp: VPN_DNS_IP,        description: 'Block ads, trackers, malware, adult content and social media.' },
+  unfiltered:       { id: 'unfiltered',       name: 'Unfiltered',        type: 'managed', adguardPolicy: 'unfiltered',       dnsIp: '1.1.1.1, 8.8.8.8', description: 'No filtering, direct DNS via 1.1.1.1.' },
+};
+
 const DNS_PRESETS = [
   { id: 'filtered', label: 'Filtré complet',    value: '10.8.0.1' },
   { id: 'malware',  label: 'Malware seulement', value: '1.1.1.2, 1.0.0.2' },
@@ -480,6 +507,41 @@ const AG_PER_CLIENT = {
     safe_search:                { enabled: false },
     upstreams:                  ['1.1.1.1', '8.8.8.8'],
   },
+};
+
+// Phase 2: extended AdGuard policy presets (aliases + new)
+AG_PER_CLIENT.default_filtered = AG_PER_CLIENT.filtered;
+AG_PER_CLIENT.malware_only = {
+  use_global_settings:         false,
+  filtering_enabled:           false,
+  safebrowsing_enabled:        true,
+  parental_enabled:            false,
+  use_global_blocked_services: true,
+  safe_search:                 { enabled: false },
+  upstreams:                   ['1.1.1.2', '1.0.0.2'],
+};
+AG_PER_CLIENT.unfiltered  = AG_PER_CLIENT.none;
+AG_PER_CLIENT.family_safe = {
+  use_global_settings:         false,
+  filtering_enabled:           true,
+  safebrowsing_enabled:        true,
+  parental_enabled:            true,
+  use_global_blocked_services: false,
+  safe_search:                 { enabled: true },
+  upstreams:                   [],
+};
+AG_PER_CLIENT.strict = {
+  use_global_settings:         false,
+  filtering_enabled:           true,
+  safebrowsing_enabled:        true,
+  parental_enabled:            true,
+  use_global_blocked_services: false,
+  safe_search:                 { enabled: true },
+  blocked_services: {
+    schedule: { time_zone: 'UTC' },
+    ids: ['youtube', 'tiktok', 'instagram', 'facebook', 'twitter', 'snapchat', 'discord'],
+  },
+  upstreams: [],
 };
 
 async function agSetClientFilter(clientName, clientIp, preset) {
@@ -1574,6 +1636,545 @@ app.get('/api/notifications/history', auth, (_req, res) => {
     const hist = JSON.parse(fs.readFileSync(NOTIF_HIST_FILE, 'utf8'));
     res.json({ history: hist.slice(0, 50) });
   } catch { res.json({ history: [] }); }
+});
+
+// ── Phase 2: Data helpers ─────────────────────────────────────────────────────
+
+function loadDevices() {
+  try { return JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveDevices(devices) {
+  fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2));
+}
+
+function loadDnsProfiles() {
+  let custom = {};
+  try { custom = JSON.parse(fs.readFileSync(DNS_PROFILES_FILE, 'utf8')); } catch { /* seed built-ins */ }
+  return { ...BUILTIN_DNS_PROFILES, ...custom };
+}
+function saveDnsProfiles(profiles) {
+  const custom = {};
+  for (const [id, p] of Object.entries(profiles)) {
+    if (p.type === 'custom') custom[id] = p;
+  }
+  fs.writeFileSync(DNS_PROFILES_FILE, JSON.stringify(custom, null, 2));
+}
+
+function loadProxyServices() {
+  try { return JSON.parse(fs.readFileSync(PROXY_SERVICES_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveProxyServices(services) {
+  fs.writeFileSync(PROXY_SERVICES_FILE, JSON.stringify(services, null, 2));
+}
+
+// Auto-import wg-easy peers that have no device record yet
+function importPeersAsDevices(peers, devices) {
+  let changed = false;
+  for (const peer of peers) {
+    if (!peer.id) continue;
+    if (!devices[peer.id]) {
+      devices[peer.id] = {
+        id: peer.id, wgPeerId: peer.id, name: peer.name || peer.id,
+        owner: '', type: 'other', vpnIp: peer.address || '',
+        dnsProfile: 'default_filtered', routingMode: 'full_tunnel',
+        customAllowedIps: [], expiresAt: null, revokedAt: null,
+        bypassUntil: null, tags: [], notes: '', createdAt: new Date().toISOString(),
+      };
+      changed = true;
+    } else if (peer.address && devices[peer.id].vpnIp !== peer.address) {
+      devices[peer.id].vpnIp = peer.address;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+// Restore expired DNS bypasses; auto-disable expired devices
+async function checkExpiredDevices(devices) {
+  const now = Date.now();
+  let changed = false;
+  for (const dev of Object.values(devices)) {
+    if (dev.bypassUntil && dev.bypassUntil !== 'permanent' && new Date(dev.bypassUntil).getTime() < now) {
+      dev.bypassUntil = null;
+      changed = true;
+      if (dev.vpnIp) {
+        try { await agSetClientFilter(dev.name, dev.vpnIp, getAdguardPolicy(dev.dnsProfile)); } catch { /* non-fatal */ }
+      }
+    }
+    if (dev.expiresAt && !dev.revokedAt && new Date(dev.expiresAt).getTime() < now) {
+      dev.revokedAt = new Date().toISOString();
+      changed = true;
+      try { await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' }); } catch { /* non-fatal */ }
+    }
+  }
+  return changed;
+}
+
+function deviceStatus(device, wgClient) {
+  if (device.revokedAt) return 'revoked';
+  if (device.expiresAt && new Date(device.expiresAt).getTime() < Date.now()) return 'expired';
+  if (!wgClient) return 'unknown';
+  if (wgClient.enabled === false) return 'inactive';
+  const hs = wgClient.latestHandshakeAt;
+  if (!hs) return 'never_connected';
+  const age = Date.now() - new Date(hs).getTime();
+  if (age < 3 * 60 * 1000)        return 'online';
+  if (age < 24 * 60 * 60 * 1000)  return 'recently_seen';
+  return 'offline';
+}
+
+function getAdguardPolicy(profileId) {
+  return loadDnsProfiles()[profileId]?.adguardPolicy || 'default_filtered';
+}
+function getDnsIpForProfile(profileId) {
+  return loadDnsProfiles()[profileId]?.dnsIp || VPN_DNS_IP;
+}
+
+function patchClientConfig(configText, device) {
+  let text = configText;
+  let allowedIps;
+  if (device.routingMode === 'custom' && device.customAllowedIps?.length) {
+    allowedIps = device.customAllowedIps.join(', ');
+  } else {
+    allowedIps = (ROUTING_MODES_DEF[device.routingMode] || ROUTING_MODES_DEF.full_tunnel).allowedIps.join(', ');
+  }
+  const bypassActive = device.bypassUntil === 'permanent' ||
+    (device.bypassUntil && new Date(device.bypassUntil).getTime() > Date.now());
+  const dnsIp = bypassActive ? '1.1.1.1, 8.8.8.8' : getDnsIpForProfile(device.dnsProfile);
+  text = text.replace(/^(AllowedIPs\s*=\s*).*$/m, `$1${allowedIps}`);
+  text = text.replace(/^(DNS\s*=\s*).*$/m, `$1${dnsIp}`);
+  return text;
+}
+
+function isValidDomain(str) {
+  if (typeof str !== 'string' || str.length > 253) return false;
+  return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(str);
+}
+function isValidTargetUrl(str) {
+  try { const u = new URL(str); return ['http:', 'https:'].includes(u.protocol); }
+  catch { return false; }
+}
+function isValidCustomAllowedIps(ips) {
+  return Array.isArray(ips) && ips.length > 0 && ips.every(ip => isValidIpOrCidr(ip));
+}
+
+// ── Caddy helpers (Module D) ──────────────────────────────────────────────────
+
+function generateCaddyServices(services) {
+  const enabled = Object.values(services).filter(s => s.enabled !== false);
+  if (!enabled.length) return '# No easywg-managed proxy services\n';
+  return enabled.map(svc => {
+    const lines = [`# easywg-managed: ${svc.id}`];
+    const site = svc.exposure === 'vpn_only' ? `http://${svc.domain}` : svc.domain;
+    lines.push(`${site} {`);
+    if (svc.exposure === 'vpn_only') lines.push(`  bind ${VPN_DNS_IP}`);
+    if (svc.basicAuth && svc.basicAuthUser && svc.basicAuthPasswordHash) {
+      lines.push('  basicauth {', `    ${svc.basicAuthUser} ${svc.basicAuthPasswordHash}`, '  }');
+    }
+    if (svc.ipAllowlist?.length) {
+      lines.push('  @allowed {', ...svc.ipAllowlist.map(ip => `    remote_ip ${ip}`), '  }');
+      lines.push('  handle @allowed {', `    reverse_proxy ${svc.target}`, '  }');
+      lines.push('  respond 403');
+    } else {
+      lines.push(`  reverse_proxy ${svc.target}`);
+    }
+    lines.push('  header {', '    X-Content-Type-Options "nosniff"', '    Referrer-Policy "same-origin"', '  }');
+    lines.push('}');
+    return lines.join('\n');
+  }).join('\n\n') + '\n';
+}
+
+async function reloadCaddy() {
+  try {
+    const caddyText = fs.readFileSync(CADDY_FILE, 'utf8');
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch('http://localhost:2019/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/caddyfile', 'Cache-Control': 'must-revalidate' },
+      body: caddyText,
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const body = await r.text();
+    return { ok: r.ok, status: r.status, body };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function writeCaddyServices(services) {
+  let prev = '';
+  try { prev = fs.readFileSync(CADDY_SERVICES_FILE, 'utf8'); } catch { /* new file */ }
+  const content = generateCaddyServices(services);
+  try {
+    fs.writeFileSync(CADDY_SERVICES_FILE, content);
+    const result = await reloadCaddy();
+    if (!result.ok) {
+      try { fs.writeFileSync(CADDY_SERVICES_FILE, prev); } catch { /* ignore */ }
+      return { ok: false, error: result.error || `Caddy reload HTTP ${result.status}: ${result.body}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    try { fs.writeFileSync(CADDY_SERVICES_FILE, prev); } catch { /* ignore */ }
+    return { ok: false, error: e.message };
+  }
+}
+
+// ── Device Inventory (Module C) ───────────────────────────────────────────────
+
+app.get('/api/devices', auth, async (_req, res) => {
+  try {
+    const wgRes  = await wgFetch('/api/wireguard/client');
+    const peers  = await wgRes.json();
+    const devices = loadDevices();
+    const imp = importPeersAsDevices(peers, devices);
+    const exp = await checkExpiredDevices(devices);
+    if (imp || exp) saveDevices(devices);
+    const wgMap = Object.fromEntries(peers.map(p => [p.id, p]));
+    res.json({
+      devices: Object.values(devices).map(dev => ({
+        ...dev,
+        status:      deviceStatus(dev, wgMap[dev.wgPeerId]),
+        wgClient:    wgMap[dev.wgPeerId] || null,
+        bypassActive: dev.bypassUntil === 'permanent' ||
+          (dev.bypassUntil && new Date(dev.bypassUntil).getTime() > Date.now()),
+      })),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/devices', auth, async (req, res) => {
+  const { name, owner = '', type = 'other', dnsProfile = 'default_filtered',
+          routingMode = 'full_tunnel', expiresAt = null, notes = '' } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim())
+    return res.status(400).json({ error: 'Device name is required' });
+  try {
+    await wgFetch('/api/wireguard/client', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
+    const listRes = await wgFetch('/api/wireguard/client');
+    const peers   = await listRes.json();
+    const wgClient = peers.find(p => p.name === name.trim());
+    if (!wgClient?.id) return res.status(500).json({ error: 'WireGuard peer creation failed' });
+    const device = {
+      id: wgClient.id, wgPeerId: wgClient.id, name: name.trim(),
+      owner, type, vpnIp: wgClient.address || '',
+      dnsProfile, routingMode, customAllowedIps: [],
+      expiresAt: expiresAt || null, revokedAt: null, bypassUntil: null,
+      tags: [], notes, createdAt: new Date().toISOString(),
+    };
+    const devices = loadDevices();
+    devices[device.id] = device;
+    saveDevices(devices);
+    if (wgClient.address) {
+      try { await agSetClientFilter(device.name, wgClient.address, getAdguardPolicy(dnsProfile)); } catch { /* non-fatal */ }
+    }
+    res.json({ device, wgClient });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/devices/:id', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    let wgClient = null;
+    try { wgClient = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}`)).json(); } catch { /* ok */ }
+    res.json({ device: { ...dev, status: deviceStatus(dev, wgClient), wgClient } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/devices/:id', auth, (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    for (const key of ['name', 'owner', 'type', 'expiresAt', 'tags', 'notes']) {
+      if (req.body[key] !== undefined) dev[key] = req.body[key];
+    }
+    saveDevices(devices);
+    res.json({ device: dev });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/devices/:id/enable', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    if (dev.revokedAt) return res.status(400).json({ error: 'Cannot re-enable a revoked device' });
+    await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/enable`, { method: 'POST' });
+    dev.expiresAt = null;
+    saveDevices(devices);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/devices/:id/disable', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/devices/:id/revoke', auth, async (req, res) => {
+  if (!req.body.confirmed) return res.status(400).json({ error: 'Requires confirmed: true' });
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    dev.revokedAt = new Date().toISOString();
+    await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' });
+    saveDevices(devices);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/devices/:id', auth, async (req, res) => {
+  const { confirmed, deleteWgPeer = false } = req.body;
+  if (!confirmed) return res.status(400).json({ error: 'Requires confirmed: true' });
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    if (!dev.revokedAt) return res.status(400).json({ error: 'Device must be revoked before deletion' });
+    if (deleteWgPeer) {
+      try { await wgFetch(`/api/wireguard/client/${dev.wgPeerId}`, { method: 'DELETE' }); } catch { /* ignore */ }
+    }
+    delete devices[req.params.id];
+    saveDevices(devices);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/devices/:id/config', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    const configText = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/configuration`)).text();
+    res.type('text/plain').send(patchClientConfig(configText, dev));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/devices/:id/qr', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    const configText = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/configuration`)).text();
+    const patched = patchClientConfig(configText, dev);
+    const svg = await QRCode.toString(patched, { type: 'svg', errorCorrectionLevel: 'L' });
+    res.type('image/svg+xml').send(svg);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DNS Profiles (Module A) ────────────────────────────────────────────────────
+
+app.get('/api/dns-profiles', auth, (_req, res) => {
+  res.json({ profiles: Object.values(loadDnsProfiles()) });
+});
+
+app.post('/api/dns-profiles', auth, (req, res) => {
+  const { id, name, description = '' } = req.body;
+  if (!id || !name) return res.status(400).json({ error: 'id and name are required' });
+  if (!/^[a-z0-9_]+$/.test(id)) return res.status(400).json({ error: 'id must be lowercase alphanumeric + underscores' });
+  const profiles = loadDnsProfiles();
+  if (profiles[id]) return res.status(409).json({ error: 'Profile ID already exists' });
+  const profile = { id, name, type: 'custom', adguardPolicy: 'default_filtered', dnsIp: VPN_DNS_IP, description };
+  profiles[id] = profile;
+  saveDnsProfiles(profiles);
+  res.json({ profile });
+});
+
+app.delete('/api/dns-profiles/:id', auth, (req, res) => {
+  const profiles = loadDnsProfiles();
+  const profile  = profiles[req.params.id];
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+  if (profile.type === 'managed') return res.status(400).json({ error: 'Built-in profiles cannot be deleted' });
+  delete profiles[req.params.id];
+  saveDnsProfiles(profiles);
+  res.json({ ok: true });
+});
+
+app.post('/api/devices/:id/dns-profile', auth, async (req, res) => {
+  const { profileId } = req.body;
+  if (!profileId) return res.status(400).json({ error: 'profileId is required' });
+  try {
+    const devices  = loadDevices();
+    const dev      = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    if (!loadDnsProfiles()[profileId]) return res.status(400).json({ error: 'Unknown DNS profile' });
+    dev.dnsProfile  = profileId;
+    dev.bypassUntil = null;
+    saveDevices(devices);
+    if (dev.vpnIp) {
+      try { await agSetClientFilter(dev.name, dev.vpnIp, getAdguardPolicy(profileId)); } catch { /* non-fatal */ }
+    }
+    res.json({ ok: true, device: dev });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/devices/:id/dns-bypass', auth, async (req, res) => {
+  const { duration = '1h' } = req.body;
+  const durationMs = { '15m': 15*60*1000, '1h': 60*60*1000, '4h': 4*60*60*1000, '24h': 24*60*60*1000 };
+  if (duration !== 'permanent' && !durationMs[duration])
+    return res.status(400).json({ error: 'Invalid duration. Use: 15m, 1h, 4h, 24h, permanent' });
+  try {
+    const devices = loadDevices();
+    const dev     = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    dev.bypassUntil = duration === 'permanent'
+      ? 'permanent'
+      : new Date(Date.now() + durationMs[duration]).toISOString();
+    saveDevices(devices);
+    if (dev.vpnIp) {
+      try { await agSetClientFilter(dev.name, dev.vpnIp, 'none'); } catch { /* non-fatal */ }
+    }
+    res.json({ ok: true, bypassUntil: dev.bypassUntil });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/devices/:id/dns-bypass', auth, async (req, res) => {
+  try {
+    const devices = loadDevices();
+    const dev     = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    dev.bypassUntil = null;
+    saveDevices(devices);
+    if (dev.vpnIp) {
+      try { await agSetClientFilter(dev.name, dev.vpnIp, getAdguardPolicy(dev.dnsProfile)); } catch { /* non-fatal */ }
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Routing Wizard (Module B) ─────────────────────────────────────────────────
+
+app.get('/api/routing-modes', auth, (_req, res) => {
+  res.json({ modes: Object.values(ROUTING_MODES_DEF) });
+});
+
+app.patch('/api/devices/:id/routing-mode', auth, (req, res) => {
+  const { mode, customAllowedIps = [] } = req.body;
+  if (!ROUTING_MODES_DEF[mode]) return res.status(400).json({ error: 'Invalid routing mode' });
+  if (mode === 'custom' && !isValidCustomAllowedIps(customAllowedIps))
+    return res.status(400).json({ error: 'customAllowedIps must be a non-empty array of valid CIDRs' });
+  try {
+    const devices = loadDevices();
+    const dev     = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    dev.routingMode = mode;
+    if (mode === 'custom') dev.customAllowedIps = customAllowedIps;
+    saveDevices(devices);
+    const allowedIps = mode === 'custom' ? customAllowedIps : ROUTING_MODES_DEF[mode].allowedIps;
+    res.json({ ok: true, device: dev, allowedIps, requiresClientUpdate: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Reverse Proxy (Module D) ──────────────────────────────────────────────────
+
+app.get('/api/proxy/services', auth, (_req, res) => {
+  res.json({ services: Object.values(loadProxyServices()) });
+});
+
+app.post('/api/proxy/services', auth, async (req, res) => {
+  const { name, domain, target, exposure = 'vpn_only', ipAllowlist = [], notes = '', confirmed = false } = req.body;
+  if (!name || !domain || !target) return res.status(400).json({ error: 'name, domain, and target are required' });
+  if (!isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
+  if (!isValidTargetUrl(target)) return res.status(400).json({ error: 'target must be a valid http:// or https:// URL' });
+  if (!['vpn_only', 'public'].includes(exposure)) return res.status(400).json({ error: 'exposure must be vpn_only or public' });
+  if (exposure === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed: true' });
+  if (ipAllowlist.length && !ipAllowlist.every(ip => isValidIpOrCidr(ip))) return res.status(400).json({ error: 'Invalid IP in ipAllowlist' });
+  try {
+    const services = loadProxyServices();
+    if (Object.values(services).some(s => s.domain === domain))
+      return res.status(409).json({ error: 'Domain already registered' });
+    const id = `svc_${Date.now()}`;
+    const service = {
+      id, name, domain, target, exposure, tls: exposure !== 'vpn_only',
+      basicAuth: false, basicAuthUser: '', basicAuthPasswordHash: '',
+      ipAllowlist, enabled: true, notes, createdAt: new Date().toISOString(),
+    };
+    services[id] = service;
+    const reload = await writeCaddyServices(services);
+    if (!reload.ok) return res.status(500).json({ error: reload.error });
+    saveProxyServices(services);
+    if (exposure === 'vpn_only') {
+      try { await agFetch('/control/rewrite/add', { method: 'POST', body: JSON.stringify({ domain, answer: VPN_DNS_IP }) }); } catch { /* non-fatal */ }
+    }
+    res.json({ service });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/proxy/services/:id', auth, async (req, res) => {
+  try {
+    const services = loadProxyServices();
+    const svc      = services[req.params.id];
+    if (!svc) return res.status(404).json({ error: 'Service not found' });
+    for (const key of ['name', 'notes', 'ipAllowlist']) {
+      if (req.body[key] !== undefined) svc[key] = req.body[key];
+    }
+    const reload = await writeCaddyServices(services);
+    if (!reload.ok) return res.status(500).json({ error: reload.error });
+    saveProxyServices(services);
+    res.json({ service: svc });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/proxy/services/:id', auth, async (req, res) => {
+  try {
+    const services = loadProxyServices();
+    const svc      = services[req.params.id];
+    if (!svc) return res.status(404).json({ error: 'Service not found' });
+    if (svc.exposure === 'vpn_only') {
+      try { await agFetch('/control/rewrite/delete', { method: 'POST', body: JSON.stringify({ domain: svc.domain, answer: VPN_DNS_IP }) }); } catch { /* non-fatal */ }
+    }
+    delete services[req.params.id];
+    const reload = await writeCaddyServices(services);
+    if (!reload.ok) return res.status(500).json({ error: reload.error });
+    saveProxyServices(services);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/proxy/services/:id/enable', auth, async (req, res) => {
+  try {
+    const services = loadProxyServices();
+    const svc      = services[req.params.id];
+    if (!svc) return res.status(404).json({ error: 'Service not found' });
+    svc.enabled = true;
+    const reload = await writeCaddyServices(services);
+    if (!reload.ok) return res.status(500).json({ error: reload.error });
+    saveProxyServices(services);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/proxy/services/:id/disable', auth, async (req, res) => {
+  try {
+    const services = loadProxyServices();
+    const svc      = services[req.params.id];
+    if (!svc) return res.status(404).json({ error: 'Service not found' });
+    svc.enabled = false;
+    const reload = await writeCaddyServices(services);
+    if (!reload.ok) return res.status(500).json({ error: reload.error });
+    saveProxyServices(services);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/proxy/validate', auth, async (req, res) => {
+  try {
+    const services    = loadProxyServices();
+    const configText  = generateCaddyServices(services);
+    const adminUp     = await tcpOpen('127.0.0.1', 2019, 2000);
+    res.json({ ok: true, adminUp, configPreview: configText });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

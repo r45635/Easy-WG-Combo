@@ -512,3 +512,36 @@ tbody tr:last-child td { border-bottom: none; }
 .notif-form-grid label { color: var(--text-dim); }
 @media (max-width: 560px) { .notif-form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .sec-info-row { grid-template-columns: 1fr; } }
+
+/* ── Phase 2: shared data table ── */
+.data-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.data-table th, .data-table td { padding: .5rem .75rem; text-align: left; border-bottom: 1px solid var(--border); }
+.data-table th { color: var(--text-dim); font-weight: 500; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+.data-table tr:last-child td { border-bottom: none; }
+
+/* status / profile / routing inline badges */
+.status-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .72rem; font-weight: 600; }
+.profile-tag  { background: var(--bg2); color: var(--text-dim); padding: .1rem .45rem; border-radius: 4px; font-size: .78rem; }
+.routing-tag  { background: #1e3a5f40; color: #7dd3fc; padding: .1rem .45rem; border-radius: 4px; font-size: .78rem; }
+.bypass-badge { display: inline-block; background: #78350f40; color: #fbbf24; border: 1px solid #92400e60; padding: .08rem .4rem; border-radius: 4px; font-size: .72rem; margin-left: .35rem; }
+
+/* ── Devices tab ── */
+.btn-danger { background: transparent; border: 1px solid #ef444460; color: #ef4444; }
+.btn-danger:hover { border-color: #ef4444; background: #ef444412; }
+
+/* ── DNS Profiles tab ── */
+.profile-cards { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: .75rem; }
+.profile-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1rem; min-width: 200px; flex: 1 1 200px; }
+.profile-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .35rem; }
+.profile-card-desc { font-size: .78rem; color: var(--text-dim); }
+.profile-type-badge { background: var(--bg); color: var(--text-dim); font-size: .68rem; padding: .1rem .4rem; border-radius: 4px; }
+.dns-profile-select { background: var(--bg2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: .2rem .4rem; font-size: .82rem; }
+
+/* ── Gateway tab ── */
+.service-row { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem 1rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; gap: 1rem; }
+.service-row.service-disabled { opacity: .5; }
+.service-row-info { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .85rem; }
+.service-domain, .service-target { background: var(--bg); padding: .1rem .4rem; border-radius: 4px; font-size: .8rem; font-family: monospace; }
+.exposure-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .72rem; font-weight: 600; }
+.exposure-vpn-only { background: #4c1d9540; color: #c4b5fd; border: 1px solid #6d28d960; }
+.exposure-public   { background: #1e3a5f40; color: #7dd3fc;   border: 1px solid #1d4ed860; }

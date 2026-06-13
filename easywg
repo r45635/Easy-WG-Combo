@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="2.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
@@ -33,6 +33,31 @@ Commands:
   notify test               Send a test notification
   notify status             Show notification configuration status
   notify send "<message>"   Send a custom notification
+
+  migrate                   Migrate existing deployment to Phase 2 (run once after upgrade)
+
+  device list               List all devices
+  device create             Create a new WireGuard device
+  device disable <id>       Disable a device (block VPN access)
+  device enable <id>        Re-enable a disabled device
+  device revoke <id>        Revoke a device permanently
+  device set-expiry <id> <date>  Set device expiration date (YYYY-MM-DD)
+
+  dns profiles              List DNS profiles
+  dns device list           List device DNS assignments
+  dns device set <id> <profile>  Assign DNS profile to device
+  dns bypass <id> <duration>     Enable DNS bypass (15m, 1h, 4h, 24h, permanent)
+  dns bypass-revoke <id>    Revoke active DNS bypass
+
+  route modes               List available routing modes
+  route set <id> <mode>     Set routing mode for a device
+
+  proxy list                List reverse proxy services
+  proxy create              Create a new proxy service (interactive)
+  proxy delete <id>         Delete a proxy service
+  proxy enable <id>         Enable a proxy service
+  proxy disable <id>        Disable a proxy service
+  proxy validate            Validate current Caddy config without applying
 
 Options:
   --help, -h                Show this help
@@ -88,6 +113,25 @@ case "${1:-}" in
     SUBCMD="${1:-status}"
     shift || true
     bash "$SCRIPTS_DIR/notify.sh" "$SUBCMD" "$@"
+    ;;
+  migrate)
+    bash "$SCRIPTS_DIR/migrate-phase2.sh"
+    ;;
+  device)
+    shift
+    bash "$SCRIPTS_DIR/device.sh" "$@"
+    ;;
+  dns)
+    shift
+    bash "$SCRIPTS_DIR/dns-profiles.sh" "$@"
+    ;;
+  route)
+    shift
+    bash "$SCRIPTS_DIR/dns-profiles.sh" --route "$@"
+    ;;
+  proxy)
+    shift
+    bash "$SCRIPTS_DIR/proxy.sh" "$@"
     ;;
   *)
     echo "Unknown command: ${1:-}" >&2
