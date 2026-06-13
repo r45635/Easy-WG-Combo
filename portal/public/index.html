@@ -43,50 +43,55 @@
         </div>
       </div>
       <nav>
-        <a href="#" class="nav-item active" data-tab="dashboard">
+        <a href="#" class="nav-item active" data-tab="dashboard" data-requires-module="dashboard">
           <span class="nav-icon">◈</span> <span data-i18n="nav.dashboard">Dashboard</span>
         </a>
-        <a href="#" class="nav-item" data-tab="clients">
-          <span class="nav-icon">◉</span> <span data-i18n="nav.clients">Clients VPN</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="wireguard">
-          <span class="nav-icon">◎</span> <span data-i18n="nav.wireguard">WireGuard</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="adguard">
-          <span class="nav-icon">◐</span> <span data-i18n="nav.adguard">AdGuard Home</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="security">
-          <span class="nav-icon">⊘</span> <span data-i18n="nav.security">Security</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="backups">
-          <span class="nav-icon">◫</span> <span data-i18n="nav.backups">Backups</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="notifications">
-          <span class="nav-icon">◌</span> <span data-i18n="nav.notifications">Notifications</span>
-        </a>
-        <a href="#" class="nav-item" data-tab="devices">
+        <a href="#" class="nav-item" data-tab="devices" data-requires-module="devices">
           <span class="nav-icon">⊞</span> <span data-i18n="nav.devices">Devices</span>
         </a>
-        <a href="#" class="nav-item" data-tab="dns-profiles">
+        <a href="#" class="nav-item" data-tab="dns-profiles" data-requires-module="dns_profiles"
+           data-nav-label-user="DNS Protection">
           <span class="nav-icon">⊙</span> <span data-i18n="nav.dnsProfiles">DNS Profiles</span>
         </a>
-        <a href="#" class="nav-item" data-tab="gateway">
-          <span class="nav-icon">⊕</span> <span data-i18n="nav.gateway">Gateway</span>
+        <a href="#" class="nav-item" data-tab="clients" data-requires-module="clients">
+          <span class="nav-icon">◉</span> <span data-i18n="nav.clients">Clients VPN</span>
         </a>
-        <a href="#" class="nav-item" data-tab="monitoring">
+        <a href="#" class="nav-item" data-tab="backups" data-requires-module="backups">
+          <span class="nav-icon">◫</span> <span data-i18n="nav.backups">Backups</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="monitoring" data-requires-module="monitoring">
           <span class="nav-icon">◎</span> <span data-i18n="nav.monitoring">Monitoring</span>
         </a>
-        <a href="#" class="nav-item" data-tab="apps">
+        <a href="#" class="nav-item" data-tab="notifications" data-requires-module="notifications">
+          <span class="nav-icon">◌</span> <span data-i18n="nav.notifications">Notifications</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="security" data-requires-module="security">
+          <span class="nav-icon">⊘</span> <span data-i18n="nav.security">Security</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="wireguard" data-requires-module="wireguard">
+          <span class="nav-icon">◎</span> <span data-i18n="nav.wireguard">WireGuard</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="adguard" data-requires-module="adguard">
+          <span class="nav-icon">◐</span> <span data-i18n="nav.adguard">AdGuard Home</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="gateway" data-requires-module="gateway">
+          <span class="nav-icon">⊕</span> <span data-i18n="nav.gateway">Gateway</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="apps" data-requires-module="apps">
           <span class="nav-icon">⊟</span> <span data-i18n="nav.apps">Apps</span>
         </a>
-        <a href="#" class="nav-item" data-tab="filedrop">
+        <a href="#" class="nav-item" data-tab="filedrop" data-requires-module="filedrop">
           <span class="nav-icon">⊠</span> <span data-i18n="nav.filedrop">File Drop</span>
         </a>
-        <a href="#" class="nav-item" data-tab="migration">
+        <a href="#" class="nav-item" data-tab="migration" data-requires-module="migration">
           <span class="nav-icon">⇌</span> <span data-i18n="nav.migration">Migration</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="settings" data-requires-module="settings">
+          <span class="nav-icon">⚙</span> <span data-i18n="nav.settings">Settings</span>
         </a>
       </nav>
       <div class="sidebar-footer">
+        <div id="profile-badge" class="profile-badge"></div>
         <div class="lang-switch-wrap">
           <label for="lang-app" data-i18n="lang.label">Language</label>
           <select id="lang-app" class="lang-select" aria-label="Language">
@@ -135,8 +140,11 @@
           </div>
         </div>
 
-        <!-- Health metrics -->
-        <div class="health-grid" id="health-grid">
+        <!-- User mode: action-oriented CTA (shown only when profile = user) -->
+        <div id="dash-user-section" style="display:none"></div>
+
+        <!-- Health metrics (Super User + Advanced) -->
+        <div class="health-grid" id="health-grid" data-show-min="super_user">
           <div class="stat-card">
             <div class="stat-value" id="health-cpu">—</div>
             <div class="stat-label" data-i18n="health.cpu">CPU</div>
@@ -155,7 +163,11 @@
           </div>
         </div>
 
-        <div class="fail2ban-panel">
+        <!-- Super User: simple fail2ban security summary -->
+        <div id="dash-security-summary" data-show-min="super_user" style="margin-bottom:.75rem"></div>
+
+        <!-- Advanced: full Fail2Ban panel -->
+        <div class="fail2ban-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="fail2ban.title">Fail2Ban</h3>
             <button class="btn-ghost btn-sm" id="fail2ban-refresh-btn" data-i18n="fail2ban.refresh">↻ Refresh bans</button>
@@ -221,7 +233,7 @@
           </div>
           <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
             <button class="btn-primary btn-sm" id="backup-create-btn" data-i18n="backup.create">Create Backup</button>
-            <button class="btn-ghost btn-sm" id="backup-encrypt-btn" data-i18n="backup.createEncrypted">Create Encrypted Backup</button>
+            <button class="btn-ghost btn-sm" id="backup-encrypt-btn" data-i18n="backup.createEncrypted" data-show-min="advanced">Create Encrypted Backup</button>
           </div>
           <div id="backup-create-msg" class="text-dim" style="margin-top:.6rem;font-size:.85rem"></div>
         </div>
@@ -249,7 +261,7 @@
             <select id="restore-select" class="input-field">
               <option value="" data-i18n="backup.selectFile">Select a backup file…</option>
             </select>
-            <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-dim)">
+            <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-dim)" data-show-min="advanced">
               <input type="checkbox" id="restore-dryrun">
               <span data-i18n="backup.dryRun">Dry run (validate only, no changes)</span>
             </label>
@@ -325,8 +337,8 @@
           </div>
         </div>
 
-        <!-- Alert thresholds -->
-        <div class="security-panel">
+        <!-- Alert thresholds — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="notifications.alerts">Alert thresholds</h3>
           </div>
@@ -338,8 +350,8 @@
           </div>
         </div>
 
-        <!-- History -->
-        <div class="security-panel">
+        <!-- History — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="notifications.history">Notification history</h3>
             <button class="btn-ghost btn-sm" id="notif-hist-refresh-btn" data-i18n="dashboard.refresh">↻</button>
@@ -361,7 +373,7 @@
             </div>
           </div>
           <div class="page-actions">
-            <button class="btn-ghost btn-sm" id="sec-edit-config-btn" data-i18n="security.config.edit">✎ Edit config</button>
+            <button class="btn-ghost btn-sm" id="sec-edit-config-btn" data-i18n="security.config.edit" data-show-min="advanced">✎ Edit config</button>
             <button class="btn-ghost btn-sm" id="security-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
           </div>
         </div>
@@ -396,8 +408,8 @@
           </div>
         </div>
 
-        <!-- Fail2Ban stats (clickable / editable) -->
-        <div class="stats-grid">
+        <!-- Fail2Ban stats (clickable / editable) — Advanced only -->
+        <div class="stats-grid" data-show-min="advanced">
           <div class="stat-card">
             <div class="stat-value" id="sec-bantime">—</div>
             <div class="stat-label" data-i18n="security.config.bantime">Ban duration</div>
@@ -416,8 +428,8 @@
           </div>
         </div>
 
-        <!-- Inline config edit form -->
-        <div id="sec-config-edit-panel" class="security-panel hidden">
+        <!-- Inline config edit form — Advanced only -->
+        <div id="sec-config-edit-panel" class="security-panel hidden" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.config.editTitle">Edit Fail2Ban config</h3>
           </div>
@@ -444,8 +456,8 @@
           </div>
         </div>
 
-        <!-- Active bans -->
-        <div class="security-panel">
+        <!-- Active bans — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.bans.title">Active bans</h3>
             <button class="btn-ghost btn-sm" id="unban-all-btn" style="color:var(--red);border-color:var(--red)44" data-i18n="security.bans.unbanAll">Unban all</button>
@@ -458,8 +470,8 @@
           <div id="security-bans-list" class="fail2ban-list" style="margin-top:.75rem"></div>
         </div>
 
-        <!-- IP Whitelist -->
-        <div class="security-panel">
+        <!-- IP Whitelist — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.whitelist.title">IP Whitelist</h3>
             <span class="text-dim" style="font-size:.8rem" data-i18n="security.whitelist.subtitle">Never banned</span>
@@ -473,8 +485,8 @@
           </div>
         </div>
 
-        <!-- Fail2Ban log -->
-        <div class="security-panel">
+        <!-- Fail2Ban log — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.jaillog.title">Fail2Ban log</h3>
             <button class="btn-ghost btn-sm" id="jaillog-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
@@ -484,8 +496,8 @@
           </div>
         </div>
 
-        <!-- Active sessions -->
-        <div class="security-panel">
+        <!-- Active sessions — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.sessions.title">Active sessions</h3>
             <button class="btn-ghost btn-sm" id="sessions-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
@@ -495,8 +507,8 @@
           </div>
         </div>
 
-        <!-- TLS + Change password (side by side) -->
-        <div class="sec-info-row">
+        <!-- TLS + Change password — Super User and Advanced -->
+        <div class="sec-info-row" data-show-min="super_user">
           <div class="security-panel">
             <div class="section-header">
               <h3 data-i18n="security.tls.title">TLS Certificate</h3>
@@ -521,8 +533,8 @@
           </div>
         </div>
 
-        <!-- Access log -->
-        <div class="security-panel">
+        <!-- Access log — Advanced only -->
+        <div class="security-panel" data-show-min="advanced">
           <div class="section-header">
             <h3 data-i18n="security.logs.title">Access log</h3>
             <label class="auto-refresh-label">
@@ -575,12 +587,14 @@
       <section id="tab-dns-profiles" class="tab-content hidden">
         <div class="page-header">
           <div>
-            <h2 data-i18n="nav.dnsProfiles">DNS Profiles</h2>
+            <h2 id="dns-tab-title" data-i18n="nav.dnsProfiles">DNS Profiles</h2>
           </div>
           <div class="page-actions">
             <button class="btn-ghost btn-sm" id="dns-profiles-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
           </div>
         </div>
+        <!-- User mode: simple DNS protection selector -->
+        <div id="dns-basic-wrap" class="hidden"></div>
         <div id="dns-profiles-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
         <div id="dns-profiles-wrap" class="hidden">
           <div class="profile-cards" id="profile-cards"></div>
@@ -756,6 +770,52 @@
         </div>
       </section>
 
+      <!-- Settings -->
+      <section id="tab-settings" class="tab-content hidden">
+        <div class="tab-header"><h1 data-i18n="nav.settings">Settings</h1></div>
+
+        <div class="security-panel">
+          <h2 class="panel-title" data-i18n="settings.interfaceMode">Interface Mode</h2>
+          <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:.75rem" data-i18n="settings.interfaceMode.desc">
+            Choose how much of the portal is visible. You can change this at any time.
+          </p>
+          <div class="mode-cards" id="settings-mode-cards">
+            <label class="mode-card" data-mode="user" id="mode-card-user">
+              <input type="radio" name="interface-mode" value="user" style="display:none">
+              <div class="mode-card-header"><strong data-i18n="settings.mode.user">User</strong></div>
+              <div class="mode-card-desc" data-i18n="settings.mode.user.desc">Simple mode for creating VPN devices and using DNS protection.</div>
+              <ul class="mode-card-features">
+                <li>Dashboard</li><li>Devices</li><li>DNS Protection</li>
+              </ul>
+            </label>
+            <label class="mode-card" data-mode="super_user" id="mode-card-super_user">
+              <input type="radio" name="interface-mode" value="super_user" style="display:none">
+              <div class="mode-card-header">
+                <strong data-i18n="settings.mode.super_user">Super User</strong>
+                <span class="badge-recommended" data-i18n="settings.recommended">Recommended</span>
+              </div>
+              <div class="mode-card-desc" data-i18n="settings.mode.super_user.desc">Operational mode for managing devices, backups, monitoring, notifications and security overview.</div>
+              <ul class="mode-card-features">
+                <li>Dashboard</li><li>Devices</li><li>DNS Profiles</li>
+                <li>Backups</li><li>Monitoring</li><li>Notifications</li><li>Security overview</li>
+              </ul>
+            </label>
+            <label class="mode-card" data-mode="advanced" id="mode-card-advanced">
+              <input type="radio" name="interface-mode" value="advanced" style="display:none">
+              <div class="mode-card-header"><strong data-i18n="settings.mode.advanced">Advanced</strong></div>
+              <div class="mode-card-desc" data-i18n="settings.mode.advanced.desc">Full administration mode exposing WireGuard, AdGuard, Gateway, Apps, File Drop, Migration, logs and low-level controls.</div>
+              <ul class="mode-card-features">
+                <li>All modules</li><li>WireGuard / AdGuard iframes</li>
+                <li>Gateway &amp; reverse proxy</li><li>Apps / File Drop / Migration</li>
+                <li>Full security controls</li>
+              </ul>
+            </label>
+          </div>
+          <button class="btn-primary" id="settings-mode-save-btn" data-i18n="settings.mode.apply">Apply Mode</button>
+          <div id="settings-mode-msg" class="settings-mode-msg"></div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -882,6 +942,28 @@
       </div>
       <div class="modal-footer">
         <button class="btn-primary" id="help-ok-btn" data-i18n="common.gotIt">Compris</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced mode confirmation modal -->
+  <div id="advanced-confirm-overlay" class="hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 data-i18n="advancedConfirm.title">Enable Advanced Mode</h3>
+        <button class="modal-close" id="advanced-confirm-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p data-i18n="advancedConfirm.body">Advanced mode exposes low-level VPS, firewall, reverse proxy, Docker and security controls.</p>
+        <p style="margin-top:.5rem;color:var(--text-dim);font-size:.85rem" data-i18n="advancedConfirm.subtext">Use only if you understand the impact of these settings.</p>
+        <label style="display:flex;align-items:center;gap:.6rem;margin-top:1rem;cursor:pointer">
+          <input type="checkbox" id="advanced-confirm-checkbox">
+          <span data-i18n="advancedConfirm.checkbox">I understand the impact of Advanced mode.</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" id="advanced-confirm-cancel" data-i18n="common.cancel">Cancel</button>
+        <button class="btn-primary" id="advanced-confirm-ok" disabled data-i18n="advancedConfirm.confirm">Enable Advanced Mode</button>
       </div>
     </div>
   </div>

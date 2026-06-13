@@ -227,7 +227,7 @@ tbody tr:last-child td { border-bottom: none; }
 .btn-sm { padding: .35rem .75rem; font-size: .82rem; }
 
 /* ── Modal ── */
-#modal-overlay, #filter-overlay, #help-overlay {
+#modal-overlay, #filter-overlay, #help-overlay, #advanced-confirm-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.65);
   display: flex; align-items: center; justify-content: center;
   z-index: 100; padding: 1rem;
@@ -583,3 +583,63 @@ tbody tr:last-child td { border-bottom: none; }
 .text-dim { color: var(--text-dim); }
 .text-muted { color: var(--text-muted, #6b7280); }
 .experimental-banner { background: #78350f30; border: 1px solid #92400e60; color: #fbbf24; border-radius: var(--radius); padding: .6rem .9rem; font-size: .82rem; margin-bottom: .9rem; }
+
+/* ── Interface Profile System ── */
+
+/* Profile-based visibility: data-show-min="super_user" hides in user mode,
+   data-show-min="advanced" hides in user and super_user modes */
+body[data-interface-mode="user"]       [data-show-min="super_user"],
+body[data-interface-mode="user"]       [data-show-min="advanced"],
+body[data-interface-mode="super_user"] [data-show-min="advanced"] { display: none !important; }
+
+/* Profile badge in sidebar footer */
+.profile-badge {
+  font-size: .72rem; font-weight: 600; padding: .2rem .6rem;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  color: var(--text-dim); margin-bottom: .5rem; display: inline-block;
+  letter-spacing: .03em;
+}
+.profile-badge[data-mode="user"]       { border-color: #3fb95055; color: var(--green); }
+.profile-badge[data-mode="super_user"] { border-color: #e3b34155; color: var(--yellow); }
+.profile-badge[data-mode="advanced"]   { border-color: #f7816655; color: var(--orange); }
+
+/* Settings tab — mode cards */
+.mode-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+.mode-card {
+  flex: 1; min-width: 200px; padding: 1rem 1.25rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface2); cursor: pointer;
+  transition: border-color var(--trans), background var(--trans);
+}
+.mode-card:hover { border-color: var(--primary); }
+.mode-card-active { border-color: var(--primary) !important; background: color-mix(in srgb, var(--primary) 8%, var(--surface2)); }
+.mode-card-header { font-weight: 700; margin-bottom: .4rem; display: flex; align-items: center; gap: .4rem; }
+.mode-card-desc { font-size: .83rem; color: var(--text-dim); margin-bottom: .6rem; }
+.mode-card-features { font-size: .78rem; color: var(--text-dim); padding-left: 1.1rem; line-height: 1.7; }
+.badge-recommended { font-size: .68rem; color: var(--green); border: 1px solid #3fb95044; border-radius: 4px; padding: 0 .4rem; font-weight: 600; }
+.settings-mode-msg { font-size: .83rem; color: var(--green); margin-top: .5rem; min-height: 1.2rem; }
+
+/* Dashboard User mode CTA */
+.dash-user-cta { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1rem; }
+.dash-user-cta h2 { font-size: 1rem; margin-bottom: .75rem; }
+.dash-user-steps { list-style: none; counter-reset: step; }
+.dash-user-steps li { counter-increment: step; padding: .5rem .5rem .5rem 2.25rem; position: relative; font-size: .88rem; border-bottom: 1px solid var(--border); }
+.dash-user-steps li:last-child { border-bottom: none; }
+.dash-user-steps li::before { content: counter(step); position: absolute; left: 0; top: .5rem; background: var(--primary); color: #fff; border-radius: 50%; width: 1.5em; height: 1.5em; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; }
+.dash-status-simple { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+.dash-status-chip { display: flex; align-items: center; gap: .35rem; font-size: .82rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: .3rem .65rem; }
+.dash-status-chip.ok  { border-color: #3fb95044; color: var(--green); }
+.dash-status-chip.warn { border-color: #e3b34144; color: var(--yellow); }
+
+/* DNS basic (User mode) */
+.dns-basic-cards { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+.dns-basic-card {
+  flex: 1; min-width: 160px; padding: .9rem 1rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface2); cursor: pointer;
+  transition: border-color var(--trans);
+}
+.dns-basic-card:hover  { border-color: var(--primary); }
+.dns-basic-card.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--surface2)); }
+.dns-basic-card-title { font-weight: 600; margin-bottom: .3rem; }
+.dns-basic-card-desc  { font-size: .78rem; color: var(--text-dim); }

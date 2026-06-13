@@ -329,6 +329,38 @@ const I18N = {
     'migration.exportDone': '✓ Backup created:',
     'migration.readiness': 'Service Readiness',
     'common.refresh': '↻ Refresh',
+    'nav.settings': 'Settings',
+    'settings.interfaceMode': 'Interface Mode',
+    'settings.interfaceMode.desc': 'Choose how much of the portal is visible. You can change this at any time.',
+    'settings.mode.user': 'User',
+    'settings.mode.user.desc': 'Simple mode for creating VPN devices and using DNS protection.',
+    'settings.mode.super_user': 'Super User',
+    'settings.mode.super_user.desc': 'Operational mode for managing devices, backups, monitoring, notifications and security overview.',
+    'settings.mode.advanced': 'Advanced',
+    'settings.mode.advanced.desc': 'Full administration mode exposing WireGuard, AdGuard, Gateway, Apps, File Drop, Migration, logs and low-level controls.',
+    'settings.mode.apply': 'Apply Mode',
+    'settings.mode.updated': '✓ Mode updated.',
+    'settings.recommended': 'Recommended',
+    'dnsBasic.title': 'DNS Protection',
+    'dnsBasic.desc': 'Choose the level of DNS protection for your devices.',
+    'dnsBasic.standard': 'Standard Protection',
+    'dnsBasic.standard.desc': 'Block ads, trackers, malware and phishing.',
+    'dnsBasic.malware': 'Malware Only',
+    'dnsBasic.malware.desc': 'Block malware and phishing only.',
+    'dnsBasic.none': 'No Filtering',
+    'dnsBasic.none.desc': 'No DNS filtering applied.',
+    'advancedConfirm.title': 'Enable Advanced Mode',
+    'advancedConfirm.body': 'Advanced mode exposes low-level VPS, firewall, reverse proxy, Docker and security controls.',
+    'advancedConfirm.subtext': 'Use only if you understand the impact of these settings.',
+    'advancedConfirm.checkbox': 'I understand the impact of Advanced mode.',
+    'advancedConfirm.confirm': 'Enable Advanced Mode',
+    'dashUser.getStarted': 'Get started with your VPN',
+    'dashUser.step1': 'Create a VPN device',
+    'dashUser.step2': 'Scan the QR code with the WireGuard app',
+    'dashUser.step3': 'Choose DNS protection level',
+    'dashUser.step4': 'Confirm device is connected',
+    'dashUser.myDevices': 'My Devices',
+    'devices.none': 'No devices yet. Create a device first.',
   },
   fr: {
     'lang.label': 'Langue',
@@ -650,6 +682,38 @@ const I18N = {
     'migration.exportDone': '✓ Sauvegarde créée :',
     'migration.readiness': 'État des services',
     'common.refresh': '↻ Actualiser',
+    'nav.settings': 'Paramètres',
+    'settings.interfaceMode': 'Mode d\'interface',
+    'settings.interfaceMode.desc': 'Choisissez la quantité du portail visible. Vous pouvez changer cela à tout moment.',
+    'settings.mode.user': 'Utilisateur',
+    'settings.mode.user.desc': 'Mode simple pour créer des appareils VPN et utiliser la protection DNS.',
+    'settings.mode.super_user': 'Super Utilisateur',
+    'settings.mode.super_user.desc': 'Mode opérationnel pour gérer les appareils, sauvegardes, surveillance, notifications et aperçu de sécurité.',
+    'settings.mode.advanced': 'Avancé',
+    'settings.mode.advanced.desc': 'Mode d\'administration complète exposant WireGuard, AdGuard, Gateway, Apps, File Drop, Migration, journaux et contrôles avancés.',
+    'settings.mode.apply': 'Appliquer le mode',
+    'settings.mode.updated': '✓ Mode mis à jour.',
+    'settings.recommended': 'Recommandé',
+    'dnsBasic.title': 'Protection DNS',
+    'dnsBasic.desc': 'Choisissez le niveau de protection DNS pour vos appareils.',
+    'dnsBasic.standard': 'Protection standard',
+    'dnsBasic.standard.desc': 'Bloquer publicités, traceurs, malwares et phishing.',
+    'dnsBasic.malware': 'Malwares seulement',
+    'dnsBasic.malware.desc': 'Bloquer uniquement malwares et phishing.',
+    'dnsBasic.none': 'Sans filtrage',
+    'dnsBasic.none.desc': 'Aucun filtrage DNS appliqué.',
+    'advancedConfirm.title': 'Activer le mode Avancé',
+    'advancedConfirm.body': 'Le mode Avancé expose les contrôles bas niveau du VPS, pare-feu, proxy inverse, Docker et sécurité.',
+    'advancedConfirm.subtext': 'Utilisez uniquement si vous comprenez l\'impact de ces paramètres.',
+    'advancedConfirm.checkbox': 'Je comprends l\'impact du mode Avancé.',
+    'advancedConfirm.confirm': 'Activer le mode Avancé',
+    'dashUser.getStarted': 'Démarrez avec votre VPN',
+    'dashUser.step1': 'Créer un appareil VPN',
+    'dashUser.step2': 'Scanner le QR code avec l\'application WireGuard',
+    'dashUser.step3': 'Choisir le niveau de protection DNS',
+    'dashUser.step4': 'Confirmer que l\'appareil est connecté',
+    'dashUser.myDevices': 'Mes appareils',
+    'devices.none': 'Aucun appareil. Créez un appareil en premier.',
   },
   zh: {
     'lang.label': '语言',
@@ -971,6 +1035,38 @@ const I18N = {
     'migration.exportDone': '✓ 备份已创建：',
     'migration.readiness': '服务就绪状态',
     'common.refresh': '↻ 刷新',
+    'nav.settings': '设置',
+    'settings.interfaceMode': '界面模式',
+    'settings.interfaceMode.desc': '选择门户显示的内容。您可以随时更改。',
+    'settings.mode.user': '用户',
+    'settings.mode.user.desc': '简单模式，用于创建VPN设备和使用DNS保护。',
+    'settings.mode.super_user': '超级用户',
+    'settings.mode.super_user.desc': '操作模式，用于管理设备、备份、监控、通知和安全概览。',
+    'settings.mode.advanced': '高级',
+    'settings.mode.advanced.desc': '完整管理模式，开放WireGuard、AdGuard、网关、应用、文件传输、迁移、日志和底层控制。',
+    'settings.mode.apply': '应用模式',
+    'settings.mode.updated': '✓ 模式已更新。',
+    'settings.recommended': '推荐',
+    'dnsBasic.title': 'DNS保护',
+    'dnsBasic.desc': '为您的设备选择DNS保护级别。',
+    'dnsBasic.standard': '标准保护',
+    'dnsBasic.standard.desc': '屏蔽广告、追踪器、恶意软件和钓鱼网站。',
+    'dnsBasic.malware': '仅恶意软件',
+    'dnsBasic.malware.desc': '仅屏蔽恶意软件和钓鱼网站。',
+    'dnsBasic.none': '不过滤',
+    'dnsBasic.none.desc': '不应用DNS过滤。',
+    'advancedConfirm.title': '启用高级模式',
+    'advancedConfirm.body': '高级模式会开放VPS底层、防火墙、反向代理、Docker和安全控制。',
+    'advancedConfirm.subtext': '请仅在了解这些设置影响的情况下使用。',
+    'advancedConfirm.checkbox': '我了解高级模式的影响。',
+    'advancedConfirm.confirm': '启用高级模式',
+    'dashUser.getStarted': '开始使用您的VPN',
+    'dashUser.step1': '创建VPN设备',
+    'dashUser.step2': '用WireGuard应用扫描二维码',
+    'dashUser.step3': '选择DNS保护级别',
+    'dashUser.step4': '确认设备已连接',
+    'dashUser.myDevices': '我的设备',
+    'devices.none': '暂无设备，请先创建设备。',
   },
 };
 
@@ -1006,7 +1102,61 @@ const state = {
   monitors:         [],
   apps:             [],
   filedropShares:   [],
+  interfaceMode:    'super_user',
+  capabilities:     null,
 };
+
+function canDo(action) {
+  const c = state.capabilities;
+  if (!c) return true;
+  return !!(c.actions?.all || c.actions?.[action]);
+}
+
+function hasModule(mod) {
+  const c = state.capabilities;
+  if (!c) return true;
+  if (Array.isArray(c.modules)) return c.modules.includes(mod);
+  return true;
+}
+
+async function loadCapabilities() {
+  const data = await GET('/api/settings/ui-capabilities');
+  if (!data) return;
+  state.interfaceMode = data.interfaceMode;
+  state.capabilities  = data;
+  applyProfileToNav();
+  applyProfileToBody();
+  renderProfileBadge();
+}
+
+function applyProfileToNav() {
+  document.querySelectorAll('.nav-item[data-requires-module]').forEach(el => {
+    let mod = el.dataset.requiresModule;
+    // User mode: dns_basic is surfaced through the dns-profiles tab
+    if (state.interfaceMode === 'user' && mod === 'dns_profiles') mod = 'dns_basic';
+    el.classList.toggle('hidden', !hasModule(mod));
+    // Relabel nav items per profile
+    const labelAttr = 'navLabel' + state.interfaceMode.replace(/_([a-z])/g, (_, c) => c.toUpperCase()).replace(/^./, c => c.toUpperCase());
+    if (el.dataset[labelAttr]) {
+      el.querySelector('[data-i18n]').textContent = el.dataset[labelAttr];
+    }
+  });
+  // Redirect if current tab is now hidden
+  const currentNav = document.querySelector(`.nav-item[data-tab="${state.tab}"]`);
+  if (currentNav && currentNav.classList.contains('hidden')) switchTab('dashboard');
+}
+
+function applyProfileToBody() {
+  document.body.dataset.interfaceMode = state.interfaceMode;
+}
+
+function renderProfileBadge() {
+  const el = document.getElementById('profile-badge');
+  if (!el) return;
+  const labels = { user: 'User', super_user: 'Super User', advanced: 'Advanced' };
+  el.textContent = labels[state.interfaceMode] || state.interfaceMode;
+  el.dataset.mode = state.interfaceMode;
+}
 
 function detectLang() {
   const saved = localStorage.getItem('portalLang');
@@ -1129,6 +1279,14 @@ async function checkAuth() {
 }
 
 function switchTab(name) {
+  // Profile guard: redirect to dashboard if tab module is not available
+  if (state.capabilities) {
+    const modKey = (name === 'dns-profiles')
+      ? (state.interfaceMode === 'user' ? 'dns_basic' : 'dns_profiles')
+      : name;
+    if (!hasModule(modKey)) name = 'dashboard';
+  }
+
   state.tab = name;
 
   document.querySelectorAll('.nav-item').forEach(el => {
@@ -1151,6 +1309,7 @@ function switchTab(name) {
   if (name === 'apps')         loadAppsTab();
   if (name === 'filedrop')     loadFiledropTab();
   if (name === 'migration')    loadMigrationTab();
+  if (name === 'settings')     loadSettingsTab();
   if (name !== 'security' && state.logAutoRefreshId) {
     clearInterval(state.logAutoRefreshId);
     state.logAutoRefreshId = null;
@@ -1173,7 +1332,9 @@ async function loadConfig() {
   state.iframePaths.wireguard = cfg.wgEasyPath || '/wireguard/';
   state.iframePaths.adguard = cfg.adguardPath || '/adguard/';
   state.serverName = cfg.serverName || 'vpn-server';
+  if (cfg.interfaceMode) state.interfaceMode = cfg.interfaceMode;
   renderServerName();
+  await loadCapabilities();
 }
 
 async function renameServer() {
@@ -1197,22 +1358,126 @@ async function renameServer() {
 }
 
 async function loadDashboard() {
-  const [clients, stats, fail2ban] = await Promise.all([
+  const mode = state.interfaceMode;
+
+  // Always fetch clients and DNS stats
+  const [clients, stats] = await Promise.all([
     GET('/api/clients'),
     GET('/api/adguard/stats'),
-    GET('/api/fail2ban/status'),
   ]);
-  loadHealth(); // async, non-blocking
 
-  if (clients) {
-    state.clients = clients;
-    const now = Date.now();
-    const connected = clients.filter(c => c.latestHandshakeAt && now - new Date(c.latestHandshakeAt).getTime() < 3 * 60 * 1000).length;
-    document.getElementById('stat-total').textContent = clients.length;
-    document.getElementById('stat-connected').textContent = connected;
-    renderDashClientList(clients.slice(0, 6));
+  if (clients) state.clients = clients;
+
+  if (mode === 'user') {
+    renderDashboardUser(clients || [], stats);
+  } else {
+    // Super User and Advanced both need fail2ban
+    const fail2ban = await GET('/api/fail2ban/status');
+    if (mode === 'super_user') {
+      renderDashboardSuperUser(clients || [], stats, fail2ban);
+    } else {
+      renderDashboardAdvanced(clients || [], stats, fail2ban);
+      loadHealth(); // health-grid shown in Advanced
+    }
+    if (mode === 'super_user') loadHealth(); // health-grid also shown for Super User
+  }
+}
+
+function renderDashboardUser(clients, stats) {
+  const userSection = document.getElementById('dash-user-section');
+  const now = Date.now();
+  const connected = clients.filter(c => c.latestHandshakeAt && now - new Date(c.latestHandshakeAt).getTime() < 3 * 60 * 1000).length;
+  const dnsActive = stats && (stats.num_dns_queries || 0) > 0;
+
+  userSection.style.display = '';
+  userSection.innerHTML = `
+    <div class="dash-user-cta">
+      <h2 data-i18n="dashUser.getStarted">Get started with your VPN</h2>
+      <ol class="dash-user-steps">
+        <li data-i18n="dashUser.step1">Create a VPN device</li>
+        <li data-i18n="dashUser.step2">Scan the QR code with the WireGuard app</li>
+        <li data-i18n="dashUser.step3">Choose DNS protection level</li>
+        <li data-i18n="dashUser.step4">Confirm device is connected</li>
+      </ol>
+      <div class="dash-status-simple">
+        <div class="dash-status-chip ok">VPN running</div>
+        <div class="dash-status-chip ${connected > 0 ? 'ok' : ''}">${connected} device${connected !== 1 ? 's' : ''} online</div>
+        <div class="dash-status-chip ${dnsActive ? 'ok' : ''}">DNS ${dnsActive ? 'active' : 'inactive'}</div>
+      </div>
+    </div>
+    ${clients.length > 0 ? `
+      <div class="section-header">
+        <h3 data-i18n="dashUser.myDevices">My Devices</h3>
+        <button class="btn-primary btn-sm" id="dash-new-btn-user" data-i18n="client.new">+ New Device</button>
+      </div>
+      <div>${renderDashClientListSimple(clients.slice(0, 6))}</div>
+    ` : `
+      <div style="text-align:center;padding:2rem">
+        <button class="btn-primary" id="dash-new-btn-user" data-i18n="client.new">+ Create your first device</button>
+      </div>
+    `}
+  `;
+  applyI18n();
+  // Wire up the new-client button in user section
+  document.getElementById('dash-new-btn-user')?.addEventListener('click', () => openNewClientModal());
+}
+
+function renderDashClientListSimple(clients) {
+  const now = Date.now();
+  return clients.map(c => {
+    const ok = c.latestHandshakeAt && now - new Date(c.latestHandshakeAt).getTime() < 3 * 60 * 1000;
+    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">
+      <span class="status-dot ${ok ? 'connected' : ''}"></span>
+      <span>${esc(c.name)}</span>
+      <span style="color:var(--text-dim);margin-left:auto">${ok ? 'Connected' : 'Offline'}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderDashboardSuperUser(clients, stats, fail2ban) {
+  // Hide user CTA section
+  const userSection = document.getElementById('dash-user-section');
+  if (userSection) userSection.style.display = 'none';
+
+  const now = Date.now();
+  const connected = clients.filter(c => c.latestHandshakeAt && now - new Date(c.latestHandshakeAt).getTime() < 3 * 60 * 1000).length;
+
+  // Stats grid
+  document.getElementById('stat-total').textContent = clients.length;
+  document.getElementById('stat-connected').textContent = connected;
+  if (stats) {
+    const total = stats.num_dns_queries || 0;
+    const blocked = stats.num_blocked_filtering || 0;
+    const pct = total > 0 ? Math.round((blocked / total) * 100) : 0;
+    document.getElementById('stat-queries').textContent = fmtNum(total);
+    document.getElementById('stat-blocked').textContent = fmtNum(blocked);
+    document.getElementById('stat-pct').textContent = total > 0 ? `(${pct}%)` : '';
   }
 
+  // Security summary (Super User — count only, no ban controls)
+  const summaryEl = document.getElementById('dash-security-summary');
+  if (summaryEl && fail2ban) {
+    const banned = fail2ban.currentlyBanned || 0;
+    summaryEl.innerHTML = `<div class="fail2ban-stats" style="font-size:.82rem;padding:.4rem 0">
+      <span><strong>Fail2Ban</strong>: ${esc(fail2ban.jail || '—')}</span>
+      <span><strong data-i18n="fail2ban.current">Currently banned</strong>: <span ${banned > 0 ? 'style="color:var(--orange)"' : ''}>${banned}</span></span>
+      <span><strong data-i18n="fail2ban.total">Total banned</strong>: ${fail2ban.totalBanned || 0}</span>
+    </div>`;
+  }
+
+  renderDashClientList(clients.slice(0, 6));
+}
+
+function renderDashboardAdvanced(clients, stats, fail2ban) {
+  // Hide user CTA section
+  const userSection = document.getElementById('dash-user-section');
+  if (userSection) userSection.style.display = 'none';
+
+  const now = Date.now();
+  const connected = clients.filter(c => c.latestHandshakeAt && now - new Date(c.latestHandshakeAt).getTime() < 3 * 60 * 1000).length;
+
+  document.getElementById('stat-total').textContent = clients.length;
+  document.getElementById('stat-connected').textContent = connected;
   if (stats) {
     const total = stats.num_dns_queries || 0;
     const blocked = stats.num_blocked_filtering || 0;
@@ -1226,6 +1491,8 @@ async function loadDashboard() {
     state.fail2ban = fail2ban;
     renderFail2ban(fail2ban);
   }
+
+  renderDashClientList(clients.slice(0, 6));
 }
 
 function renderFail2ban(data) {
@@ -1973,40 +2240,49 @@ function statusColor(code) {
 }
 
 async function loadSecurity() {
-  const [config, bans] = await Promise.all([
-    GET('/api/fail2ban/config'),
-    GET('/api/fail2ban/status'),
-  ]);
+  const mode = state.interfaceMode;
 
-  if (config && !config.error) {
-    state.security.config = config;
-    document.getElementById('security-jail-name').textContent = config.jail || '—';
-    document.getElementById('sec-bantime').textContent  = fmtSeconds(config.bantime);
-    document.getElementById('sec-findtime').textContent = fmtSeconds(config.findtime);
-    document.getElementById('sec-maxretry').textContent = String(config.maxretry);
-    // Pre-fill edit form
-    document.getElementById('edit-bantime').value  = config.bantime;
-    document.getElementById('edit-findtime').value = config.findtime;
-    document.getElementById('edit-maxretry').value = config.maxretry;
+  // Score, status bar, and IP are always loaded (visible to all profiles that can see this tab)
+  const always = [loadSecurityScore(), loadSystemStatus(), loadMyIp()];
+
+  if (mode === 'advanced') {
+    const [config, bans] = await Promise.all([
+      GET('/api/fail2ban/config'),
+      GET('/api/fail2ban/status'),
+    ]);
+
+    if (config && !config.error) {
+      state.security.config = config;
+      document.getElementById('security-jail-name').textContent = config.jail || '—';
+      document.getElementById('sec-bantime').textContent  = fmtSeconds(config.bantime);
+      document.getElementById('sec-findtime').textContent = fmtSeconds(config.findtime);
+      document.getElementById('sec-maxretry').textContent = String(config.maxretry);
+      document.getElementById('edit-bantime').value  = config.bantime;
+      document.getElementById('edit-findtime').value = config.findtime;
+      document.getElementById('edit-maxretry').value = config.maxretry;
+    }
+
+    if (bans) {
+      state.security.bans = bans;
+      renderSecurityBans(bans);
+      document.getElementById('sec-current-bans').textContent = String(bans.currentlyBanned || 0);
+    }
+
+    await Promise.all([
+      ...always,
+      loadLogs(state.securityLogFilter),
+      loadWhitelist(),
+      loadJailLog(),
+      loadSessions(),
+      loadTlsCert(),
+    ]);
+  } else if (mode === 'super_user') {
+    // Super User: score + status + TLS + password change only
+    await Promise.all([...always, loadTlsCert()]);
+  } else {
+    // User profile cannot reach security tab; guard in switchTab redirects away
+    await Promise.all(always);
   }
-
-  if (bans) {
-    state.security.bans = bans;
-    renderSecurityBans(bans);
-    document.getElementById('sec-current-bans').textContent = String(bans.currentlyBanned || 0);
-  }
-
-  // Load all additional panels in parallel
-  await Promise.all([
-    loadLogs(state.securityLogFilter),
-    loadSystemStatus(),
-    loadWhitelist(),
-    loadJailLog(),
-    loadSessions(),
-    loadTlsCert(),
-    loadMyIp(),
-    loadSecurityScore(),
-  ]);
 }
 
 async function loadLogs(filter) {
@@ -2600,8 +2876,70 @@ document.getElementById('devices-tbody').addEventListener('click', async e => {
 // ── Phase 2: DNS Profiles (Module A) ─────────────────────────────────────────
 
 async function loadDnsProfilesTab() {
-  const loading = document.getElementById('dns-profiles-loading');
-  const wrap    = document.getElementById('dns-profiles-wrap');
+  if (state.interfaceMode === 'user') {
+    await loadDnsBasic();
+  } else {
+    await loadDnsProfilesFull();
+  }
+}
+
+async function loadDnsBasic() {
+  const basicWrap   = document.getElementById('dns-basic-wrap');
+  const fullWrap    = document.getElementById('dns-profiles-wrap');
+  const loading     = document.getElementById('dns-profiles-loading');
+  const titleEl     = document.getElementById('dns-tab-title');
+
+  if (titleEl) titleEl.textContent = t('dnsBasic.title');
+  if (fullWrap) fullWrap.classList.add('hidden');
+  if (loading)  loading.classList.remove('hidden');
+
+  // Fetch current device DNS settings
+  const devData = await GET('/api/devices');
+  if (loading) loading.classList.add('hidden');
+  const devices = devData?.devices || [];
+  state.devices = devices;
+
+  const DNS_BASIC_OPTIONS = [
+    { id: 'default_filtered', label: t('dnsBasic.standard'), desc: t('dnsBasic.standard.desc') },
+    { id: 'malware_only',     label: t('dnsBasic.malware'),  desc: t('dnsBasic.malware.desc')  },
+    { id: 'unfiltered',       label: t('dnsBasic.none'),     desc: t('dnsBasic.none.desc')      },
+  ];
+
+  basicWrap.classList.remove('hidden');
+  basicWrap.innerHTML = `
+    <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:.75rem" data-i18n="dnsBasic.desc">
+      Choose the level of DNS protection for your devices.
+    </p>
+    ${devices.length === 0 ? `<div class="text-dim" data-i18n="devices.none">No devices yet. Create a device first.</div>` : ''}
+    ${devices.map(dev => {
+      const current = dev.dnsProfile || 'default_filtered';
+      return `
+        <div class="security-panel" style="margin-bottom:.75rem">
+          <div style="font-weight:600;margin-bottom:.5rem">${esc(dev.name)}</div>
+          <div class="dns-basic-cards" data-dev-id="${dev.id}">
+            ${DNS_BASIC_OPTIONS.map(opt => `
+              <div class="dns-basic-card ${current === opt.id ? 'active' : ''}"
+                   data-action="dns-basic-select" data-dev-id="${dev.id}" data-profile="${opt.id}">
+                <div class="dns-basic-card-title">${esc(opt.label)}</div>
+                <div class="dns-basic-card-desc">${esc(opt.desc)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+  applyI18n();
+}
+
+async function loadDnsProfilesFull() {
+  const basicWrap = document.getElementById('dns-basic-wrap');
+  const loading   = document.getElementById('dns-profiles-loading');
+  const wrap      = document.getElementById('dns-profiles-wrap');
+  const titleEl   = document.getElementById('dns-tab-title');
+
+  if (titleEl) titleEl.textContent = t('nav.dnsProfiles');
+  if (basicWrap) basicWrap.classList.add('hidden');
   if (loading) loading.classList.remove('hidden');
   if (wrap)    wrap.classList.add('hidden');
 
@@ -2700,6 +3038,22 @@ document.getElementById('dns-assign-tbody').addEventListener('click', async e =>
   if (action === 'revoke-bypass') {
     await DEL(`/api/devices/${id}/dns-bypass`);
     await loadDnsProfilesTab();
+  }
+});
+
+// DNS basic (User mode) click handler
+document.getElementById('dns-basic-wrap').addEventListener('click', async e => {
+  const card = e.target.closest('[data-action="dns-basic-select"]');
+  if (!card) return;
+  const { devId, profile } = card.dataset;
+  // Optimistic UI update
+  document.querySelectorAll(`.dns-basic-cards[data-dev-id="${devId}"] .dns-basic-card`).forEach(c => {
+    c.classList.toggle('active', c.dataset.profile === profile);
+  });
+  const res = await POST(`/api/devices/${devId}/dns-profile`, { profileId: profile });
+  if (res?.error) {
+    window.alert(res.error);
+    await loadDnsBasic(); // revert on error
   }
 });
 
@@ -3225,4 +3579,83 @@ document.getElementById('migration-export-btn').addEventListener('click', async 
   btn.disabled = false;
   if (data?.error) { result.textContent = `Error: ${data.error}`; return; }
   result.textContent = `${t('migration.exportDone')} ${data.filename}`;
+});
+
+// ── Settings Tab ──────────────────────────────────────────────────────────────
+
+function loadSettingsTab() {
+  document.querySelectorAll('input[name="interface-mode"]').forEach(r => {
+    r.checked = r.value === state.interfaceMode;
+  });
+  updateModeCardHighlight();
+  document.getElementById('settings-mode-msg').textContent = '';
+}
+
+function updateModeCardHighlight() {
+  document.querySelectorAll('.mode-card').forEach(card => {
+    card.classList.toggle('mode-card-active', card.dataset.mode === state.interfaceMode);
+  });
+}
+
+function openAdvancedConfirm(onConfirmed) {
+  const overlay  = document.getElementById('advanced-confirm-overlay');
+  const checkbox = document.getElementById('advanced-confirm-checkbox');
+  const okBtn    = document.getElementById('advanced-confirm-ok');
+  checkbox.checked = false;
+  okBtn.disabled = true;
+  overlay.classList.remove('hidden');
+
+  checkbox.onchange = () => { okBtn.disabled = !checkbox.checked; };
+
+  okBtn.onclick = async () => {
+    overlay.classList.add('hidden');
+    await onConfirmed();
+  };
+
+  const closeModal = () => {
+    overlay.classList.add('hidden');
+    // Reset radio back to current mode
+    document.querySelectorAll('input[name="interface-mode"]').forEach(r => {
+      r.checked = r.value === state.interfaceMode;
+    });
+    updateModeCardHighlight();
+  };
+
+  document.getElementById('advanced-confirm-cancel').onclick = closeModal;
+  document.getElementById('advanced-confirm-close').onclick  = closeModal;
+}
+
+async function applyInterfaceMode(mode) {
+  const msgEl = document.getElementById('settings-mode-msg');
+  msgEl.textContent = '';
+  const data = await POST('/api/settings/interface-mode', { interfaceMode: mode });
+  if (!data?.success) {
+    msgEl.textContent = data?.error || t('common.error');
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+  msgEl.style.color = 'var(--green)';
+  msgEl.textContent = t('settings.mode.updated');
+  await loadCapabilities();
+  updateModeCardHighlight();
+}
+
+// Mode card click selects the radio
+document.querySelectorAll('.mode-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+    updateModeCardHighlight();
+  });
+});
+
+document.getElementById('settings-mode-save-btn').addEventListener('click', async () => {
+  const selected = document.querySelector('input[name="interface-mode"]:checked')?.value;
+  if (!selected || selected === state.interfaceMode) return;
+
+  if (selected === 'advanced') {
+    openAdvancedConfirm(() => applyInterfaceMode('advanced'));
+  } else {
+    await applyInterfaceMode(selected);
+  }
 });

@@ -77,6 +77,41 @@ function dnsToPreset(dns) {
 const DATA_FILE = '/data/client-dns.json';
 const SETTINGS_FILE = '/data/portal-config.json';
 
+const VALID_INTERFACE_MODES = ['user', 'super_user', 'advanced'];
+const DEFAULT_INTERFACE_MODE = 'super_user';
+
+const UI_CAPABILITIES = {
+  user: {
+    modules: ['dashboard', 'devices', 'dns_basic', 'settings'],
+    actions: {
+      createDevice: true, deleteDevice: true, assignBasicDns: true,
+      viewQrCode: true, downloadConfig: true,
+      createBackup: false, guidedRestore: false, restoreBackup: false,
+      configureNotifications: false, viewSecurityScore: false,
+      publicGateway: false, fileDropPublic: false, appsLifecycle: false,
+      rawLogs: false, advancedSecurity: false,
+    },
+  },
+  super_user: {
+    modules: ['dashboard', 'devices', 'dns_profiles', 'backups',
+              'monitoring', 'notifications', 'security', 'settings'],
+    actions: {
+      createDevice: true, deleteDevice: true, assignDnsProfile: true,
+      temporaryDnsBypass: true, createBackup: true, guidedRestore: true,
+      restoreBackup: true, configureNotifications: true,
+      viewSecurityScore: true, viewMonitoring: true,
+      publicGateway: false, fileDropPublic: false, appsLifecycle: false,
+      rawLogs: false, advancedSecurity: false,
+    },
+  },
+  advanced: {
+    modules: ['dashboard', 'devices', 'clients', 'wireguard', 'adguard',
+              'dns_profiles', 'gateway', 'monitoring', 'apps', 'filedrop',
+              'migration', 'security', 'backups', 'notifications', 'settings'],
+    actions: { all: true },
+  },
+};
+
 function sanitizeServerName(value) {
   return String(value || '')
     .trim()
@@ -110,6 +145,26 @@ function setServerName(serverName) {
   const settings = loadSettings();
   settings.serverName = serverName;
   saveSettings(settings);
+}
+
+function getInterfaceMode() {
+  const mode = loadSettings().interfaceMode;
+  return VALID_INTERFACE_MODES.includes(mode) ? mode : DEFAULT_INTERFACE_MODE;
+}
+
+function setInterfaceMode(mode) {
+  if (!VALID_INTERFACE_MODES.includes(mode)) throw new Error('Invalid interface mode');
+  const settings = loadSettings();
+  settings.interfaceMode = mode;
+  saveSettings(settings);
+}
+
+function requiresAction(action) {
+  return (req, res, next) => {
+    const caps = UI_CAPABILITIES[getInterfaceMode()];
+    if (caps.actions?.all || caps.actions?.[action]) return next();
+    res.status(403).json({ error: `Action '${action}' not allowed in current interface mode.` });
+  };
 }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
@@ -379,6 +434,7 @@ app.get('/api/config', auth, (_req, res) => res.json({
   wgEasyPath: '/wireguard/',
   adguardPath: '/adguard/',
   serverName: getServerName(),
+  interfaceMode: getInterfaceMode(),
 }));
 
 app.post('/api/server-name', auth, (req, res) => {
@@ -389,6 +445,27 @@ app.post('/api/server-name', auth, (req, res) => {
 
   setServerName(serverName);
   res.json({ success: true, serverName });
+});
+
+// ── Interface Mode / UI Capabilities ─────────────────────────────────────────
+
+app.get('/api/settings/interface-mode', auth, (_req, res) => {
+  res.json({ interfaceMode: getInterfaceMode() });
+});
+
+app.post('/api/settings/interface-mode', auth, (req, res) => {
+  const mode = String(req.body.interfaceMode || '').trim();
+  if (!VALID_INTERFACE_MODES.includes(mode)) {
+    return res.status(400).json({ error: `Invalid interface mode. Must be one of: ${VALID_INTERFACE_MODES.join(', ')}.` });
+  }
+  setInterfaceMode(mode);
+  res.json({ success: true, interfaceMode: mode });
+});
+
+app.get('/api/settings/ui-capabilities', auth, (_req, res) => {
+  const mode = getInterfaceMode();
+  const caps = UI_CAPABILITIES[mode];
+  res.json({ interfaceMode: mode, modules: caps.modules, actions: caps.actions });
 });
 
 // ── WireGuard clients ─────────────────────────────────────────────────────────
@@ -2101,7 +2178,7 @@ app.get('/api/proxy/services', auth, (_req, res) => {
   res.json({ services: Object.values(loadProxyServices()) });
 });
 
-app.post('/api/proxy/services', auth, async (req, res) => {
+app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (req, res) => {
   const { name, domain, target, exposure = 'vpn_only', ipAllowlist = [], notes = '', confirmed = false } = req.body;
   if (!name || !domain || !target) return res.status(400).json({ error: 'name, domain, and target are required' });
   if (!isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
@@ -2661,7 +2738,7 @@ app.get('/api/apps', auth, async (req, res) => {
   res.json({ apps: result });
 });
 
-app.post('/api/apps/:id/install', auth, async (req, res) => {
+app.post('/api/apps/:id/install', auth, requiresAction('appsLifecycle'), async (req, res) => {
   const catalogEntry = APP_CATALOG[req.params.id];
   if (!catalogEntry) return res.status(404).json({ error: 'App not in catalog' });
   const apps = loadApps();
@@ -2742,7 +2819,7 @@ app.post('/api/apps/:id/install', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/start', auth, async (req, res) => {
+app.post('/api/apps/:id/start', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/start`, null);
     if (r.status === 204 || r.status === 304) return res.json({ ok: true });
@@ -2810,7 +2887,7 @@ app.post('/api/apps/:id/update', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/remove', auth, async (req, res) => {
+app.post('/api/apps/:id/remove', auth, requiresAction('appsLifecycle'), async (req, res) => {
   const { confirmed, deleteData } = req.body;
   if (!confirmed) return res.status(400).json({ error: 'requires confirmed:true' });
   const apps = loadApps();
@@ -2856,7 +2933,7 @@ app.get('/api/filedrop', auth, (req, res) => {
   res.json({ shares: Object.values(shares) });
 });
 
-app.post('/api/filedrop/upload', auth, (req, res) => {
+app.post('/api/filedrop/upload', auth, requiresAction('fileDropPublic'), (req, res) => {
   let responded = false;
   const respond = (code, body) => { if (!responded) { responded = true; res.status(code).json(body); } };
 
