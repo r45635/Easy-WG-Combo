@@ -11,3 +11,5 @@ portal/data/
 caddy/data/
 caddy/config/
 caddy/logs/
+.claude/
+Local.MD
