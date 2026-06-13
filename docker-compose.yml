@@ -55,11 +55,29 @@ services:
       - ADGUARD_PASSWORD=${ADMIN_PASSWORD}
       - ACCESS_LOG_PATH=/var/log/easy-wg-portal/access.log
       - FAIL2BAN_LOG=/var/log/fail2ban.log
+      - BACKUP_DIR=/backups
+      - BACKUP_KEEP=${BACKUP_KEEP:-10}
+      - ALERT_DISK_THRESHOLD=${ALERT_DISK_THRESHOLD:-85}
+      - ALERT_CERT_EXPIRY_DAYS=${ALERT_CERT_EXPIRY_DAYS:-14}
     volumes:
       - ./portal/data:/data
       - /var/run/fail2ban:/var/run/fail2ban
       - ./caddy/logs:/var/log/easy-wg-portal:ro
       - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
+      # Health module: Docker socket for container status
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Security module: read host config files for security checks
+      - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
+      - /etc/ufw:/etc/ufw:ro
+      - /etc/apt/apt.conf.d:/etc/apt/apt.conf.d:ro
+      # Backup module: source directories (read-only) + output directory (writable)
+      - ./wireguard:/backup-src/wireguard:ro
+      - ./adguard/conf:/backup-src/adguard/conf:ro
+      - ./caddy:/backup-src/caddy:ro
+      - ./.env:/backup-src/.env:ro
+      - ./docker-compose.yml:/backup-src/docker-compose.yml:ro
+      - ./compose.sh:/backup-src/compose.sh:ro
+      - ./backups:/backups
     depends_on:
       - wg-easy
       - adguard

@@ -6,6 +6,7 @@ const QRCode     = require('qrcode');
 const fs         = require('fs');
 const os         = require('os');
 const path       = require('path');
+const http       = require('http');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
@@ -24,6 +25,16 @@ const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
 const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
 const FAIL2BAN_LOG     = process.env.FAIL2BAN_LOG     || '/var/log/fail2ban.log';
+const BACKUP_DIR       = process.env.BACKUP_DIR       || '/backups';
+const BACKUP_SRC_DIR   = process.env.BACKUP_SRC_DIR   || '/backup-src';
+const BACKUP_KEEP      = parseInt(process.env.BACKUP_KEEP || '10', 10);
+const DOCKER_SOCK      = '/var/run/docker.sock';
+const SSH_CONFIG_PATH  = '/etc/ssh/sshd_config';
+const UFW_CONF_PATH    = '/etc/ufw/ufw.conf';
+const NOTIF_FILE       = '/data/notifications.json';
+const NOTIF_HIST_FILE  = '/data/notifications-history.json';
+const ALERT_DISK_THRESHOLD  = parseInt(process.env.ALERT_DISK_THRESHOLD  || '85',  10);
+const ALERT_CERT_EXPIRY_DAYS = parseInt(process.env.ALERT_CERT_EXPIRY_DAYS || '14', 10);
 const runCmd = promisify(execFile);
 
 const DNS_PRESETS = [
@@ -861,6 +872,647 @@ app.get('/api/geoip/:ip', auth, async (req, res) => {
     );
     res.json(await r.json());
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Docker API (Unix socket) ──────────────────────────────────────────────────
+
+function dockerApiRequest(apiPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ socketPath: DOCKER_SOCK, path: apiPath, method: 'GET' }, res => {
+      let body = '';
+      res.on('data', d => { body += d; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); }
+        catch { resolve([]); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(4000, () => { req.destroy(); reject(new Error('Docker socket timeout')); });
+    req.end();
+  });
+}
+
+// ── Health module ─────────────────────────────────────────────────────────────
+
+async function getSystemMetrics() {
+  // CPU usage: sample /proc/stat twice
+  function readCpuTimes() {
+    const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
+    const parts = line.trim().split(/\s+/).slice(1).map(Number);
+    const idle = parts[3] + (parts[4] || 0);
+    const total = parts.reduce((a, b) => a + b, 0);
+    return { idle, total };
+  }
+  let cpuPct = 0;
+  try {
+    const t1 = readCpuTimes();
+    await new Promise(r => setTimeout(r, 200));
+    const t2 = readCpuTimes();
+    const dIdle = t2.idle - t1.idle;
+    const dTotal = t2.total - t1.total;
+    cpuPct = dTotal > 0 ? Math.round((1 - dIdle / dTotal) * 100) : 0;
+  } catch { /* /proc not available in container – fallback */ }
+
+  const totalMem = os.totalmem();
+  const freeMem  = os.freemem();
+  const usedMem  = totalMem - freeMem;
+
+  // Disk usage via df
+  let disk = { used: 0, total: 0, free: 0, pct: 0 };
+  try {
+    const { stdout } = await runCmd('df', ['-BM', '--output=size,used,avail,pcent', '/'], { timeout: 5000 });
+    const row = stdout.trim().split('\n')[1].trim().split(/\s+/);
+    disk = {
+      total: parseInt(row[0], 10),
+      used:  parseInt(row[1], 10),
+      free:  parseInt(row[2], 10),
+      pct:   parseInt(row[3], 10),
+    };
+  } catch { /* ignore */ }
+
+  // Network RX/TX from /proc/net/dev
+  let net = { rx: 0, tx: 0 };
+  try {
+    const devFile = fs.readFileSync('/proc/net/dev', 'utf8');
+    const lines = devFile.split('\n').filter(l => l.includes(':') && !l.trim().startsWith('lo'));
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      net.rx += parseInt(parts[1], 10) || 0;
+      net.tx += parseInt(parts[9], 10) || 0;
+    }
+  } catch { /* ignore */ }
+
+  return {
+    cpu:    { pct: cpuPct, cores: os.cpus().length },
+    ram:    { total: totalMem, used: usedMem, free: freeMem, pct: Math.round(usedMem / totalMem * 100) },
+    disk,
+    swap:   {},
+    uptime: Math.round(os.uptime()),
+    loadavg: os.loadavg(),
+    hostname: os.hostname(),
+    platform: `${os.type()} ${os.release()}`,
+    net,
+  };
+}
+
+app.get('/api/health', auth, async (_req, res) => {
+  try {
+    const metrics = await getSystemMetrics();
+    res.json(metrics);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/health/services', auth, async (_req, res) => {
+  try {
+    const [wg, ag, caddy] = await Promise.all([
+      checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
+      checkService('adguard',  `${AG_URL}/control/status`, [200]),
+      checkService('caddy',    'http://127.0.0.1:2019/',   [200]),
+    ]);
+
+    // Docker containers via socket
+    let containers = [];
+    try {
+      const raw = await dockerApiRequest('/containers/json?all=true');
+      containers = (raw || []).map(c => ({
+        name:    (c.Names || [])[0]?.replace(/^\//, '') || 'unknown',
+        image:   c.Image,
+        status:  c.State,
+        state:   c.Status,
+        ports:   (c.Ports || []).map(p => p.PublicPort).filter(Boolean),
+      }));
+    } catch { /* Docker socket not available */ }
+
+    res.json({
+      services:   { 'wg-easy': wg, adguard: ag, caddy, portal: { name: 'portal', up: true } },
+      containers,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Security module ───────────────────────────────────────────────────────────
+
+let securityCache = null;
+let securityCacheAt = 0;
+const SECURITY_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+function parseSshConfig(configPath) {
+  const result = {};
+  // Check drop-in dir first
+  const dropin = configPath + '.d';
+  const readConfig = (p) => {
+    try { return fs.readFileSync(p, 'utf8'); } catch { return ''; }
+  };
+  let content = readConfig(configPath);
+  if (fs.existsSync(dropin)) {
+    try {
+      for (const f of fs.readdirSync(dropin).filter(f => f.endsWith('.conf'))) {
+        content += '\n' + readConfig(path.join(dropin, f));
+      }
+    } catch { /* ignore */ }
+  }
+  for (const line of content.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z]+)\s+(.+)/);
+    if (m) result[m[1].toLowerCase()] = m[2].trim();
+  }
+  return result;
+}
+
+async function computeSecurityScore() {
+  const checks = [];
+
+  function check(id, label, pts, status, note = '') {
+    checks.push({ id, label, pts, status, note });
+    return status === 'pass' ? pts : 0;
+  }
+
+  let score = 0;
+
+  // SSH checks
+  const sshCfg = parseSshConfig(SSH_CONFIG_PATH);
+  const rootLogin = (sshCfg['permitrootlogin'] || 'yes').toLowerCase();
+  score += check('ssh_root', 'SSH root login restricted', 10,
+    (rootLogin === 'no' || rootLogin === 'prohibit-password') ? 'pass' : 'fail',
+    `PermitRootLogin: ${sshCfg['permitrootlogin'] || 'yes (default)'}`);
+
+  const pwAuth = (sshCfg['passwordauthentication'] || 'yes').toLowerCase();
+  score += check('ssh_password', 'SSH password auth disabled', 10,
+    pwAuth === 'no' ? 'pass' : 'fail',
+    `PasswordAuthentication: ${sshCfg['passwordauthentication'] || 'yes (default)'}`);
+
+  // UFW
+  let ufwActive = false;
+  try {
+    const ufwConf = fs.readFileSync(UFW_CONF_PATH, 'utf8');
+    ufwActive = /ENABLED=yes/i.test(ufwConf);
+  } catch { /* ufw.conf not mounted */ }
+  score += check('ufw', 'Firewall (UFW) active', 15, ufwActive ? 'pass' : 'fail');
+
+  // Fail2Ban
+  let f2bActive = false;
+  try {
+    await runCmd('fail2ban-client', ['ping'], { timeout: 4000 });
+    f2bActive = true;
+  } catch { /* not active */ }
+  score += check('fail2ban', 'Fail2Ban active', 15, f2bActive ? 'pass' : 'fail');
+
+  // TLS / HTTPS
+  let tlsPts = 0;
+  let certDaysLeft = null;
+  try {
+    const tls = require('tls');
+    await new Promise((resolve, reject) => {
+      const sock = tls.connect({ host: '127.0.0.1', port: 443, rejectUnauthorized: false, servername: 'localhost' }, () => {
+        const cert = sock.getPeerCertificate();
+        sock.destroy();
+        if (cert.valid_to) {
+          certDaysLeft = Math.floor((new Date(cert.valid_to) - Date.now()) / 86400000);
+          tlsPts = 15;
+        }
+        resolve();
+      });
+      sock.on('error', reject);
+      setTimeout(() => { sock.destroy(); reject(new Error('timeout')); }, 3000);
+    });
+  } catch { /* no TLS */ }
+  score += check('tls', 'HTTPS active', 15, tlsPts > 0 ? 'pass' : 'fail');
+  if (certDaysLeft !== null) {
+    score += check('cert_expiry', `Certificate valid (${certDaysLeft} days left)`, 5,
+      certDaysLeft > ALERT_CERT_EXPIRY_DAYS ? 'pass' : 'fail');
+  } else {
+    check('cert_expiry', 'Certificate expiry check', 5, 'warn', 'HTTPS not active');
+  }
+
+  // Reboot required
+  const rebootRequired = fs.existsSync('/var/run/reboot-required');
+  score += check('reboot', 'No reboot required', 5, rebootRequired ? 'fail' : 'pass');
+
+  // Auto-updates
+  let autoUpdates = false;
+  try {
+    const auContent = fs.readFileSync('/etc/apt/apt.conf.d/20auto-upgrades', 'utf8');
+    autoUpdates = /Unattended-Upgrade\s+"1"/i.test(auContent);
+  } catch { /* not available */ }
+  score += check('auto_updates', 'Automatic security updates enabled', 10,
+    autoUpdates ? 'pass' : (fs.existsSync('/etc/apt/apt.conf.d/20auto-upgrades') ? 'fail' : 'warn'),
+    autoUpdates ? '' : 'Install unattended-upgrades to enable');
+
+  // Admin portal exposure
+  const portalBoundLocally = (process.env.PORTAL_HOST || '127.0.0.1') === '127.0.0.1';
+  score += check('portal_exposure', 'Admin portal bound to localhost', 15,
+    portalBoundLocally ? 'pass' : 'fail',
+    `PORTAL_HOST=${process.env.PORTAL_HOST || '127.0.0.1'}`);
+
+  const maxScore = checks.reduce((s, c) => s + (c.status !== 'warn' ? c.pts : 0), 0);
+  const pct = maxScore > 0 ? Math.round(score / maxScore * 100) : 0;
+  let grade;
+  if (pct >= 90) grade = 'strong';
+  else if (pct >= 70) grade = 'good';
+  else if (pct >= 50) grade = 'needs_attention';
+  else grade = 'risky';
+
+  return { score, maxScore, pct, grade, checks, scannedAt: Date.now() };
+}
+
+app.get('/api/security', auth, async (_req, res) => {
+  try {
+    if (!securityCache || (Date.now() - securityCacheAt) > SECURITY_CACHE_TTL) {
+      securityCache = await computeSecurityScore();
+      securityCacheAt = Date.now();
+    }
+    res.json(securityCache);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/security/rescan', auth, async (_req, res) => {
+  try {
+    securityCache = await computeSecurityScore();
+    securityCacheAt = Date.now();
+    res.json(securityCache);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Backup module ─────────────────────────────────────────────────────────────
+
+function listBackups() {
+  try {
+    return fs.readdirSync(BACKUP_DIR)
+      .filter(f => /^easy-wg-combo-backup-.+\.(tar\.gz|tar\.gz\.age)$/.test(f))
+      .sort()
+      .reverse()
+      .map(f => {
+        const fullPath = path.join(BACKUP_DIR, f);
+        const stat = fs.statSync(fullPath);
+        return { filename: f, size: stat.size, createdAt: stat.mtime.toISOString() };
+      });
+  } catch { return []; }
+}
+
+function assertSafeBackupFilename(filename) {
+  if (!/^easy-wg-combo-backup-.+\.(tar\.gz|tar\.gz\.age)$/.test(filename)) {
+    throw new Error('Invalid backup filename.');
+  }
+  if (filename.includes('/') || filename.includes('..')) {
+    throw new Error('Invalid backup filename.');
+  }
+}
+
+async function createBackupArchive(encrypt = false) {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const archiveName = `easy-wg-combo-backup-${timestamp}.tar.gz`;
+  const archivePath = path.join(BACKUP_DIR, archiveName);
+
+  const stage = fs.mkdtempSync('/tmp/ewg-backup-');
+  try {
+    // Manifest
+    const manifest = {
+      project: 'Easy-WG-Combo',
+      backup_version: '1',
+      created_at: new Date().toISOString(),
+      hostname: os.hostname(),
+      os: os.type() + ' ' + os.release(),
+      components: {
+        wg_easy:     fs.existsSync(path.join(BACKUP_SRC_DIR, 'wireguard')),
+        adguard_home: fs.existsSync(path.join(BACKUP_SRC_DIR, 'adguard')),
+        caddy:       fs.existsSync(path.join(BACKUP_SRC_DIR, 'caddy')),
+        fail2ban:    true,
+        portal:      true,
+      },
+    };
+    fs.writeFileSync(path.join(stage, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+    // Copy from mounted backup source
+    const copyDir = (src, dst) => {
+      if (!fs.existsSync(src)) return;
+      fs.mkdirSync(dst, { recursive: true });
+      for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        if (entry.name.endsWith('.log')) continue;
+        const s = path.join(src, entry.name);
+        const d = path.join(dst, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else fs.copyFileSync(s, d);
+      }
+    };
+
+    for (const d of ['wireguard', 'adguard', 'caddy']) {
+      const srcDir = path.join(BACKUP_SRC_DIR, d);
+      if (fs.existsSync(srcDir)) copyDir(srcDir, path.join(stage, d));
+    }
+    // Remove AdGuard work dir (large, not needed)
+    try { fs.rmSync(path.join(stage, 'adguard', 'work'), { recursive: true }); } catch { /* ok */ }
+
+    for (const f of ['.env', '.env.secrets', 'docker-compose.yml']) {
+      const srcFile = path.join(BACKUP_SRC_DIR, f);
+      if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(stage, f));
+    }
+
+    // Portal data
+    const dataSrc = '/data';
+    if (fs.existsSync(dataSrc)) copyDir(dataSrc, path.join(stage, 'portal', 'data'));
+
+    await runCmd('tar', ['-czf', archivePath, '-C', stage, '.'], { timeout: 60000 });
+    fs.chmodSync(archivePath, 0o600);
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+
+  if (encrypt) {
+    // age encryption not available in container by default; skip gracefully
+    throw new Error('Encryption via age is not available in the portal. Use ./easywg backup --encrypt from the host CLI.');
+  }
+
+  // Rotate old backups
+  const backups = listBackups();
+  if (backups.length > BACKUP_KEEP) {
+    for (const old of backups.slice(BACKUP_KEEP)) {
+      try { fs.unlinkSync(path.join(BACKUP_DIR, old.filename)); } catch { /* ignore */ }
+    }
+  }
+
+  // Fire notification
+  sendNotification('backup_success', { filename: archiveName }).catch(() => {});
+  return archiveName;
+}
+
+app.get('/api/backup', auth, (_req, res) => {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    res.json({ backups: listBackups() });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/backup/create', auth, async (req, res) => {
+  const encrypt = req.body.encrypt === true;
+  try {
+    const filename = await createBackupArchive(encrypt);
+    res.json({ success: true, filename, backups: listBackups() });
+  } catch (e) {
+    sendNotification('backup_failure', { error: e.message }).catch(() => {});
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/backup/download/:filename', auth, (req, res) => {
+  try {
+    assertSafeBackupFilename(req.params.filename);
+    const filePath = path.join(BACKUP_DIR, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`);
+    res.setHeader('Content-Type', 'application/gzip');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post('/api/backup/restore', auth, async (req, res) => {
+  const { filename, dryRun, confirmed } = req.body;
+  try {
+    assertSafeBackupFilename(filename);
+  } catch (e) { return res.status(400).json({ error: e.message }); }
+
+  const filePath = path.join(BACKUP_DIR, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
+
+  if (filename.endsWith('.age')) {
+    return res.status(422).json({ error: 'Encrypted backups must be restored from the CLI: ./easywg restore <file>' });
+  }
+
+  // Validate archive
+  try {
+    await runCmd('tar', ['-tzf', filePath], { timeout: 15000 });
+  } catch { return res.status(422).json({ error: 'Archive validation failed — file may be corrupt.' }); }
+
+  // Check manifest
+  let manifest = {};
+  try {
+    const { stdout } = await runCmd('tar', ['-xOf', filePath, 'manifest.json'], { timeout: 10000 });
+    manifest = JSON.parse(stdout);
+  } catch { return res.status(422).json({ error: 'Backup is missing manifest.json — cannot verify compatibility.' }); }
+
+  if (dryRun) {
+    const { stdout: listing } = await runCmd('tar', ['-tzf', filePath], { timeout: 10000 });
+    return res.json({
+      dryRun: true,
+      manifest,
+      files: listing.trim().split('\n').slice(0, 50),
+    });
+  }
+
+  if (!confirmed) {
+    return res.status(400).json({ error: 'Restore requires confirmed=true in the request body.' });
+  }
+
+  // Create pre-restore backup
+  let preRestoreFile = null;
+  try {
+    preRestoreFile = await createBackupArchive(false);
+  } catch { /* non-fatal */ }
+
+  // Restore
+  const stage = fs.mkdtempSync('/tmp/ewg-restore-');
+  try {
+    await runCmd('tar', ['-xzf', filePath, '-C', stage], { timeout: 60000 });
+
+    const restoreDir = (src, dst) => {
+      if (!fs.existsSync(src)) return;
+      fs.rmSync(dst, { recursive: true, force: true });
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.cpSync(src, dst, { recursive: true });
+    };
+
+    for (const d of ['wireguard', 'adguard', 'caddy']) {
+      const srcDir = path.join(stage, d);
+      if (fs.existsSync(srcDir)) restoreDir(srcDir, path.join(BACKUP_SRC_DIR, d));
+    }
+    for (const f of ['.env', 'docker-compose.yml']) {
+      const srcFile = path.join(stage, f);
+      if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(BACKUP_SRC_DIR, f));
+    }
+    const portalData = path.join(stage, 'portal', 'data');
+    if (fs.existsSync(portalData)) restoreDir(portalData, '/data');
+
+    sendNotification('restore_success', { filename }).catch(() => {});
+    res.json({ success: true, manifest, preRestoreFile });
+  } catch (e) {
+    sendNotification('restore_failure', { filename, error: e.message }).catch(() => {});
+    res.status(500).json({ error: `Restore failed: ${e.message}` });
+  } finally {
+    fs.rmSync(stage, { recursive: true, force: true });
+  }
+});
+
+app.delete('/api/backup/:filename', auth, (req, res) => {
+  try {
+    assertSafeBackupFilename(req.params.filename);
+    const filePath = path.join(BACKUP_DIR, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
+    fs.unlinkSync(filePath);
+    res.json({ success: true, backups: listBackups() });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ── Notification module ───────────────────────────────────────────────────────
+
+function loadNotifConfig() {
+  try { return JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8')); }
+  catch { return { enabled: false, channels: { email: {}, webhook: {} }, alerts: {} }; }
+}
+
+function saveNotifConfig(cfg) {
+  fs.writeFileSync(NOTIF_FILE, JSON.stringify(cfg, null, 2));
+}
+
+function maskSecrets(cfg) {
+  const m = JSON.parse(JSON.stringify(cfg));
+  if (m.channels?.email?.password)     m.channels.email.password     = '***';
+  if (m.channels?.webhook?.url)        m.channels.webhook.url        = '***';
+  if (m.channels?.webhook?.token)      m.channels.webhook.token      = '***';
+  return m;
+}
+
+async function sendEmailNotif(subject, body) {
+  let nodemailer;
+  try { nodemailer = require('nodemailer'); } catch { throw new Error('nodemailer not installed'); }
+  const cfg = loadNotifConfig();
+  const ec = cfg.channels?.email || {};
+  if (!ec.enabled || !ec.smtp_host || !ec.to) throw new Error('Email not configured');
+  const transporter = nodemailer.createTransporter({
+    host: ec.smtp_host,
+    port: ec.smtp_port || 587,
+    secure: (ec.smtp_port || 587) === 465,
+    auth: ec.username ? { user: ec.username, pass: ec.password } : undefined,
+  });
+  await transporter.sendMail({
+    from: ec.from || ec.username,
+    to:   ec.to,
+    subject: `[Easy-WG-Combo] ${subject}`,
+    text: body,
+  });
+}
+
+async function sendWebhookNotif(message) {
+  const cfg = loadNotifConfig();
+  const wc = cfg.channels?.webhook || {};
+  if (!wc.enabled || !wc.url) throw new Error('Webhook not configured');
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 8000);
+  await fetch(wc.url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ text: message, hostname: os.hostname() }),
+    signal:  ctrl.signal,
+  });
+}
+
+async function sendNotification(event, details = {}) {
+  const cfg = loadNotifConfig();
+  if (!cfg.enabled) return;
+
+  const message = `[${os.hostname()}] ${event}: ${JSON.stringify(details)}`;
+  const results = [];
+
+  try { await sendEmailNotif(event, message); results.push({ channel: 'email', ok: true }); }
+  catch (e) { results.push({ channel: 'email', ok: false, error: e.message }); }
+
+  try { await sendWebhookNotif(message); results.push({ channel: 'webhook', ok: true }); }
+  catch (e) { results.push({ channel: 'webhook', ok: false, error: e.message }); }
+
+  // Log to history
+  try {
+    let hist = [];
+    try { hist = JSON.parse(fs.readFileSync(NOTIF_HIST_FILE, 'utf8')); } catch { /* ok */ }
+    hist.unshift({ event, details, results, sentAt: new Date().toISOString() });
+    fs.writeFileSync(NOTIF_HIST_FILE, JSON.stringify(hist.slice(0, 100), null, 2));
+  } catch { /* non-fatal */ }
+}
+
+async function checkAlerts() {
+  // Disk threshold
+  try {
+    const { stdout } = await runCmd('df', ['--output=pcent', '/'], { timeout: 5000 });
+    const pct = parseInt(stdout.trim().split('\n')[1], 10);
+    if (!isNaN(pct) && pct >= ALERT_DISK_THRESHOLD) {
+      await sendNotification('disk_usage_alert', { pct, threshold: ALERT_DISK_THRESHOLD });
+    }
+  } catch { /* ignore */ }
+
+  // Cert expiry
+  if (securityCache?.checks) {
+    const certCheck = securityCache.checks.find(c => c.id === 'cert_expiry');
+    if (certCheck?.status === 'fail') {
+      await sendNotification('certificate_expiring', { check: certCheck.note });
+    }
+  }
+
+  // Services down
+  try {
+    const [wg, ag, caddy] = await Promise.all([
+      checkService('wg-easy', `${WG_URL}/api/session`, [200, 401]),
+      checkService('adguard', `${AG_URL}/control/status`, [200]),
+      checkService('caddy', 'http://127.0.0.1:2019/', [200]),
+    ]);
+    for (const svc of [wg, ag, caddy]) {
+      if (!svc.up) await sendNotification('service_down', { service: svc.name });
+    }
+  } catch { /* ignore */ }
+}
+
+app.get('/api/notifications/config', auth, (_req, res) => {
+  res.json(maskSecrets(loadNotifConfig()));
+});
+
+app.post('/api/notifications/config', auth, (req, res) => {
+  const existing = loadNotifConfig();
+  const incoming = req.body;
+
+  // Merge: never overwrite secret fields with '***'
+  const merge = (dst, src) => {
+    if (!src || typeof src !== 'object') return dst;
+    const result = { ...dst };
+    for (const [k, v] of Object.entries(src)) {
+      if (v === '***') continue; // client didn't change this secret
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        result[k] = merge(dst[k] || {}, v);
+      } else {
+        result[k] = v;
+      }
+    }
+    return result;
+  };
+
+  const merged = merge(existing, incoming);
+  saveNotifConfig(merged);
+  res.json(maskSecrets(merged));
+});
+
+app.post('/api/notifications/test', auth, async (_req, res) => {
+  const results = [];
+  try {
+    await sendEmailNotif('Test notification', `Test from Easy-WG-Combo on ${os.hostname()}`);
+    results.push({ channel: 'email', ok: true });
+  } catch (e) { results.push({ channel: 'email', ok: false, error: e.message }); }
+
+  try {
+    await sendWebhookNotif(`Test from Easy-WG-Combo on ${os.hostname()}`);
+    results.push({ channel: 'webhook', ok: true });
+  } catch (e) { results.push({ channel: 'webhook', ok: false, error: e.message }); }
+
+  // Log
+  try {
+    let hist = [];
+    try { hist = JSON.parse(fs.readFileSync(NOTIF_HIST_FILE, 'utf8')); } catch { /* ok */ }
+    hist.unshift({ event: 'test', results, sentAt: new Date().toISOString() });
+    fs.writeFileSync(NOTIF_HIST_FILE, JSON.stringify(hist.slice(0, 100), null, 2));
+  } catch { /* non-fatal */ }
+
+  res.json({ results });
+});
+
+app.get('/api/notifications/history', auth, (_req, res) => {
+  try {
+    const hist = JSON.parse(fs.readFileSync(NOTIF_HIST_FILE, 'utf8'));
+    res.json({ history: hist.slice(0, 50) });
+  } catch { res.json({ history: [] }); }
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

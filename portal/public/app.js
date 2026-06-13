@@ -179,6 +179,64 @@ const I18N = {
     'security.password.tooShort': 'Minimum 8 characters.',
     'security.password.success': 'Password changed successfully.',
     'security.password.wrongCurrent': 'Current password is incorrect.',
+    // nav
+    'nav.backups': 'Backups',
+    'nav.notifications': 'Notifications',
+    // health
+    'health.cpu': 'CPU Usage',
+    'health.ram': 'RAM Usage',
+    'health.disk': 'Disk Usage',
+    'health.uptime': 'Uptime',
+    // security score
+    'security.score.title': 'Security Score',
+    'security.score.rescan': '↻ Rescan',
+    'security.score.strong': 'Strong',
+    'security.score.good': 'Good',
+    'security.score.attention': 'Needs attention',
+    'security.score.risky': 'Risky',
+    'security.score.pass': 'pass',
+    'security.score.fail': 'fail',
+    'security.score.warn': 'warn',
+    // backup
+    'backup.create': 'Create Backup',
+    'backup.createEncrypted': 'Create Encrypted Backup',
+    'backup.list': 'Backup files',
+    'backup.download': 'Download',
+    'backup.delete': 'Delete',
+    'backup.restore': 'Restore',
+    'backup.restoreWarning': 'Warning:',
+    'backup.restoreWarningBody': ' Restoring will overwrite the current configuration. A pre-restore backup will be created automatically.',
+    'backup.dryRun': 'Dry run (validate only, no changes)',
+    'backup.confirmText': 'I understand this will overwrite the current configuration',
+    'backup.selectFile': 'Select a backup file…',
+    'backup.noBackups': 'No backups found.',
+    'backup.creating': 'Creating backup…',
+    'backup.restoring': 'Restoring…',
+    'backup.restoreSelect': 'Please select a backup file.',
+    'backup.restoreConfirm': 'Please check the confirmation checkbox.',
+    // notifications
+    'notifications.title': 'Notification channels',
+    'notifications.enabled': 'Enable notifications',
+    'notifications.email': 'Email (SMTP)',
+    'notifications.emailEnabled': 'Enable email',
+    'notifications.webhook': 'Webhook',
+    'notifications.webhookEnabled': 'Enable webhook',
+    'notifications.smtp.host': 'SMTP Host',
+    'notifications.smtp.port': 'SMTP Port',
+    'notifications.smtp.from': 'From',
+    'notifications.smtp.to': 'To',
+    'notifications.smtp.user': 'Username',
+    'notifications.smtp.password': 'Password',
+    'notifications.webhook.url': 'Webhook URL',
+    'notifications.alerts': 'Alert thresholds',
+    'notifications.alerts.disk': 'Disk usage threshold (%)',
+    'notifications.alerts.cert': 'Certificate expiry warning (days)',
+    'notifications.save': 'Save',
+    'notifications.test': 'Send test',
+    'notifications.history': 'Notification history',
+    'notifications.saved': 'Configuration saved.',
+    'notifications.testSent': 'Test notification sent.',
+    'notifications.noChannels': 'No channels configured or reachable.',
   },
   fr: {
     'lang.label': 'Langue',
@@ -358,6 +416,59 @@ const I18N = {
     'security.password.tooShort': 'Minimum 8 caractères.',
     'security.password.success': 'Mot de passe changé avec succès.',
     'security.password.wrongCurrent': 'Mot de passe actuel incorrect.',
+    'nav.backups': 'Sauvegardes',
+    'nav.notifications': 'Notifications',
+    'health.cpu': 'CPU',
+    'health.ram': 'RAM',
+    'health.disk': 'Disque',
+    'health.uptime': 'Disponibilité',
+    'security.score.title': 'Score de sécurité',
+    'security.score.rescan': '↻ Rescanner',
+    'security.score.strong': 'Fort',
+    'security.score.good': 'Bon',
+    'security.score.attention': 'À améliorer',
+    'security.score.risky': 'Risqué',
+    'security.score.pass': 'ok',
+    'security.score.fail': 'échec',
+    'security.score.warn': 'avert.',
+    'backup.create': 'Créer une sauvegarde',
+    'backup.createEncrypted': 'Sauvegarde chiffrée',
+    'backup.list': 'Fichiers de sauvegarde',
+    'backup.download': 'Télécharger',
+    'backup.delete': 'Supprimer',
+    'backup.restore': 'Restaurer',
+    'backup.restoreWarning': 'Attention :',
+    'backup.restoreWarningBody': ' La restauration écrasera la configuration actuelle. Une sauvegarde préalable sera créée automatiquement.',
+    'backup.dryRun': 'Simulation (validation uniquement, aucune modification)',
+    'backup.confirmText': 'Je comprends que cela écrasera la configuration actuelle',
+    'backup.selectFile': 'Sélectionner un fichier de sauvegarde…',
+    'backup.noBackups': 'Aucune sauvegarde trouvée.',
+    'backup.creating': 'Création de la sauvegarde…',
+    'backup.restoring': 'Restauration…',
+    'backup.restoreSelect': 'Veuillez sélectionner un fichier de sauvegarde.',
+    'backup.restoreConfirm': 'Veuillez cocher la case de confirmation.',
+    'notifications.title': 'Canaux de notification',
+    'notifications.enabled': 'Activer les notifications',
+    'notifications.email': 'Email (SMTP)',
+    'notifications.emailEnabled': 'Activer l\'email',
+    'notifications.webhook': 'Webhook',
+    'notifications.webhookEnabled': 'Activer le webhook',
+    'notifications.smtp.host': 'Hôte SMTP',
+    'notifications.smtp.port': 'Port SMTP',
+    'notifications.smtp.from': 'Expéditeur',
+    'notifications.smtp.to': 'Destinataire',
+    'notifications.smtp.user': 'Utilisateur',
+    'notifications.smtp.password': 'Mot de passe',
+    'notifications.webhook.url': 'URL du webhook',
+    'notifications.alerts': 'Seuils d\'alerte',
+    'notifications.alerts.disk': 'Seuil d\'utilisation du disque (%)',
+    'notifications.alerts.cert': 'Alerte expiration certificat (jours)',
+    'notifications.save': 'Enregistrer',
+    'notifications.test': 'Envoyer un test',
+    'notifications.history': 'Historique des notifications',
+    'notifications.saved': 'Configuration enregistrée.',
+    'notifications.testSent': 'Notification de test envoyée.',
+    'notifications.noChannels': 'Aucun canal configuré ou joignable.',
   },
   zh: {
     'lang.label': '语言',
@@ -537,6 +648,59 @@ const I18N = {
     'security.password.tooShort': '至少需要 8 个字符。',
     'security.password.success': '密码修改成功。',
     'security.password.wrongCurrent': '当前密码不正确。',
+    'nav.backups': '备份',
+    'nav.notifications': '通知',
+    'health.cpu': 'CPU 使用率',
+    'health.ram': '内存使用率',
+    'health.disk': '磁盘使用率',
+    'health.uptime': '运行时间',
+    'security.score.title': '安全评分',
+    'security.score.rescan': '↻ 重新扫描',
+    'security.score.strong': '强',
+    'security.score.good': '良好',
+    'security.score.attention': '需要改进',
+    'security.score.risky': '风险',
+    'security.score.pass': '通过',
+    'security.score.fail': '失败',
+    'security.score.warn': '警告',
+    'backup.create': '创建备份',
+    'backup.createEncrypted': '创建加密备份',
+    'backup.list': '备份文件',
+    'backup.download': '下载',
+    'backup.delete': '删除',
+    'backup.restore': '还原',
+    'backup.restoreWarning': '警告：',
+    'backup.restoreWarningBody': ' 还原将覆盖当前配置，系统会自动创建预还原备份。',
+    'backup.dryRun': '演习模式（仅验证，不应用更改）',
+    'backup.confirmText': '我了解这将覆盖当前配置',
+    'backup.selectFile': '选择备份文件…',
+    'backup.noBackups': '未找到备份文件。',
+    'backup.creating': '正在创建备份…',
+    'backup.restoring': '正在还原…',
+    'backup.restoreSelect': '请选择备份文件。',
+    'backup.restoreConfirm': '请勾选确认复选框。',
+    'notifications.title': '通知渠道',
+    'notifications.enabled': '启用通知',
+    'notifications.email': '电子邮件（SMTP）',
+    'notifications.emailEnabled': '启用邮件',
+    'notifications.webhook': 'Webhook',
+    'notifications.webhookEnabled': '启用 Webhook',
+    'notifications.smtp.host': 'SMTP 主机',
+    'notifications.smtp.port': 'SMTP 端口',
+    'notifications.smtp.from': '发件人',
+    'notifications.smtp.to': '收件人',
+    'notifications.smtp.user': '用户名',
+    'notifications.smtp.password': '密码',
+    'notifications.webhook.url': 'Webhook URL',
+    'notifications.alerts': '告警阈值',
+    'notifications.alerts.disk': '磁盘使用率阈值 (%)',
+    'notifications.alerts.cert': '证书到期预警（天）',
+    'notifications.save': '保存',
+    'notifications.test': '发送测试',
+    'notifications.history': '通知历史',
+    'notifications.saved': '配置已保存。',
+    'notifications.testSent': '测试通知已发送。',
+    'notifications.noChannels': '未配置或无法连接任何通知渠道。',
   },
 };
 
@@ -563,6 +727,9 @@ const state = {
   tlsCert:          null,
   serverName:       'vpn-server',
   lang:             'en',
+  health:           null,
+  backups:          [],
+  notifConfig:      null,
 };
 
 function detectLang() {
@@ -694,17 +861,19 @@ function switchTab(name) {
     el.classList.toggle('hidden', el.id !== `tab-${name}`);
   });
 
-  if (name === 'dashboard') loadDashboard();
-  if (name === 'clients')   loadClients();
-  if (name === 'wireguard') loadIframe('wireguard');
-  if (name === 'adguard')   loadIframe('adguard');
+  if (name === 'dashboard')     loadDashboard();
+  if (name === 'clients')       loadClients();
+  if (name === 'wireguard')     loadIframe('wireguard');
+  if (name === 'adguard')       loadIframe('adguard');
+  if (name === 'backups')       loadBackups();
+  if (name === 'notifications') loadNotifications();
   if (name !== 'security' && state.logAutoRefreshId) {
     clearInterval(state.logAutoRefreshId);
     state.logAutoRefreshId = null;
     const arEl = document.getElementById('log-auto-refresh');
     if (arEl) arEl.checked = false;
   }
-  if (name === 'security')  loadSecurity();
+  if (name === 'security')      loadSecurity();
 }
 
 function loadIframe(name) {
@@ -749,6 +918,7 @@ async function loadDashboard() {
     GET('/api/adguard/stats'),
     GET('/api/fail2ban/status'),
   ]);
+  loadHealth(); // async, non-blocking
 
   if (clients) {
     state.clients = clients;
@@ -1205,6 +1375,263 @@ function timeAgo(date) {
   return t('time.daysAgo', { count: Math.floor(s / 86400) });
 }
 
+// ── Health metrics ────────────────────────────────────────────────────────────
+
+function fmtBytes(bytes) {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024)        return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  if (bytes >= 1024)               return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+function fmtUptime(secs) {
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+async function loadHealth() {
+  const data = await GET('/api/health');
+  if (!data) return;
+  state.health = data;
+
+  const cpu = document.getElementById('health-cpu');
+  const ram = document.getElementById('health-ram');
+  const disk = document.getElementById('health-disk');
+  const uptime = document.getElementById('health-uptime');
+
+  if (cpu)    { cpu.textContent = `${data.cpu?.pct ?? '—'}%`; cpu.className = `stat-value${(data.cpu?.pct||0) > 80 ? ' orange' : ''}`; }
+  if (ram)    { ram.textContent = `${data.ram?.pct ?? '—'}%`; ram.className = `stat-value${(data.ram?.pct||0) > 85 ? ' orange' : ''}`; }
+  if (disk)   { disk.textContent = `${data.disk?.pct ?? '—'}%`; disk.className = `stat-value${(data.disk?.pct||0) > 85 ? ' orange' : ''}`; }
+  if (uptime) uptime.textContent = data.uptime ? fmtUptime(data.uptime) : '—';
+}
+
+// ── Security score ─────────────────────────────────────────────────────────────
+
+async function loadSecurityScore() {
+  const data = await GET('/api/security');
+  const loadingEl = document.getElementById('score-loading');
+  const contentEl = document.getElementById('score-content');
+  if (!data || !contentEl) return;
+
+  if (loadingEl) loadingEl.classList.add('hidden');
+  contentEl.classList.remove('hidden');
+
+  const gradeKey = {
+    strong:        'security.score.strong',
+    good:          'security.score.good',
+    needs_attention: 'security.score.attention',
+    risky:         'security.score.risky',
+  }[data.grade] || 'security.score.risky';
+
+  const gradeColor = { strong: 'var(--green)', good: 'var(--yellow)', needs_attention: 'var(--orange)', risky: 'var(--red)' }[data.grade] || 'var(--red)';
+
+  const numEl = document.getElementById('score-number');
+  const gradeEl = document.getElementById('score-grade');
+  if (numEl)   { numEl.textContent = `${data.pct ?? data.score}%`; numEl.style.color = gradeColor; }
+  if (gradeEl) { gradeEl.textContent = t(gradeKey); gradeEl.style.color = gradeColor; }
+
+  const checksEl = document.getElementById('score-checks');
+  if (checksEl && data.checks) {
+    checksEl.innerHTML = data.checks.map(c => {
+      const icon = c.status === 'pass' ? '✓' : c.status === 'warn' ? '⚠' : '✗';
+      const color = c.status === 'pass' ? 'var(--green)' : c.status === 'warn' ? 'var(--yellow)' : 'var(--red)';
+      return `<div class="score-check-row">
+        <span class="score-check-icon" style="color:${color}">${icon}</span>
+        <span class="score-check-label">${esc(c.label)}</span>
+        <span class="score-check-pts" style="color:var(--text-dim)">${c.status !== 'warn' ? `+${c.pts}` : '—'}</span>
+        ${c.note ? `<span class="score-check-note text-dim">${esc(c.note)}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
+}
+
+// ── Backup module ─────────────────────────────────────────────────────────────
+
+function fmtFileSize(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024)        return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+async function loadBackups() {
+  const data = await GET('/api/backup');
+  if (!data) return;
+  state.backups = data.backups || [];
+  renderBackupList(state.backups);
+  populateRestoreSelect(state.backups);
+}
+
+function renderBackupList(backups) {
+  const el = document.getElementById('backup-list');
+  if (!el) return;
+  if (!backups.length) {
+    el.innerHTML = `<div class="text-dim" style="font-size:.85rem;padding:.4rem 0">${esc(t('backup.noBackups'))}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="log-table-wrap"><table class="log-table"><thead><tr>
+    <th>${esc(t('backup.list'))}</th>
+    <th>Size</th>
+    <th>Date</th>
+    <th></th>
+  </tr></thead><tbody>
+    ${backups.map(b => `<tr>
+      <td><code style="font-size:.78rem">${esc(b.filename)}</code></td>
+      <td>${esc(fmtFileSize(b.size))}</td>
+      <td class="log-time">${esc(new Date(b.createdAt).toLocaleString())}</td>
+      <td>
+        <div class="actions">
+          <a class="btn-ghost btn-sm" href="/api/backup/download/${encodeURIComponent(b.filename)}" download="${esc(b.filename)}">${esc(t('backup.download'))}</a>
+          <button class="btn-ghost btn-sm" style="color:var(--red)" data-action="backup-delete" data-filename="${esc(b.filename)}">${esc(t('backup.delete'))}</button>
+        </div>
+      </td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function populateRestoreSelect(backups) {
+  const sel = document.getElementById('restore-select');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">${esc(t('backup.selectFile'))}</option>` +
+    backups.map(b => `<option value="${esc(b.filename)}" ${cur === b.filename ? 'selected' : ''}>${esc(b.filename)}</option>`).join('');
+}
+
+async function doCreateBackup(encrypt = false) {
+  const msgEl = document.getElementById('backup-create-msg');
+  if (msgEl) { msgEl.textContent = t('backup.creating'); msgEl.style.color = 'var(--text-dim)'; }
+  const data = await POST('/api/backup/create', { encrypt });
+  if (!data || data.error) {
+    if (msgEl) { msgEl.textContent = data?.error || 'Error'; msgEl.style.color = 'var(--red)'; }
+    return;
+  }
+  if (msgEl) { msgEl.textContent = `Created: ${data.filename}`; msgEl.style.color = 'var(--green)'; }
+  state.backups = data.backups || [];
+  renderBackupList(state.backups);
+  populateRestoreSelect(state.backups);
+}
+
+async function doRestoreBackup() {
+  const sel = document.getElementById('restore-select');
+  const dryRun = document.getElementById('restore-dryrun')?.checked || false;
+  const confirmed = document.getElementById('restore-confirm')?.checked || false;
+  const msgEl = document.getElementById('restore-msg');
+
+  const filename = sel?.value;
+  if (!filename) { if (msgEl) { msgEl.textContent = t('backup.restoreSelect'); msgEl.style.color = 'var(--orange)'; } return; }
+  if (!dryRun && !confirmed) { if (msgEl) { msgEl.textContent = t('backup.restoreConfirm'); msgEl.style.color = 'var(--orange)'; } return; }
+
+  if (msgEl) { msgEl.textContent = t('backup.restoring'); msgEl.style.color = 'var(--text-dim)'; }
+  const data = await POST('/api/backup/restore', { filename, dryRun, confirmed });
+  if (!data || data.error) {
+    if (msgEl) { msgEl.textContent = data?.error || 'Error'; msgEl.style.color = 'var(--red)'; }
+    return;
+  }
+  if (dryRun) {
+    if (msgEl) { msgEl.textContent = `Dry-run OK. Files: ${(data.files || []).length}. Created: ${data.manifest?.created_at || ''}. Hostname: ${data.manifest?.hostname || ''}`; msgEl.style.color = 'var(--green)'; }
+  } else {
+    if (msgEl) { msgEl.textContent = `Restore complete. Pre-restore backup: ${data.preRestoreFile || 'none'}`; msgEl.style.color = 'var(--green)'; }
+  }
+}
+
+// ── Notification module ───────────────────────────────────────────────────────
+
+async function loadNotifications() {
+  const data = await GET('/api/notifications/config');
+  if (!data) return;
+  state.notifConfig = data;
+  populateNotifForm(data);
+  loadNotifHistory();
+}
+
+function populateNotifForm(cfg) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = !!val; else el.value = val || ''; } };
+  set('notif-enabled',         cfg.enabled);
+  set('notif-email-enabled',   cfg.channels?.email?.enabled);
+  set('notif-smtp-host',       cfg.channels?.email?.smtp_host);
+  set('notif-smtp-port',       cfg.channels?.email?.smtp_port || 587);
+  set('notif-smtp-from',       cfg.channels?.email?.from);
+  set('notif-smtp-to',         cfg.channels?.email?.to);
+  set('notif-smtp-user',       cfg.channels?.email?.username);
+  set('notif-smtp-password',   cfg.channels?.email?.password);
+  set('notif-webhook-enabled', cfg.channels?.webhook?.enabled);
+  set('notif-webhook-url',     cfg.channels?.webhook?.url);
+  set('notif-disk-threshold',  cfg.alerts?.disk_usage_threshold || 85);
+  set('notif-cert-days',       cfg.alerts?.certificate_expiry_days || 14);
+}
+
+async function saveNotifConfig() {
+  const get = (id) => { const el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value) : null; };
+  const cfg = {
+    enabled: get('notif-enabled'),
+    channels: {
+      email: {
+        enabled:   get('notif-email-enabled'),
+        smtp_host: get('notif-smtp-host'),
+        smtp_port: parseInt(get('notif-smtp-port') || '587', 10),
+        from:      get('notif-smtp-from'),
+        to:        get('notif-smtp-to'),
+        username:  get('notif-smtp-user'),
+        password:  get('notif-smtp-password') || '***',
+      },
+      webhook: {
+        enabled: get('notif-webhook-enabled'),
+        url:     get('notif-webhook-url') || '***',
+      },
+    },
+    alerts: {
+      disk_usage_threshold:      parseInt(get('notif-disk-threshold') || '85', 10),
+      certificate_expiry_days:   parseInt(get('notif-cert-days') || '14', 10),
+    },
+  };
+  const result = await POST('/api/notifications/config', cfg);
+  const msgEl = document.getElementById('notif-test-result');
+  if (!result || result.error) {
+    if (msgEl) { msgEl.textContent = result?.error || 'Error saving.'; msgEl.style.color = 'var(--red)'; }
+    return;
+  }
+  if (msgEl) { msgEl.textContent = t('notifications.saved'); msgEl.style.color = 'var(--green)'; }
+  state.notifConfig = result;
+  setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 3000);
+}
+
+async function sendTestNotification() {
+  const msgEl = document.getElementById('notif-test-result');
+  if (msgEl) { msgEl.textContent = t('common.processing'); msgEl.style.color = 'var(--text-dim)'; }
+  const data = await POST('/api/notifications/test', {});
+  if (!data) return;
+  const anyOk = (data.results || []).some(r => r.ok);
+  if (msgEl) {
+    msgEl.textContent = anyOk ? t('notifications.testSent') : t('notifications.noChannels');
+    msgEl.style.color = anyOk ? 'var(--green)' : 'var(--orange)';
+    const details = (data.results || []).map(r => `${r.channel}: ${r.ok ? 'ok' : r.error || 'fail'}`).join(' | ');
+    if (details) msgEl.textContent += ` (${details})`;
+  }
+  loadNotifHistory();
+}
+
+async function loadNotifHistory() {
+  const data = await GET('/api/notifications/history');
+  const el = document.getElementById('notif-history');
+  if (!el || !data) return;
+  const hist = data.history || [];
+  if (!hist.length) {
+    el.innerHTML = `<div class="text-dim" style="font-size:.85rem;padding:.4rem 0">No notification history yet.</div>`;
+    return;
+  }
+  el.innerHTML = hist.slice(0, 20).map(h => {
+    const results = (h.results || []).map(r => `<span style="color:${r.ok ? 'var(--green)' : 'var(--red)'}">${esc(r.channel)}</span>`).join(' ');
+    return `<div class="fail2ban-item" style="flex-wrap:wrap;gap:.3rem">
+      <span style="font-size:.78rem;color:var(--text-dim)">${esc(new Date(h.sentAt).toLocaleString())}</span>
+      <code style="font-size:.78rem">${esc(h.event)}</code>
+      ${results}
+    </div>`;
+  }).join('');
+}
+
 document.getElementById('login-form').addEventListener('submit', async e => {
   e.preventDefault();
   const pw = document.getElementById('login-password').value;
@@ -1294,6 +1721,7 @@ async function loadSecurity() {
     loadSessions(),
     loadTlsCert(),
     loadMyIp(),
+    loadSecurityScore(),
   ]);
 }
 
@@ -1727,3 +2155,37 @@ document.getElementById('password-form').addEventListener('submit', async e => {
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-confirm').value = '';
 });
+
+// ── Security: score rescan ─────────────────────────────────────────────────────
+
+document.getElementById('score-rescan-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('score-rescan-btn');
+  if (btn) btn.disabled = true;
+  await POST('/api/security/rescan', {});
+  await loadSecurityScore();
+  if (btn) btn.disabled = false;
+});
+
+// ── Backups ───────────────────────────────────────────────────────────────────
+
+document.getElementById('backup-create-btn').addEventListener('click',  () => doCreateBackup(false));
+document.getElementById('backup-encrypt-btn').addEventListener('click', () => doCreateBackup(true));
+document.getElementById('backup-refresh-btn').addEventListener('click', loadBackups);
+document.getElementById('restore-btn').addEventListener('click', doRestoreBackup);
+
+document.getElementById('backup-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="backup-delete"]');
+  if (!btn) return;
+  if (!confirm(`Delete ${btn.dataset.filename}?`)) return;
+  const data = await DEL(`/api/backup/${encodeURIComponent(btn.dataset.filename)}`);
+  if (!data || data.error) { window.alert(data?.error || 'Error deleting backup'); return; }
+  state.backups = data.backups || [];
+  renderBackupList(state.backups);
+  populateRestoreSelect(state.backups);
+});
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+document.getElementById('notif-save-btn').addEventListener('click',         saveNotifConfig);
+document.getElementById('notif-test-btn').addEventListener('click',         sendTestNotification);
+document.getElementById('notif-hist-refresh-btn').addEventListener('click', loadNotifHistory);

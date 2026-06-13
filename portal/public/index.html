@@ -58,6 +58,12 @@
         <a href="#" class="nav-item" data-tab="security">
           <span class="nav-icon">⊘</span> <span data-i18n="nav.security">Security</span>
         </a>
+        <a href="#" class="nav-item" data-tab="backups">
+          <span class="nav-icon">◫</span> <span data-i18n="nav.backups">Backups</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="notifications">
+          <span class="nav-icon">◌</span> <span data-i18n="nav.notifications">Notifications</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="lang-switch-wrap">
@@ -105,6 +111,26 @@
           <div class="stat-card">
             <div class="stat-value orange" id="stat-blocked">—</div>
             <div class="stat-label"><span data-i18n="dashboard.blocked">Bloquées</span> <span id="stat-pct" class="stat-pct"></span></div>
+          </div>
+        </div>
+
+        <!-- Health metrics -->
+        <div class="health-grid" id="health-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="health-cpu">—</div>
+            <div class="stat-label" data-i18n="health.cpu">CPU</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="health-ram">—</div>
+            <div class="stat-label" data-i18n="health.ram">RAM</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="health-disk">—</div>
+            <div class="stat-label" data-i18n="health.disk">Disk</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="health-uptime">—</div>
+            <div class="stat-label" data-i18n="health.uptime">Uptime</div>
           </div>
         </div>
 
@@ -158,6 +184,151 @@
         <iframe id="ag-iframe" src="about:blank" title="AdGuard Home"></iframe>
       </section>
 
+      <!-- Backups -->
+      <section id="tab-backups" class="tab-content hidden">
+        <div class="page-header">
+          <h2 data-i18n="nav.backups">Backups</h2>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="backup-refresh-btn" data-i18n="dashboard.refresh">↻ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Create backup -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="backup.create">Create Backup</h3>
+          </div>
+          <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+            <button class="btn-primary btn-sm" id="backup-create-btn" data-i18n="backup.create">Create Backup</button>
+            <button class="btn-ghost btn-sm" id="backup-encrypt-btn" data-i18n="backup.createEncrypted">Create Encrypted Backup</button>
+          </div>
+          <div id="backup-create-msg" class="text-dim" style="margin-top:.6rem;font-size:.85rem"></div>
+        </div>
+
+        <!-- Backup list -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="backup.list">Backup files</h3>
+          </div>
+          <div id="backup-list">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Restore -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="backup.restore">Restore from Backup</h3>
+          </div>
+          <div class="notice notice-warn" style="margin-bottom:.75rem">
+            <strong data-i18n="backup.restoreWarning">Warning:</strong>
+            <span data-i18n="backup.restoreWarningBody"> Restoring will overwrite the current configuration. A pre-restore backup will be created automatically.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.6rem;max-width:500px">
+            <select id="restore-select" class="input-field">
+              <option value="" data-i18n="backup.selectFile">Select a backup file…</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-dim)">
+              <input type="checkbox" id="restore-dryrun">
+              <span data-i18n="backup.dryRun">Dry run (validate only, no changes)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem">
+              <input type="checkbox" id="restore-confirm">
+              <span data-i18n="backup.confirmText">I understand this will overwrite the current configuration</span>
+            </label>
+            <button class="btn-ghost btn-sm" id="restore-btn" style="align-self:flex-start;color:var(--orange);border-color:var(--orange)44" data-i18n="backup.restore">Restore</button>
+          </div>
+          <div id="restore-msg" style="margin-top:.6rem;font-size:.85rem"></div>
+        </div>
+      </section>
+
+      <!-- Notifications -->
+      <section id="tab-notifications" class="tab-content hidden">
+        <div class="page-header">
+          <h2 data-i18n="nav.notifications">Notifications</h2>
+          <div class="page-actions">
+            <button class="btn-primary btn-sm" id="notif-save-btn" data-i18n="notifications.save">Save</button>
+            <button class="btn-ghost btn-sm" id="notif-test-btn" data-i18n="notifications.test">Send test</button>
+          </div>
+        </div>
+
+        <!-- Enable toggle -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="notifications.title">Notification channels</h3>
+          </div>
+          <label style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+            <input type="checkbox" id="notif-enabled" style="width:16px;height:16px">
+            <span data-i18n="notifications.enabled">Enable notifications</span>
+          </label>
+          <div id="notif-test-result" style="font-size:.82rem;margin-bottom:.5rem"></div>
+        </div>
+
+        <!-- Email / SMTP -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="notifications.email">Email (SMTP)</h3>
+          </div>
+          <label style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+            <input type="checkbox" id="notif-email-enabled" style="width:16px;height:16px">
+            <span data-i18n="notifications.emailEnabled">Enable email</span>
+          </label>
+          <div class="notif-form-grid">
+            <label class="field-label" data-i18n="notifications.smtp.host">SMTP Host</label>
+            <input type="text" id="notif-smtp-host" class="input-field" placeholder="smtp.example.com">
+            <label class="field-label" data-i18n="notifications.smtp.port">SMTP Port</label>
+            <input type="number" id="notif-smtp-port" class="input-field" placeholder="587" style="width:100px">
+            <label class="field-label" data-i18n="notifications.smtp.from">From</label>
+            <input type="email" id="notif-smtp-from" class="input-field" placeholder="easywg@example.com">
+            <label class="field-label" data-i18n="notifications.smtp.to">To</label>
+            <input type="email" id="notif-smtp-to" class="input-field" placeholder="admin@example.com">
+            <label class="field-label" data-i18n="notifications.smtp.user">Username</label>
+            <input type="text" id="notif-smtp-user" class="input-field" placeholder="user@example.com">
+            <label class="field-label" data-i18n="notifications.smtp.password">Password</label>
+            <input type="password" id="notif-smtp-password" class="input-field" placeholder="••••••••">
+          </div>
+        </div>
+
+        <!-- Webhook -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="notifications.webhook">Webhook</h3>
+          </div>
+          <label style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+            <input type="checkbox" id="notif-webhook-enabled" style="width:16px;height:16px">
+            <span data-i18n="notifications.webhookEnabled">Enable webhook</span>
+          </label>
+          <div class="notif-form-grid">
+            <label class="field-label" data-i18n="notifications.webhook.url">Webhook URL</label>
+            <input type="text" id="notif-webhook-url" class="input-field" placeholder="https://ntfy.sh/your-topic or Slack/Discord URL">
+          </div>
+        </div>
+
+        <!-- Alert thresholds -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="notifications.alerts">Alert thresholds</h3>
+          </div>
+          <div class="notif-form-grid">
+            <label class="field-label" data-i18n="notifications.alerts.disk">Disk usage threshold (%)</label>
+            <input type="number" id="notif-disk-threshold" class="input-field" min="50" max="99" style="width:100px">
+            <label class="field-label" data-i18n="notifications.alerts.cert">Certificate expiry warning (days)</label>
+            <input type="number" id="notif-cert-days" class="input-field" min="1" max="90" style="width:100px">
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="security-panel">
+          <div class="section-header">
+            <h3 data-i18n="notifications.history">Notification history</h3>
+            <button class="btn-ghost btn-sm" id="notif-hist-refresh-btn" data-i18n="dashboard.refresh">↻</button>
+          </div>
+          <div id="notif-history">
+            <div class="loading" data-i18n="common.loading">Loading…</div>
+          </div>
+        </div>
+      </section>
+
       <!-- Security / Fail2Ban -->
       <section id="tab-security" class="tab-content hidden">
         <div class="page-header">
@@ -171,6 +342,22 @@
           <div class="page-actions">
             <button class="btn-ghost btn-sm" id="sec-edit-config-btn" data-i18n="security.config.edit">✎ Edit config</button>
             <button class="btn-ghost btn-sm" id="security-refresh-btn" data-i18n="security.refresh">↻ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Security Score -->
+        <div class="security-panel score-panel" id="score-panel">
+          <div class="section-header">
+            <h3 data-i18n="security.score.title">Security Score</h3>
+            <button class="btn-ghost btn-sm" id="score-rescan-btn" data-i18n="security.score.rescan">↻ Rescan</button>
+          </div>
+          <div id="score-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+          <div id="score-content" class="hidden">
+            <div class="score-display">
+              <div class="score-number" id="score-number">—</div>
+              <div class="score-grade" id="score-grade">—</div>
+            </div>
+            <div id="score-checks" class="score-checks"></div>
           </div>
         </div>
 

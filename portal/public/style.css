@@ -452,3 +452,63 @@ tbody tr:last-child td { border-bottom: none; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
 }
 @media (max-width: 720px) { .sec-info-row { grid-template-columns: 1fr; } }
+
+/* ── Health grid ── */
+.health-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem;
+  margin-bottom: 1.2rem;
+}
+@media (max-width: 800px) { .health-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .health-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ── Security score panel ── */
+.score-panel { margin-bottom: 1.2rem; }
+
+.score-display {
+  display: flex; align-items: flex-start; gap: 2rem; flex-wrap: wrap; margin: .75rem 0;
+}
+
+.score-number {
+  font-size: 3.2rem; font-weight: 800; line-height: 1; letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-grade {
+  font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  margin-top: .35rem; opacity: .85;
+}
+
+.score-checks { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: .3rem; }
+
+.score-check-row {
+  display: grid; grid-template-columns: 1.2rem 1fr auto;
+  gap: .3rem .5rem; align-items: baseline;
+  font-size: .82rem; padding: .18rem 0; border-bottom: 1px solid var(--border)33;
+}
+.score-check-row:last-child { border-bottom: none; }
+.score-check-icon  { text-align: center; font-size: .9rem; line-height: 1.2; }
+.score-check-label { color: var(--text); }
+.score-check-pts   { font-size: .76rem; font-variant-numeric: tabular-nums; }
+.score-check-note  {
+  grid-column: 2 / -1; font-size: .75rem; color: var(--text-faint);
+  padding-left: .15rem; margin-top: -.1rem;
+}
+
+/* ── Backup list ── */
+.btn-sm {
+  padding: .22rem .7rem; font-size: .78rem; border-radius: var(--radius); cursor: pointer;
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  transition: border-color var(--trans), color var(--trans);
+}
+.btn-sm:hover { border-color: var(--primary); color: var(--primary); }
+
+.actions { display: flex; gap: .4rem; align-items: center; }
+
+/* ── Notification form ── */
+.notif-form-grid {
+  display: grid; grid-template-columns: 180px 1fr; gap: .55rem .75rem;
+  align-items: center; font-size: .85rem;
+}
+.notif-form-grid label { color: var(--text-dim); }
+@media (max-width: 560px) { .notif-form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .sec-info-row { grid-template-columns: 1fr; } }

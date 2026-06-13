@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+
+export EASYWG_DIR="$SCRIPT_DIR"
+
+usage() {
+  cat <<EOF
+Easy-WG-Combo CLI v$VERSION
+
+Usage: ./easywg <command> [options]
+
+Commands:
+  status                    Show system health summary
+  health                    Full system health report
+  services                  Show service status only
+
+  backup                    Create a configuration backup
+  backup --encrypt          Create an encrypted backup (requires age)
+  backup --output <dir>     Set backup output directory
+
+  restore <file>            Restore from a backup archive
+  restore --dry-run <file>  Validate backup without applying
+
+  security check            Run security scan
+  security status           Show last security scan result
+  security harden-ssh       Harden SSH configuration (with safety checks)
+  security harden-ssh --dry-run  Preview SSH hardening changes
+
+  notify test               Send a test notification
+  notify status             Show notification configuration status
+  notify send "<message>"   Send a custom notification
+
+Options:
+  --help, -h                Show this help
+  --version, -v             Show version
+
+EOF
+}
+
+case "${1:-}" in
+  --help|-h|help|"")
+    usage
+    exit 0
+    ;;
+  --version|-v)
+    echo "easywg v$VERSION"
+    exit 0
+    ;;
+  status|health)
+    shift
+    bash "$SCRIPTS_DIR/health.sh" "$@"
+    ;;
+  services)
+    bash "$SCRIPTS_DIR/health.sh" --services-only
+    ;;
+  backup)
+    shift
+    bash "$SCRIPTS_DIR/backup.sh" "$@"
+    ;;
+  restore)
+    shift
+    bash "$SCRIPTS_DIR/restore.sh" "$@"
+    ;;
+  security)
+    shift
+    SUBCMD="${1:-check}"
+    shift || true
+    case "$SUBCMD" in
+      check|status)
+        bash "$SCRIPTS_DIR/security-check.sh" "$@"
+        ;;
+      harden-ssh)
+        bash "$SCRIPTS_DIR/security-check.sh" --harden-ssh "$@"
+        ;;
+      *)
+        echo "Unknown security subcommand: $SUBCMD" >&2
+        usage
+        exit 1
+        ;;
+    esac
+    ;;
+  notify)
+    shift
+    SUBCMD="${1:-status}"
+    shift || true
+    bash "$SCRIPTS_DIR/notify.sh" "$SUBCMD" "$@"
+    ;;
+  *)
+    echo "Unknown command: ${1:-}" >&2
+    usage
+    exit 1
+    ;;
+esac
