@@ -817,8 +817,9 @@ app.get('/api/tls/cert', auth, (req, res) => {
   const tls = require('tls');
   let resolved = false;
   const done = (payload) => { if (!resolved) { resolved = true; res.json(payload); } };
+  const hostIp = getHostIp();
   const sock  = tls.connect(
-    { host: '127.0.0.1', port: 443, rejectUnauthorized: false, servername: 'localhost' },
+    { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp },
     () => {
       try {
         const cert = sock.getPeerCertificate();
@@ -1083,6 +1084,7 @@ async function computeSecurityScore() {
   // TLS / HTTPS
   let tlsPts = 0;
   let certDaysLeft = null;
+  let certIsInternal = false;
   try {
     const tls = require('tls');
     await new Promise((resolve, reject) => {
@@ -1093,6 +1095,11 @@ async function computeSecurityScore() {
         if (cert.valid_to) {
           certDaysLeft = Math.floor((new Date(cert.valid_to) - Date.now()) / 86400000);
           tlsPts = 15;
+          // Caddy-managed internal certs are auto-renewed; mark as internal
+          const issuerO = (cert.issuer?.O || '').toLowerCase();
+          const issuerCN = (cert.issuer?.CN || '').toLowerCase();
+          certIsInternal = issuerO.includes('caddy') || issuerCN.includes('local') ||
+                           issuerCN.includes('caddy');
         }
         resolve();
       });
@@ -1102,8 +1109,13 @@ async function computeSecurityScore() {
   } catch { /* no TLS */ }
   score += check('tls', 'HTTPS active', 15, tlsPts > 0 ? 'pass' : 'fail');
   if (certDaysLeft !== null) {
-    score += check('cert_expiry', `Certificate valid (${certDaysLeft} days left)`, 5,
-      certDaysLeft > ALERT_CERT_EXPIRY_DAYS ? 'pass' : 'fail');
+    if (certIsInternal) {
+      // Internal CA certs are short-lived but auto-renewed by Caddy — not a concern
+      score += check('cert_expiry', 'Certificate (managed by Caddy)', 5, 'pass');
+    } else {
+      score += check('cert_expiry', `Certificate valid (${certDaysLeft} days left)`, 5,
+        certDaysLeft > ALERT_CERT_EXPIRY_DAYS ? 'pass' : 'fail');
+    }
   } else {
     check('cert_expiry', 'Certificate expiry check', 5, 'warn', 'HTTPS not active');
   }
@@ -1378,9 +1390,32 @@ app.delete('/api/backup/:filename', auth, (req, res) => {
 
 // ── Notification module ───────────────────────────────────────────────────────
 
+const NOTIF_DEFAULTS = {
+  enabled: false,
+  channels: {
+    email:   { enabled: false, smtp_host: '', smtp_port: 587, from: '', to: '', username: '', password: '' },
+    webhook: { enabled: false, url: '' },
+  },
+  alerts: {
+    disk_usage_threshold:    ALERT_DISK_THRESHOLD,
+    certificate_expiry_days: ALERT_CERT_EXPIRY_DAYS,
+  },
+};
+
 function loadNotifConfig() {
-  try { return JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8')); }
-  catch { return { enabled: false, channels: { email: {}, webhook: {} }, alerts: {} }; }
+  try {
+    const saved = JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8'));
+    // Deep-merge saved over defaults so newly added keys always appear
+    return {
+      ...NOTIF_DEFAULTS, ...saved,
+      channels: {
+        email:   { ...NOTIF_DEFAULTS.channels.email,   ...(saved.channels?.email   || {}) },
+        webhook: { ...NOTIF_DEFAULTS.channels.webhook, ...(saved.channels?.webhook || {}) },
+      },
+      alerts: { ...NOTIF_DEFAULTS.alerts, ...(saved.alerts || {}) },
+    };
+  }
+  catch { return NOTIF_DEFAULTS; }
 }
 
 function saveNotifConfig(cfg) {
