@@ -17,6 +17,7 @@ Commands:
   status                    Show system health summary
   health                    Full system health report
   services                  Show service status only
+  doctor                    Check installation health (containers, API, scripts, security)
 
   backup                    Create a configuration backup
   backup --encrypt          Create an encrypted backup (requires age)
@@ -94,6 +95,9 @@ case "${1:-}" in
   --version|-v)
     echo "easywg v$VERSION"
     exit 0
+    ;;
+  doctor)
+    bash "$SCRIPTS_DIR/doctor.sh" "$@"
     ;;
   status|health)
     shift
