@@ -227,6 +227,13 @@ app.use(session({
 }));
 
 const auth = (req, res, next) => {
+  // Accept HTTP Basic auth for CLI / scripted access
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Basic ')) {
+    const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+    const password = decoded.slice(decoded.indexOf(':') + 1);
+    if (password === currentPortalPass) return next();
+  }
   if (!req.session.ok) return res.status(401).json({ error: 'Unauthorized' });
   const meta = sessionRegistry.get(req.sessionID);
   if (meta) meta.lastSeen = Date.now();
