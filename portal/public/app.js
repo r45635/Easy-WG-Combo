@@ -277,6 +277,58 @@ const I18N = {
     'notifications.saved': 'Configuration saved.',
     'notifications.testSent': 'Test notification sent.',
     'notifications.noChannels': 'No channels configured or reachable.',
+    // Phase 3
+    'nav.monitoring': 'Monitoring',
+    'nav.apps': 'Apps',
+    'nav.filedrop': 'File Drop',
+    'nav.migration': 'Migration',
+    'monitoring.add': '+ Add Monitor',
+    'monitoring.empty': 'No monitors. Click + Add Monitor to create one.',
+    'monitoring.col.name': 'Name',
+    'monitoring.col.type': 'Type',
+    'monitoring.col.status': 'Status',
+    'monitoring.col.lastCheck': 'Last Check',
+    'monitoring.col.response': 'Response',
+    'monitoring.status.up': 'Up',
+    'monitoring.status.down': 'Down',
+    'monitoring.status.unknown': 'Unknown',
+    'monitoring.status.disabled': 'Disabled',
+    'apps.catalog': 'App Catalog',
+    'apps.installed': 'Installed Apps',
+    'apps.noneInstalled': 'No apps installed.',
+    'apps.install': 'Install',
+    'apps.start': '▶ Start',
+    'apps.stop': '‖ Stop',
+    'apps.restart': '↻ Restart',
+    'apps.logs': 'Logs',
+    'apps.update': '↑ Update',
+    'apps.remove': 'Remove',
+    'apps.status.running': 'Running',
+    'apps.status.stopped': 'Stopped',
+    'apps.status.not_found': 'Not found',
+    'filedrop.uploadHint': 'Click or drag a file here to share it',
+    'filedrop.expires': 'Expires after (days, 1–30)',
+    'filedrop.maxDownloads': 'Max downloads',
+    'filedrop.password': 'Password (optional)',
+    'filedrop.mode': 'Access mode',
+    'filedrop.mode.vpn': 'VPN only',
+    'filedrop.mode.public': 'Public HTTPS',
+    'filedrop.publicWarn': '⚠ Public links are accessible without VPN login.',
+    'filedrop.upload': 'Upload & Generate Link',
+    'filedrop.cleanup': '↻ Cleanup',
+    'filedrop.noShares': 'No active shares.',
+    'filedrop.col.name': 'File',
+    'filedrop.col.size': 'Size',
+    'filedrop.col.expires': 'Expires',
+    'filedrop.col.downloads': 'Downloads',
+    'filedrop.col.mode': 'Mode',
+    'filedrop.linkCopied': '✓ Link copied',
+    'migration.dnsTitle': 'DNS Records to Update',
+    'migration.checklistTitle': 'Migration Checklist',
+    'migration.export': 'Create Migration Backup',
+    'migration.exportDone': '✓ Backup created:',
+    'migration.readiness': 'Service Readiness',
+    'common.refresh': '↻ Refresh',
   },
   fr: {
     'lang.label': 'Langue',
@@ -546,6 +598,58 @@ const I18N = {
     'notifications.saved': 'Configuration enregistrée.',
     'notifications.testSent': 'Notification de test envoyée.',
     'notifications.noChannels': 'Aucun canal configuré ou joignable.',
+    // Phase 3
+    'nav.monitoring': 'Surveillance',
+    'nav.apps': 'Applications',
+    'nav.filedrop': 'Partage fichiers',
+    'nav.migration': 'Migration',
+    'monitoring.add': '+ Ajouter moniteur',
+    'monitoring.empty': 'Aucun moniteur. Cliquez + Ajouter moniteur.',
+    'monitoring.col.name': 'Nom',
+    'monitoring.col.type': 'Type',
+    'monitoring.col.status': 'Statut',
+    'monitoring.col.lastCheck': 'Dernier contrôle',
+    'monitoring.col.response': 'Réponse',
+    'monitoring.status.up': 'En ligne',
+    'monitoring.status.down': 'Hors ligne',
+    'monitoring.status.unknown': 'Inconnu',
+    'monitoring.status.disabled': 'Désactivé',
+    'apps.catalog': 'Catalogue d\'applications',
+    'apps.installed': 'Applications installées',
+    'apps.noneInstalled': 'Aucune application installée.',
+    'apps.install': 'Installer',
+    'apps.start': '▶ Démarrer',
+    'apps.stop': '‖ Arrêter',
+    'apps.restart': '↻ Redémarrer',
+    'apps.logs': 'Journaux',
+    'apps.update': '↑ Mettre à jour',
+    'apps.remove': 'Supprimer',
+    'apps.status.running': 'En cours',
+    'apps.status.stopped': 'Arrêté',
+    'apps.status.not_found': 'Introuvable',
+    'filedrop.uploadHint': 'Cliquez ou déposez un fichier ici pour le partager',
+    'filedrop.expires': 'Expire après (jours, 1–30)',
+    'filedrop.maxDownloads': 'Téléchargements max',
+    'filedrop.password': 'Mot de passe (optionnel)',
+    'filedrop.mode': 'Mode d\'accès',
+    'filedrop.mode.vpn': 'VPN uniquement',
+    'filedrop.mode.public': 'HTTPS public',
+    'filedrop.publicWarn': '⚠ Les liens publics sont accessibles sans connexion VPN.',
+    'filedrop.upload': 'Uploader & Générer le lien',
+    'filedrop.cleanup': '↻ Nettoyer',
+    'filedrop.noShares': 'Aucun partage actif.',
+    'filedrop.col.name': 'Fichier',
+    'filedrop.col.size': 'Taille',
+    'filedrop.col.expires': 'Expire le',
+    'filedrop.col.downloads': 'Téléchargements',
+    'filedrop.col.mode': 'Mode',
+    'filedrop.linkCopied': '✓ Lien copié',
+    'migration.dnsTitle': 'Enregistrements DNS à mettre à jour',
+    'migration.checklistTitle': 'Liste de migration',
+    'migration.export': 'Créer sauvegarde de migration',
+    'migration.exportDone': '✓ Sauvegarde créée :',
+    'migration.readiness': 'État des services',
+    'common.refresh': '↻ Actualiser',
   },
   zh: {
     'lang.label': '语言',
@@ -815,6 +919,58 @@ const I18N = {
     'notifications.saved': '配置已保存。',
     'notifications.testSent': '测试通知已发送。',
     'notifications.noChannels': '未配置或无法连接任何通知渠道。',
+    // Phase 3
+    'nav.monitoring': '监控',
+    'nav.apps': '应用',
+    'nav.filedrop': '文件分享',
+    'nav.migration': '迁移',
+    'monitoring.add': '+ 添加监控',
+    'monitoring.empty': '无监控项。点击 + 添加监控 创建。',
+    'monitoring.col.name': '名称',
+    'monitoring.col.type': '类型',
+    'monitoring.col.status': '状态',
+    'monitoring.col.lastCheck': '最近检查',
+    'monitoring.col.response': '响应',
+    'monitoring.status.up': '正常',
+    'monitoring.status.down': '异常',
+    'monitoring.status.unknown': '未知',
+    'monitoring.status.disabled': '已禁用',
+    'apps.catalog': '应用目录',
+    'apps.installed': '已安装应用',
+    'apps.noneInstalled': '暂无已安装应用。',
+    'apps.install': '安装',
+    'apps.start': '▶ 启动',
+    'apps.stop': '‖ 停止',
+    'apps.restart': '↻ 重启',
+    'apps.logs': '日志',
+    'apps.update': '↑ 更新',
+    'apps.remove': '删除',
+    'apps.status.running': '运行中',
+    'apps.status.stopped': '已停止',
+    'apps.status.not_found': '未找到',
+    'filedrop.uploadHint': '点击或拖放文件到此处进行分享',
+    'filedrop.expires': '过期时间（天，1–30）',
+    'filedrop.maxDownloads': '最大下载次数',
+    'filedrop.password': '密码（可选）',
+    'filedrop.mode': '访问模式',
+    'filedrop.mode.vpn': '仅VPN',
+    'filedrop.mode.public': '公开HTTPS',
+    'filedrop.publicWarn': '⚠ 公开链接无需VPN即可访问。',
+    'filedrop.upload': '上传并生成链接',
+    'filedrop.cleanup': '↻ 清理',
+    'filedrop.noShares': '暂无分享。',
+    'filedrop.col.name': '文件',
+    'filedrop.col.size': '大小',
+    'filedrop.col.expires': '过期时间',
+    'filedrop.col.downloads': '下载次数',
+    'filedrop.col.mode': '模式',
+    'filedrop.linkCopied': '✓ 链接已复制',
+    'migration.dnsTitle': '需更新的DNS记录',
+    'migration.checklistTitle': '迁移清单',
+    'migration.export': '创建迁移备份',
+    'migration.exportDone': '✓ 备份已创建：',
+    'migration.readiness': '服务就绪状态',
+    'common.refresh': '↻ 刷新',
   },
 };
 
@@ -847,6 +1003,9 @@ const state = {
   devices:          [],
   dnsProfiles:      [],
   proxyServices:    [],
+  monitors:         [],
+  apps:             [],
+  filedropShares:   [],
 };
 
 function detectLang() {
@@ -988,6 +1147,10 @@ function switchTab(name) {
   if (name === 'devices')      loadDevicesTab();
   if (name === 'dns-profiles') loadDnsProfilesTab();
   if (name === 'gateway')      loadGatewayTab();
+  if (name === 'monitoring')   loadMonitoringTab();
+  if (name === 'apps')         loadAppsTab();
+  if (name === 'filedrop')     loadFiledropTab();
+  if (name === 'migration')    loadMigrationTab();
   if (name !== 'security' && state.logAutoRefreshId) {
     clearInterval(state.logAutoRefreshId);
     state.logAutoRefreshId = null;
@@ -2633,4 +2796,433 @@ document.getElementById('gateway-list').addEventListener('click', async e => {
     await loadGatewayTab();
     return;
   }
+});
+
+// ── Phase 3: Monitoring Tab ───────────────────────────────────────────────────
+
+function monitorBadge(status) {
+  const map = { up: 'up', down: 'down', unknown: 'unknown', disabled: 'disabled' };
+  const cls = map[status] || 'unknown';
+  return `<span class="monitor-badge monitor-${cls}">${t(`monitoring.status.${status}`) || status}</span>`;
+}
+
+async function loadMonitoringTab() {
+  const loading = document.getElementById('monitoring-loading');
+  const wrap    = document.getElementById('monitoring-wrap');
+  loading.classList.remove('hidden');
+  wrap.classList.add('hidden');
+
+  const data = await GET('/api/monitors');
+  if (!data) return;
+  state.monitors = data.monitors || [];
+
+  const tbody = document.getElementById('monitoring-tbody');
+  const empty = document.getElementById('monitoring-empty');
+
+  if (!state.monitors.length) {
+    empty.classList.remove('hidden');
+    tbody.innerHTML = '';
+  } else {
+    empty.classList.add('hidden');
+    tbody.innerHTML = state.monitors.map(m => {
+      const lastCheck = m.lastCheck ? timeAgo(new Date(m.lastCheck)) : '—';
+      const ms = m.lastResponseMs != null ? `${m.lastResponseMs}ms` : '—';
+      return `<tr>
+        <td><strong>${esc(m.name)}</strong><br><small class="text-dim">${esc(m.target)}</small></td>
+        <td><code>${esc(m.type)}</code></td>
+        <td>${monitorBadge(m.lastStatus)}</td>
+        <td>${lastCheck}</td>
+        <td>${ms}</td>
+        <td class="actions">
+          <button class="btn-sm btn-ghost" data-action="mon-check" data-id="${m.id}" title="Run now">▶</button>
+          <button class="btn-sm btn-ghost" data-action="mon-toggle" data-id="${m.id}" title="${m.enabled ? 'Disable' : 'Enable'}">${m.enabled ? '‖' : '▶'}</button>
+          <button class="btn-sm btn-danger" data-action="mon-delete" data-id="${m.id}">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  loading.classList.add('hidden');
+  wrap.classList.remove('hidden');
+}
+
+document.getElementById('monitoring-refresh-btn').addEventListener('click', loadMonitoringTab);
+
+document.getElementById('monitoring-add-btn').addEventListener('click', async () => {
+  const name   = window.prompt('Monitor name:');
+  if (!name) return;
+  const types  = 'http | https | tcp | dns | docker | tls | wireguard';
+  const type   = window.prompt(`Type (${types}):`, 'http');
+  if (!type) return;
+  let defTarget = '';
+  if (type === 'http' || type === 'https') defTarget = 'https://example.com';
+  else if (type === 'tcp') defTarget = 'host:port';
+  else if (type === 'dns') defTarget = 'example.com';
+  else if (type === 'docker') defTarget = 'container-name';
+  else if (type === 'tls') defTarget = 'example.com:443';
+  const target = window.prompt('Target:', defTarget);
+  if (!target) return;
+  const res = await POST('/api/monitors', { name, type, target });
+  if (res?.error) { window.alert(res.error); return; }
+  await loadMonitoringTab();
+});
+
+document.querySelector('#monitoring-table tbody') || document.getElementById('monitoring-tbody');
+document.getElementById('monitoring-table').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'mon-check') {
+    btn.textContent = '…';
+    const res = await POST(`/api/monitors/${id}/check`, {});
+    btn.textContent = '▶';
+    if (res?.error) { window.alert(res.error); return; }
+    await loadMonitoringTab();
+  }
+  if (action === 'mon-toggle') {
+    const m = state.monitors.find(x => x.id === id);
+    const ep = m?.enabled ? 'disable' : 'enable';
+    const res = await POST(`/api/monitors/${id}/${ep}`, {});
+    if (res?.error) { window.alert(res.error); return; }
+    await loadMonitoringTab();
+  }
+  if (action === 'mon-delete') {
+    const m = state.monitors.find(x => x.id === id);
+    if (!confirm(`Delete monitor "${m?.name}"?`)) return;
+    await DEL(`/api/monitors/${id}`);
+    await loadMonitoringTab();
+  }
+});
+
+// ── Phase 3: Apps Tab ─────────────────────────────────────────────────────────
+
+function appStatusBadge(status) {
+  const cls = status === 'running' ? 'up' : (status === 'not_found' ? 'unknown' : 'down');
+  return `<span class="monitor-badge monitor-${cls}">${t(`apps.status.${status}`) || status}</span>`;
+}
+
+async function loadAppsTab() {
+  const loading = document.getElementById('apps-loading');
+  const wrap    = document.getElementById('apps-wrap');
+  loading.classList.remove('hidden');
+  wrap.classList.add('hidden');
+
+  const [catData, appsData] = await Promise.all([GET('/api/apps/catalog'), GET('/api/apps')]);
+  if (!catData || !appsData) return;
+
+  const installed = appsData.apps || [];
+  state.apps = installed;
+  const installedIds = new Set(installed.map(a => a.id));
+
+  // Render catalog
+  const catalogEl = document.getElementById('apps-catalog');
+  catalogEl.innerHTML = (catData.catalog || []).map(app => {
+    const isInstalled = installedIds.has(app.id);
+    return `<div class="app-card">
+      <div class="app-card-header">
+        <strong>${esc(app.name)}</strong>
+        <span class="profile-type-badge">${esc(app.category)}</span>
+      </div>
+      <p class="text-dim" style="font-size:.82rem;margin:.3rem 0 .6rem">${esc(app.description)}</p>
+      <div style="font-size:.78rem;color:var(--text-muted)">Port ${app.internalPort} · min ${app.minRamMb}MB RAM</div>
+      ${isInstalled
+        ? '<span class="status-badge status-online" style="margin-top:.5rem;display:inline-block">Installed</span>'
+        : `<button class="btn-primary btn-sm" style="margin-top:.6rem" data-action="app-install" data-id="${app.id}">${t('apps.install')}</button>`
+      }
+    </div>`;
+  }).join('');
+
+  // Render installed
+  const installedListEl = document.getElementById('apps-installed-list');
+  const installedEmptyEl = document.getElementById('apps-installed-empty');
+  if (!installed.length) {
+    installedEmptyEl.classList.remove('hidden');
+    installedListEl.innerHTML = '';
+  } else {
+    installedEmptyEl.classList.add('hidden');
+    installedListEl.innerHTML = installed.map(app => `<div class="service-row" data-app-id="${app.id}">
+      <div class="service-row-info">
+        <strong>${esc(app.id)}</strong>
+        ${appStatusBadge(app.running ? 'running' : (app.containerStatus === 'not_found' ? 'not_found' : 'stopped'))}
+        ${app.domain ? `<code class="service-domain">${esc(app.domain)}</code>` : ''}
+      </div>
+      <div class="actions">
+        <button class="btn-sm btn-ghost" data-action="app-start"   data-id="${app.id}">${t('apps.start')}</button>
+        <button class="btn-sm btn-ghost" data-action="app-stop"    data-id="${app.id}">${t('apps.stop')}</button>
+        <button class="btn-sm btn-ghost" data-action="app-restart" data-id="${app.id}">${t('apps.restart')}</button>
+        <button class="btn-sm btn-ghost" data-action="app-logs"    data-id="${app.id}">${t('apps.logs')}</button>
+        <button class="btn-sm btn-danger" data-action="app-remove" data-id="${app.id}">${t('apps.remove')}</button>
+      </div>
+    </div>`).join('');
+  }
+
+  loading.classList.add('hidden');
+  wrap.classList.remove('hidden');
+}
+
+document.getElementById('apps-refresh-btn').addEventListener('click', loadAppsTab);
+
+document.getElementById('apps-wrap').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+
+  if (action === 'app-install') {
+    const domain = window.prompt('Domain for this app (blank to skip, e.g. app.example.com):');
+    const res = await POST(`/api/apps/${id}/install`, { exposure: 'vpn_only', domain: domain || '', confirmed: false });
+    if (res?.error) { window.alert(res.error); return; }
+    await loadAppsTab();
+    return;
+  }
+  if (action === 'app-start')   { await POST(`/api/apps/${id}/start`,   {}); await loadAppsTab(); return; }
+  if (action === 'app-stop')    { await POST(`/api/apps/${id}/stop`,    {}); await loadAppsTab(); return; }
+  if (action === 'app-restart') { await POST(`/api/apps/${id}/restart`, {}); await loadAppsTab(); return; }
+  if (action === 'app-logs') {
+    const data = await GET(`/api/apps/${id}/logs`);
+    if (data?.logs) window.alert(data.logs.slice(-3000));
+    return;
+  }
+  if (action === 'app-remove') {
+    if (!confirm(`Remove app "${id}"? Container will be stopped.`)) return;
+    const del = confirm('Also delete app data volumes? (cannot be undone)');
+    const res = await POST(`/api/apps/${id}/remove`, { confirmed: true, deleteData: del });
+    if (res?.error) { window.alert(res.error); return; }
+    await loadAppsTab();
+  }
+});
+
+// ── Phase 3: File Drop Tab ────────────────────────────────────────────────────
+
+function fmtSize(bytes) {
+  if (bytes < 1024)         return `${bytes} B`;
+  if (bytes < 1024 * 1024)  return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1024/1024).toFixed(1)} MB`;
+}
+
+async function loadFiledropTab() {
+  const loading = document.getElementById('filedrop-loading');
+  const wrap    = document.getElementById('filedrop-wrap');
+  loading.classList.remove('hidden');
+  wrap.classList.add('hidden');
+
+  const [sharesData, statusData] = await Promise.all([GET('/api/filedrop'), GET('/api/filedrop/status')]);
+  if (!sharesData) return;
+  state.filedropShares = sharesData.shares || [];
+
+  // Storage bar
+  const storBar = document.getElementById('filedrop-storage-bar');
+  if (statusData) {
+    const pct = statusData.pct || 0;
+    storBar.innerHTML = `<div>Storage: ${statusData.usageMb} MB / ${statusData.limitMb} MB (${pct}%)</div>
+      <div class="storage-bar"><div class="storage-bar-fill" style="width:${Math.min(pct,100)}%"></div></div>`;
+  }
+
+  // Shares table
+  const tbody = document.getElementById('filedrop-tbody');
+  const table = document.getElementById('filedrop-table');
+  const empty = document.getElementById('filedrop-shares-empty');
+  if (!state.filedropShares.length) {
+    empty.classList.remove('hidden');
+    table.classList.add('hidden');
+  } else {
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    const origin = window.location.origin;
+    tbody.innerHTML = state.filedropShares.map(s => {
+      const link = `${origin}/files/${s.token}`;
+      const exp  = s.expiresAt ? new Date(s.expiresAt).toLocaleDateString() : '—';
+      const mode = s.mode === 'public' ? `<span class="exposure-badge exposure-public">public</span>` : `<span class="exposure-badge exposure-vpn-only">vpn</span>`;
+      return `<tr>
+        <td>${esc(s.originalName)}${s.passwordProtected ? ' 🔒' : ''}</td>
+        <td>${fmtSize(s.sizeBytes || 0)}</td>
+        <td>${exp}</td>
+        <td>${s.downloads}/${s.maxDownloads}</td>
+        <td>${mode}</td>
+        <td class="actions">
+          <button class="btn-sm btn-ghost" data-action="fd-copy" data-link="${esc(link)}">⎘</button>
+          <button class="btn-sm btn-danger" data-action="fd-delete" data-id="${s.id}">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  loading.classList.add('hidden');
+  wrap.classList.remove('hidden');
+}
+
+// File input + drag-drop wiring
+const fdDropZone  = document.getElementById('filedrop-drop-zone');
+const fdFileInput = document.getElementById('filedrop-file-input');
+const fdOptions   = document.getElementById('filedrop-options');
+
+fdDropZone.addEventListener('click', e => {
+  if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('select')) {
+    fdFileInput.click();
+  }
+});
+fdDropZone.addEventListener('dragover', e => { e.preventDefault(); fdDropZone.classList.add('drag-over'); });
+fdDropZone.addEventListener('dragleave', () => fdDropZone.classList.remove('drag-over'));
+fdDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  fdDropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) { fdFileInput.files = e.dataTransfer.files; fdOptions.style.display = 'flex'; }
+});
+fdFileInput.addEventListener('change', () => { if (fdFileInput.files[0]) fdOptions.style.display = 'flex'; });
+
+document.getElementById('fd-mode').addEventListener('change', e => {
+  const warn = document.getElementById('fd-public-warn');
+  warn.classList.toggle('hidden', e.target.value !== 'public');
+});
+
+document.getElementById('fd-upload-btn').addEventListener('click', async () => {
+  const file = fdFileInput.files[0];
+  if (!file) return;
+  const mode = document.getElementById('fd-mode').value;
+  if (mode === 'public' && !confirm('Share this file publicly (accessible without VPN login)?')) return;
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('expires',      document.getElementById('fd-expires').value);
+  fd.append('maxDownloads', document.getElementById('fd-maxdl').value);
+  fd.append('password',     document.getElementById('fd-password').value);
+  fd.append('mode',         mode);
+  fd.append('confirmed',    mode === 'public' ? 'true' : 'false');
+
+  const btn = document.getElementById('fd-upload-btn');
+  btn.disabled = true;
+  btn.textContent = t('common.processing');
+
+  try {
+    const resp = await fetch('/api/filedrop/upload', { method: 'POST', body: fd });
+    const data = await resp.json();
+    btn.disabled = false;
+    btn.textContent = t('filedrop.upload');
+    if (data.error) { window.alert(data.error); return; }
+    const link = `${window.location.origin}${data.url}`;
+    navigator.clipboard.writeText(link).catch(() => {});
+    window.alert(`✓ Uploaded! Link copied:\n${link}\nExpires: ${data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : '—'}`);
+    fdFileInput.value = '';
+    fdOptions.style.display = 'none';
+    await loadFiledropTab();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = t('filedrop.upload');
+    window.alert(`Upload error: ${e.message}`);
+  }
+});
+
+document.getElementById('filedrop-refresh-btn').addEventListener('click', loadFiledropTab);
+
+document.getElementById('filedrop-cleanup-btn').addEventListener('click', async () => {
+  await POST('/api/filedrop/cleanup', {});
+  await loadFiledropTab();
+});
+
+document.getElementById('filedrop-tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id, link } = btn.dataset;
+  if (action === 'fd-copy') {
+    navigator.clipboard.writeText(link).then(() => {
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+    });
+  }
+  if (action === 'fd-delete') {
+    if (!confirm('Delete this file share?')) return;
+    await DEL(`/api/filedrop/${id}`);
+    await loadFiledropTab();
+  }
+});
+
+// ── Phase 3: Migration Tab ────────────────────────────────────────────────────
+
+async function loadMigrationTab() {
+  const loading = document.getElementById('migration-loading');
+  const wrap    = document.getElementById('migration-wrap');
+  loading.classList.remove('hidden');
+  wrap.classList.add('hidden');
+
+  const [readiness, dnsplan, impact, checklist] = await Promise.all([
+    GET('/api/migration/readiness'),
+    GET('/api/migration/dns-plan'),
+    GET('/api/migration/client-impact'),
+    GET('/api/migration/checklist'),
+  ]);
+
+  // Readiness panel
+  const readinessEl = document.getElementById('migration-readiness');
+  if (readiness) {
+    const svc = readiness.services || {};
+    const checks = [
+      ['wg-easy', svc['wg-easy']?.up], ['adguard', svc.adguard?.up],
+      ['caddy', svc.caddy?.up],        ['portal', svc.portal?.up],
+    ];
+    readinessEl.innerHTML = `<h3 style="margin-top:0">${t('migration.readiness')}</h3>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem">
+        ${checks.map(([name, up]) => `<span class="monitor-badge monitor-${up ? 'up' : 'down'}">${name}: ${up ? '✓' : '✗'}</span>`).join('')}
+      </div>
+      <div class="text-dim" style="font-size:.85rem">VPS: <strong>${esc(readiness.vpsHost || 'unknown')}</strong> ·
+        Devices: ${readiness.counts?.devices || 0} ·
+        Services: ${readiness.counts?.proxySvc || 0} ·
+        Apps: ${readiness.counts?.apps || 0}
+      </div>`;
+  }
+
+  // DNS plan
+  const dnsWrap = document.getElementById('migration-dns-wrap');
+  if (dnsplan?.domains?.length) {
+    dnsWrap.innerHTML = `<table class="data-table"><thead><tr><th>Domain</th><th>Current IP</th><th>Service</th></tr></thead>
+      <tbody>${dnsplan.domains.map(d => `<tr><td><code>${esc(d.domain)}</code></td><td><code>${esc(d.currentIp)}</code></td><td>${esc(d.service)}</td></tr>`).join('')}</tbody>
+    </table>`;
+  } else {
+    dnsWrap.innerHTML = `<p class="text-dim" style="font-size:.85rem">No public domains configured.</p>`;
+  }
+
+  // Client impact
+  const impactEl = document.getElementById('migration-client-impact');
+  if (impact) {
+    const warn = impact.clientsNeedUpdate;
+    impactEl.innerHTML = `<div class="${warn ? 'status-badge status-revoked' : 'status-badge status-online'}" style="display:inline-block;margin-bottom:.5rem">
+      WireGuard endpoint: ${impact.endpointType === 'ip' ? '⚠ IP address' : '✓ Hostname'}
+    </div>
+    <p class="text-dim" style="font-size:.85rem">${esc(impact.message)}</p>`;
+  }
+
+  // Checklist
+  const listEl = document.getElementById('migration-checklist-list');
+  if (checklist?.steps) {
+    listEl.innerHTML = checklist.steps.map(s => `<li class="checklist-step">
+      <strong>${esc(s.title)}</strong>
+      ${s.cmd ? `<br><code style="font-size:.82rem">${esc(s.cmd)}</code>` : ''}
+      ${s.detail ? `<br><span class="text-dim" style="font-size:.83rem">${esc(s.detail)}</span>` : ''}
+      ${s.value ? `<br><span class="text-dim" style="font-size:.8rem">→ ${esc(String(s.value))}</span>` : ''}
+    </li>`).join('');
+  }
+
+  loading.classList.add('hidden');
+  wrap.classList.remove('hidden');
+}
+
+document.getElementById('migration-refresh-btn').addEventListener('click', loadMigrationTab);
+
+document.getElementById('migration-copy-checklist').addEventListener('click', () => {
+  const items = document.querySelectorAll('#migration-checklist-list .checklist-step');
+  const text  = [...items].map((li, i) => `${i+1}. ${li.textContent.trim().replace(/\s+/g, ' ')}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('migration-copy-checklist');
+    btn.textContent = '✓';
+    setTimeout(() => { btn.textContent = t('common.copy'); }, 1500);
+  });
+});
+
+document.getElementById('migration-export-btn').addEventListener('click', async () => {
+  const btn    = document.getElementById('migration-export-btn');
+  const result = document.getElementById('migration-export-result');
+  btn.disabled = true;
+  result.textContent = t('common.processing');
+  const data = await POST('/api/migration/export', {});
+  btn.disabled = false;
+  if (data?.error) { result.textContent = `Error: ${data.error}`; return; }
+  result.textContent = `${t('migration.exportDone')} ${data.filename}`;
 });

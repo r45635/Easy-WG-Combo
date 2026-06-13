@@ -545,3 +545,40 @@ tbody tr:last-child td { border-bottom: none; }
 .exposure-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .72rem; font-weight: 600; }
 .exposure-vpn-only { background: #4c1d9540; color: #c4b5fd; border: 1px solid #6d28d960; }
 .exposure-public   { background: #1e3a5f40; color: #7dd3fc;   border: 1px solid #1d4ed860; }
+
+/* ── Phase 3: Monitor badges ── */
+.monitor-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .72rem; font-weight: 600; }
+.monitor-up      { background: #14532d40; color: #4ade80; border: 1px solid #15803d60; }
+.monitor-down    { background: #7f1d1d40; color: #f87171; border: 1px solid #b91c1c60; }
+.monitor-unknown { background: var(--bg2); color: var(--text-dim); border: 1px solid var(--border); }
+.monitor-disabled { background: #1c1917; color: #78716c; border: 1px solid #44403c; }
+
+/* ── Phase 3: App catalog ── */
+.app-catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+.app-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem 1rem; display: flex; flex-direction: column; }
+.app-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .3rem; }
+
+/* ── Phase 3: File Drop ── */
+.filedrop-upload-area {
+  border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.5rem 1rem;
+  text-align: center; cursor: pointer; transition: border-color var(--trans), background var(--trans);
+  background: var(--bg2); margin-bottom: .75rem;
+}
+.filedrop-upload-area.drag-over { border-color: var(--primary); background: #312e8120; }
+.filedrop-options { display: none; flex-wrap: wrap; gap: .6rem .9rem; margin-bottom: .75rem; align-items: flex-end; }
+.filedrop-options label { font-size: .8rem; color: var(--text-dim); display: block; margin-bottom: .2rem; }
+.filedrop-options input, .filedrop-options select { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: .3rem .5rem; font-size: .83rem; width: 100%; box-sizing: border-box; }
+.filedrop-options .fd-field { display: flex; flex-direction: column; min-width: 140px; flex: 1 1 140px; }
+.filedrop-icon { font-size: 2rem; line-height: 1; margin-bottom: .4rem; }
+.storage-bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: .3rem; }
+.storage-bar-fill { height: 100%; background: var(--primary); transition: width .3s; border-radius: 3px; }
+
+/* ── Phase 3: Migration ── */
+.migration-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: .75rem; }
+.migration-section-title { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 0 0 .5rem; }
+.migration-checklist { padding: 0; counter-reset: step; }
+.checklist-step { list-style: none; padding: .6rem .75rem .6rem 2.5rem; border-bottom: 1px solid var(--border); position: relative; font-size: .84rem; }
+.checklist-step:last-child { border-bottom: none; }
+.checklist-step::before { counter-increment: step; content: counter(step); position: absolute; left: .5rem; top: .65rem; background: var(--primary); color: #fff; border-radius: 50%; width: 1.3em; height: 1.3em; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; }
+.text-dim { color: var(--text-dim); }
+.text-muted { color: var(--text-muted, #6b7280); }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="2.0.0"
+VERSION="3.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
@@ -58,6 +58,26 @@ Commands:
   proxy enable <id>         Enable a proxy service
   proxy disable <id>        Disable a proxy service
   proxy validate            Validate current Caddy config without applying
+
+  monitor list              List uptime monitors
+  monitor check <id>        Run a monitor check immediately
+  monitor add               Add a new monitor (interactive)
+  monitor delete <id>       Delete a monitor
+
+  app catalog               List available apps
+  app list                  List installed apps
+  app install <id>          Install an app
+  app start <id>            Start an app container
+  app stop <id>             Stop an app container
+  app restart <id>          Restart an app container
+  app logs <id>             Show last 200 log lines
+  app remove <id>           Remove an installed app
+
+  filedrop list             List active file shares
+  filedrop upload <file>    Upload a file and get a share link
+  filedrop delete <id>      Delete a file share
+  filedrop status           Show storage usage
+  filedrop cleanup          Delete expired and exhausted shares
 
 Options:
   --help, -h                Show this help
@@ -132,6 +152,18 @@ case "${1:-}" in
   proxy)
     shift
     bash "$SCRIPTS_DIR/proxy.sh" "$@"
+    ;;
+  monitor)
+    shift
+    bash "$SCRIPTS_DIR/monitor.sh" "$@"
+    ;;
+  app)
+    shift
+    bash "$SCRIPTS_DIR/apps.sh" "$@"
+    ;;
+  filedrop)
+    shift
+    bash "$SCRIPTS_DIR/filedrop.sh" "$@"
     ;;
   *)
     echo "Unknown command: ${1:-}" >&2
