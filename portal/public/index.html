@@ -73,6 +73,18 @@
         <a href="#" class="nav-item" data-tab="gateway">
           <span class="nav-icon">⊕</span> <span data-i18n="nav.gateway">Gateway</span>
         </a>
+        <a href="#" class="nav-item" data-tab="monitoring">
+          <span class="nav-icon">◎</span> <span data-i18n="nav.monitoring">Monitoring</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="apps">
+          <span class="nav-icon">⊟</span> <span data-i18n="nav.apps">Apps</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="filedrop">
+          <span class="nav-icon">⊠</span> <span data-i18n="nav.filedrop">File Drop</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="migration">
+          <span class="nav-icon">⇌</span> <span data-i18n="nav.migration">Migration</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="lang-switch-wrap">
@@ -606,6 +618,139 @@
         <div id="gateway-list-wrap" class="hidden">
           <div id="gateway-empty" class="text-dim hidden" data-i18n="gateway.empty">No proxy services configured.</div>
           <div id="gateway-list"></div>
+        </div>
+      </section>
+
+      <!-- ── Monitoring (Phase 3 Module A) ── -->
+      <section id="tab-monitoring" class="tab-content hidden">
+        <div class="page-header">
+          <div><h2 data-i18n="nav.monitoring">Monitoring</h2></div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="monitoring-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+            <button class="btn-primary btn-sm" id="monitoring-add-btn" data-i18n="monitoring.add">+ Add Monitor</button>
+          </div>
+        </div>
+        <div id="monitoring-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="monitoring-wrap" class="hidden">
+          <div id="monitoring-empty" class="text-dim hidden" data-i18n="monitoring.empty">No monitors configured.</div>
+          <table class="data-table" id="monitoring-table">
+            <thead>
+              <tr>
+                <th data-i18n="monitoring.col.name">Name</th>
+                <th data-i18n="monitoring.col.type">Type</th>
+                <th data-i18n="monitoring.col.status">Status</th>
+                <th data-i18n="monitoring.col.lastCheck">Last Check</th>
+                <th data-i18n="monitoring.col.response">Response</th>
+                <th data-i18n="devices.col.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="monitoring-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Apps (Phase 3 Module B) ── -->
+      <section id="tab-apps" class="tab-content hidden">
+        <div class="page-header">
+          <div><h2 data-i18n="nav.apps">Apps</h2></div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="apps-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="apps-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="apps-wrap" class="hidden">
+          <div class="section-header"><h3 data-i18n="apps.catalog">App Catalog</h3></div>
+          <div id="apps-catalog" class="app-catalog-grid"></div>
+          <div class="section-header" style="margin-top:1.5rem">
+            <h3 data-i18n="apps.installed">Installed Apps</h3>
+          </div>
+          <div id="apps-installed-empty" class="text-dim" data-i18n="apps.noneInstalled">No apps installed.</div>
+          <div id="apps-installed-list"></div>
+        </div>
+      </section>
+
+      <!-- ── File Drop (Phase 3 Module C) ── -->
+      <section id="tab-filedrop" class="tab-content hidden">
+        <div class="page-header">
+          <div><h2 data-i18n="nav.filedrop">File Drop</h2></div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="filedrop-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+            <button class="btn-ghost btn-sm" id="filedrop-cleanup-btn" data-i18n="filedrop.cleanup">↻ Cleanup</button>
+          </div>
+        </div>
+        <div id="filedrop-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="filedrop-wrap" class="hidden">
+          <!-- Upload area -->
+          <div class="filedrop-upload-area" id="filedrop-drop-zone">
+            <div class="filedrop-icon">⊠</div>
+            <p data-i18n="filedrop.uploadHint">Click or drag a file here to share it</p>
+            <input type="file" id="filedrop-file-input" style="display:none">
+            <div class="filedrop-options" id="filedrop-options" style="display:none">
+              <label class="field-label" data-i18n="filedrop.expires">Expires after (days, 1–30)</label>
+              <input type="number" id="fd-expires" value="7" min="1" max="30" style="width:80px">
+              <label class="field-label" data-i18n="filedrop.maxDownloads">Max downloads</label>
+              <input type="number" id="fd-maxdl" value="5" min="1" style="width:80px">
+              <label class="field-label" data-i18n="filedrop.password">Password (optional)</label>
+              <input type="password" id="fd-password" placeholder="" autocomplete="new-password" style="width:200px">
+              <label class="field-label" data-i18n="filedrop.mode">Access mode</label>
+              <select id="fd-mode">
+                <option value="vpn_only" data-i18n="filedrop.mode.vpn">VPN only</option>
+                <option value="public" data-i18n="filedrop.mode.public">Public HTTPS</option>
+              </select>
+              <div id="fd-public-warn" class="hidden" style="color:var(--warn);font-size:.8rem;margin-top:.4rem" data-i18n="filedrop.publicWarn">⚠ Public links are accessible without VPN login.</div>
+              <button class="btn-primary" id="fd-upload-btn" data-i18n="filedrop.upload">Upload &amp; Generate Link</button>
+            </div>
+          </div>
+          <!-- Storage bar -->
+          <div id="filedrop-storage-bar" style="margin:1rem 0;font-size:.85rem"></div>
+          <!-- Shares table -->
+          <div id="filedrop-shares-empty" class="text-dim hidden" data-i18n="filedrop.noShares">No active shares.</div>
+          <table class="data-table hidden" id="filedrop-table">
+            <thead>
+              <tr>
+                <th data-i18n="filedrop.col.name">File</th>
+                <th data-i18n="filedrop.col.size">Size</th>
+                <th data-i18n="filedrop.col.expires">Expires</th>
+                <th data-i18n="filedrop.col.downloads">Downloads</th>
+                <th data-i18n="filedrop.col.mode">Mode</th>
+                <th data-i18n="devices.col.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="filedrop-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Migration Assistant (Phase 3 Module D) ── -->
+      <section id="tab-migration" class="tab-content hidden">
+        <div class="page-header">
+          <div><h2 data-i18n="nav.migration">Migration</h2></div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="migration-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="migration-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="migration-wrap" class="hidden">
+          <!-- Readiness -->
+          <div class="migration-panel" id="migration-readiness"></div>
+          <!-- DNS plan -->
+          <div class="section-header" style="margin-top:1.2rem">
+            <h3 data-i18n="migration.dnsTitle">DNS Records to Update</h3>
+          </div>
+          <div id="migration-dns-wrap"></div>
+          <!-- Client impact -->
+          <div id="migration-client-impact" style="margin-top:1rem"></div>
+          <!-- Checklist -->
+          <div class="section-header" style="margin-top:1.2rem">
+            <h3 data-i18n="migration.checklistTitle">Migration Checklist</h3>
+            <button class="btn-ghost btn-sm" id="migration-copy-checklist" data-i18n="common.copy">⎘ Copy</button>
+          </div>
+          <ol class="migration-checklist" id="migration-checklist-list"></ol>
+          <!-- Export backup -->
+          <div style="margin-top:1.5rem">
+            <button class="btn-primary" id="migration-export-btn" data-i18n="migration.export">Create Migration Backup</button>
+            <span id="migration-export-result" style="margin-left:.8rem;font-size:.85rem"></span>
+          </div>
         </div>
       </section>
 

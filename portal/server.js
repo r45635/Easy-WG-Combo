@@ -2196,6 +2196,895 @@ app.post('/api/proxy/validate', auth, async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+// ── Phase 3: requires ─────────────────────────────────────────────────────────
+const crypto   = require('crypto');
+const httpsLib = require('https');
+const dnsLib   = require('dns');
+
+// ── Phase 3: constants ────────────────────────────────────────────────────────
+const MONITORS_FILE      = '/data/monitors.json';
+const MONITOR_HIST_FILE  = '/data/monitor-history.json';
+const APPS_FILE          = '/data/apps.json';
+const FILEDROP_META_FILE = '/data/filedrop-shares.json';
+const FILEDROP_DIR       = '/filedrop/storage';
+const FILEDROP_MAX_MB    = parseInt(process.env.FILEDROP_MAX_MB   || '500');
+const FILEDROP_TOTAL_GB  = parseInt(process.env.FILEDROP_TOTAL_GB  || '5');
+const FILEDROP_DEFAULT_EXPIRY = 7;
+const FILEDROP_MAX_EXPIRY     = 30;
+const VPS_HOST           = process.env.WG_HOST || '';
+
+// ── Phase 3: App catalog ─────────────────────────────────────────────────────
+const APP_CATALOG = {
+  'uptime-kuma': {
+    id: 'uptime-kuma', name: 'Uptime Kuma', category: 'monitoring',
+    description: 'Self-hosted uptime monitoring tool with a beautiful UI and status pages.',
+    image: 'louislam/uptime-kuma:1',
+    internalPort: 3001, minRamMb: 512, defaultExposure: 'vpn_only',
+    namedVolumes: [{ name: 'easywg-uptime-kuma-data', target: '/app/data' }],
+    env: [],
+    securityNotes: ['Create a strong admin password on first login.'],
+    healthcheck: { type: 'http', path: '/', port: 3001 },
+  },
+  'ntfy': {
+    id: 'ntfy', name: 'ntfy', category: 'notifications',
+    description: 'Simple self-hosted push notification service for any platform.',
+    image: 'binwiederhier/ntfy:latest',
+    internalPort: 8080, minRamMb: 128, defaultExposure: 'vpn_only',
+    namedVolumes: [
+      { name: 'easywg-ntfy-cache', target: '/var/cache/ntfy' },
+      { name: 'easywg-ntfy-etc',   target: '/etc/ntfy' },
+    ],
+    env: ['NTFY_BASE_URL=http://localhost:8080'],
+    securityNotes: ['Configure access control in /etc/ntfy/server.yml to restrict who can publish.'],
+    healthcheck: { type: 'http', path: '/v1/health', port: 8080 },
+  },
+  'filebrowser': {
+    id: 'filebrowser', name: 'FileBrowser', category: 'files',
+    description: 'Web-based file manager with user management and sharing.',
+    image: 'filebrowser/filebrowser:latest',
+    internalPort: 8081, minRamMb: 64, defaultExposure: 'vpn_only',
+    namedVolumes: [
+      { name: 'easywg-filebrowser-db',  target: '/database' },
+      { name: 'easywg-filebrowser-srv', target: '/srv' },
+    ],
+    env: ['FB_PORT=8081'],
+    securityNotes: ['Change default admin/admin credentials immediately after install.'],
+    healthcheck: { type: 'http', path: '/', port: 8081 },
+  },
+  'stirling-pdf': {
+    id: 'stirling-pdf', name: 'Stirling PDF', category: 'productivity',
+    description: 'Powerful web-based PDF manipulation tool. All processing is local.',
+    image: 'frooodle/s-pdf:latest',
+    internalPort: 8082, minRamMb: 256, defaultExposure: 'vpn_only',
+    namedVolumes: [
+      { name: 'easywg-stirling-configs', target: '/configs' },
+      { name: 'easywg-stirling-logs',    target: '/logs' },
+    ],
+    env: ['SERVER_PORT=8082'],
+    securityNotes: ['Enable login if exposing to public networks.'],
+    healthcheck: { type: 'http', path: '/', port: 8082 },
+  },
+  'vaultwarden': {
+    id: 'vaultwarden', name: 'Vaultwarden', category: 'security',
+    description: 'Lightweight Bitwarden-compatible password manager server.',
+    image: 'vaultwarden/server:latest',
+    internalPort: 8083, minRamMb: 256, defaultExposure: 'vpn_only',
+    namedVolumes: [{ name: 'easywg-vaultwarden-data', target: '/data' }],
+    env: ['ROCKET_PORT=8083', 'SIGNUPS_ALLOWED=false'],
+    securityNotes: [
+      'Disable signups (SIGNUPS_ALLOWED=false) after creating your account.',
+      'Set a strong ADMIN_TOKEN to enable the admin panel.',
+      'Never expose without HTTPS — Bitwarden clients require it.',
+    ],
+    healthcheck: { type: 'http', path: '/alive', port: 8083 },
+  },
+};
+
+// ── Phase 3: load/save helpers ─────────────────────────────────────────────
+function loadMonitors() {
+  try { return JSON.parse(fs.readFileSync(MONITORS_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveMonitors(data) {
+  fs.writeFileSync(MONITORS_FILE, JSON.stringify(data, null, 2));
+}
+function loadMonitorHistory() {
+  try { return JSON.parse(fs.readFileSync(MONITOR_HIST_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveMonitorHistory(data) {
+  fs.writeFileSync(MONITOR_HIST_FILE, JSON.stringify(data, null, 2));
+}
+function loadApps() {
+  try { return JSON.parse(fs.readFileSync(APPS_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveApps(data) {
+  fs.writeFileSync(APPS_FILE, JSON.stringify(data, null, 2));
+}
+function loadFiledropShares() {
+  try { return JSON.parse(fs.readFileSync(FILEDROP_META_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function saveFiledropShares(data) {
+  fs.writeFileSync(FILEDROP_META_FILE, JSON.stringify(data, null, 2));
+}
+
+// ── Phase 3: Docker write helpers ───────────────────────────────────────────
+function dockerPost(apiPath, body) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = body != null ? JSON.stringify(body) : '';
+    const req = http.request({
+      socketPath: DOCKER_SOCK, path: apiPath, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) },
+    }, res => {
+      let data = '';
+      res.on('data', d => { data += d; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Docker POST timeout')); });
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+function dockerDelete(apiPath) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ socketPath: DOCKER_SOCK, path: apiPath, method: 'DELETE' }, res => {
+      let data = '';
+      res.on('data', d => { data += d; });
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('Docker DELETE timeout')); });
+    req.end();
+  });
+}
+
+// ── Phase 3: Monitor check functions ─────────────────────────────────────────
+async function checkHttp(url, timeoutMs, expectedStatus) {
+  const start = Date.now();
+  const lib = url.startsWith('https') ? httpsLib : http;
+  return new Promise(resolve => {
+    try {
+      const req = lib.get(url, { rejectUnauthorized: false, timeout: timeoutMs }, res => {
+        res.resume();
+        resolve({ ok: res.statusCode === expectedStatus, statusCode: res.statusCode, ms: Date.now() - start });
+      });
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout', ms: timeoutMs }); });
+      req.on('error',   e  => resolve({ ok: false, error: e.message, ms: Date.now() - start }));
+    } catch (e) { resolve({ ok: false, error: e.message, ms: Date.now() - start }); }
+  });
+}
+async function checkTcp(host, port, timeoutMs) {
+  const start = Date.now();
+  const ok = await tcpOpen(host, port, timeoutMs);
+  return { ok, ms: Date.now() - start };
+}
+async function checkDnsResolve(target, resolver) {
+  const start = Date.now();
+  return new Promise(resolve => {
+    try {
+      const r = new dnsLib.Resolver({ timeout: 5000 });
+      r.setServers([resolver]);
+      r.resolve4(target, err => {
+        resolve({ ok: !err, ms: Date.now() - start, error: err?.message });
+      });
+    } catch (e) { resolve({ ok: false, error: e.message, ms: Date.now() - start }); }
+  });
+}
+async function checkDockerContainer(name) {
+  try {
+    const data = await dockerApiRequest(`/containers/${encodeURIComponent(name)}/json`);
+    return { ok: data?.State?.Running === true };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+async function checkTlsDaysLeft(host, port) {
+  return new Promise(resolve => {
+    const tls = require('tls');
+    const sock = tls.connect({ host, port, rejectUnauthorized: false, servername: host }, () => {
+      try {
+        const cert = sock.getPeerCertificate();
+        sock.destroy();
+        const daysLeft = Math.floor((new Date(cert.valid_to).getTime() - Date.now()) / 86400000);
+        resolve({ ok: daysLeft >= 0, daysLeft });
+      } catch (e) { sock.destroy(); resolve({ ok: false, error: e.message }); }
+    });
+    sock.on('error', e => resolve({ ok: false, error: e.message }));
+    setTimeout(() => { sock.destroy(); resolve({ ok: false, error: 'timeout' }); }, 5000);
+  });
+}
+
+async function runMonitorCheck(monitor) {
+  let result = { ok: false, error: 'unknown type', ms: 0 };
+  try {
+    const to = (monitor.timeoutSeconds || 5) * 1000;
+    if (monitor.type === 'http' || monitor.type === 'https') {
+      result = await checkHttp(monitor.target, to, monitor.expectedStatus || 200);
+    } else if (monitor.type === 'tcp') {
+      const [h, p] = (monitor.target || '').split(':');
+      result = await checkTcp(h, parseInt(p || '80'), to);
+    } else if (monitor.type === 'dns') {
+      result = await checkDnsResolve(monitor.target, monitor.resolver || VPN_DNS_IP);
+    } else if (monitor.type === 'docker' || monitor.type === 'wireguard') {
+      result = await checkDockerContainer(monitor.target);
+    } else if (monitor.type === 'tls') {
+      const [h, p] = (monitor.target || '').split(':');
+      const r = await checkTlsDaysLeft(h, parseInt(p || '443'));
+      const minDays = monitor.minDaysLeft || ALERT_CERT_EXPIRY_DAYS;
+      result = { ...r, ok: typeof r.daysLeft === 'number' && r.daysLeft >= minDays };
+    }
+  } catch (e) { result = { ok: false, error: e.message, ms: 0 }; }
+
+  const monitors = loadMonitors();
+  const m = monitors[monitor.id];
+  if (!m) return result;
+
+  const prevStatus = m.lastStatus;
+  const now = new Date().toISOString();
+  m.lastCheck = now;
+  m.lastStatus = result.ok ? 'up' : 'down';
+  m.lastResponseMs = result.ms || null;
+  m.nextCheckAt = new Date(Date.now() + (m.intervalSeconds || 300) * 1000).toISOString();
+
+  if (result.ok) {
+    m.consecutiveFailures = 0;
+    m.lastSuccess = now;
+    if (prevStatus === 'down' && m.notify) {
+      sendNotification('monitor_recovered', { name: m.name, type: m.type }).catch(() => {});
+    }
+  } else {
+    m.consecutiveFailures = (m.consecutiveFailures || 0) + 1;
+    m.failureCount = (m.failureCount || 0) + 1;
+    m.lastFailure = now;
+    if (m.notify && m.consecutiveFailures >= (m.notifyAfterFailures || 2) && prevStatus !== 'down') {
+      sendNotification('monitor_down', { name: m.name, type: m.type, error: result.error }).catch(() => {});
+    }
+  }
+  saveMonitors(monitors);
+
+  const hist = loadMonitorHistory();
+  if (!hist[m.id]) hist[m.id] = [];
+  hist[m.id].push({ t: now, ok: result.ok, ms: result.ms || null, err: result.error || null });
+  if (hist[m.id].length > 100) hist[m.id] = hist[m.id].slice(-100);
+  saveMonitorHistory(hist);
+
+  return result;
+}
+
+function seedDefaultMonitors() {
+  const monitors = loadMonitors();
+  if (Object.keys(monitors).length > 0) return;
+  const now = Date.now();
+  const defaults = [
+    { id: 'mon_portal',  name: 'Portal',       type: 'http',   target: `http://127.0.0.1:${PORT}`, expectedStatus: 200 },
+    { id: 'mon_wgeasy',  name: 'wg-easy',      type: 'docker', target: 'wg-easy' },
+    { id: 'mon_adguard', name: 'AdGuard Home', type: 'docker', target: 'adguard' },
+    { id: 'mon_caddy',   name: 'Caddy',        type: 'docker', target: 'caddy' },
+    { id: 'mon_dns',     name: 'AdGuard DNS',  type: 'dns',    target: 'example.com', resolver: VPN_DNS_IP },
+  ];
+  if (VPS_HOST) {
+    defaults.push({ id: 'mon_tls', name: 'TLS Certificate', type: 'tls', target: `${VPS_HOST}:443` });
+  }
+  const services = loadProxyServices();
+  for (const svc of Object.values(services)) {
+    if (svc.enabled && svc.exposure === 'public') {
+      defaults.push({ id: `mon_svc_${svc.id}`, name: `${svc.name} (proxy)`, type: 'http', target: `https://${svc.domain}`, expectedStatus: 200 });
+    }
+  }
+  for (const d of defaults) {
+    monitors[d.id] = {
+      id: d.id, name: d.name, type: d.type, target: d.target,
+      expectedStatus: d.expectedStatus || null, resolver: d.resolver || null,
+      intervalSeconds: 300, timeoutSeconds: 5, retries: 2,
+      enabled: true, notify: true, notifyAfterFailures: 2,
+      lastCheck: null, lastStatus: 'unknown', lastSuccess: null, lastFailure: null,
+      failureCount: 0, consecutiveFailures: 0, lastResponseMs: null,
+      nextCheckAt: new Date(now + 60000).toISOString(), tags: [], notes: '',
+    };
+  }
+  saveMonitors(monitors);
+}
+
+// ── Phase 3: File Drop helpers ───────────────────────────────────────────────
+function generateShareToken() {
+  return crypto.randomBytes(24).toString('hex');
+}
+function hashFilePassword(pass) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
+  return `${salt}:${hash}`;
+}
+function verifyFilePassword(pass, stored) {
+  const [salt, hash] = (stored || '').split(':');
+  if (!salt || !hash) return false;
+  try {
+    const attempt = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(attempt, 'hex'));
+  } catch { return false; }
+}
+function getFiledropUsageMb() {
+  try {
+    let total = 0;
+    const files = fs.readdirSync(FILEDROP_DIR);
+    for (const f of files) {
+      try { total += fs.statSync(path.join(FILEDROP_DIR, f)).size; } catch {}
+    }
+    return Math.round(total / (1024 * 1024));
+  } catch { return 0; }
+}
+function cleanupExpiredShares() {
+  const shares = loadFiledropShares();
+  let changed = false;
+  for (const [id, share] of Object.entries(shares)) {
+    const expired = share.expiresAt && new Date(share.expiresAt).getTime() < Date.now();
+    const exhausted = share.maxDownloads && share.downloads >= share.maxDownloads;
+    if (expired || exhausted || share.status === 'expired') {
+      try { fs.unlinkSync(path.join(FILEDROP_DIR, share.storedName)); } catch {}
+      delete shares[id];
+      changed = true;
+    }
+  }
+  if (changed) saveFiledropShares(shares);
+  return changed;
+}
+
+// ── Phase 3: Module A — Uptime Monitor ───────────────────────────────────────
+
+app.get('/api/monitors', auth, (req, res) => {
+  seedDefaultMonitors();
+  const monitors = loadMonitors();
+  res.json({ monitors: Object.values(monitors) });
+});
+
+app.post('/api/monitors', auth, (req, res) => {
+  const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
+  if (!name || !type || !target) return res.status(400).json({ error: 'name, type, target required' });
+  const monitors = loadMonitors();
+  const id = `mon_${Date.now()}`;
+  monitors[id] = {
+    id, name, type, target,
+    expectedStatus: expectedStatus || 200, resolver: resolver || null,
+    intervalSeconds: intervalSeconds || 300, timeoutSeconds: timeoutSeconds || 5,
+    retries: retries || 2, enabled: true,
+    notify: notify !== false, notifyAfterFailures: notifyAfterFailures || 2,
+    lastCheck: null, lastStatus: 'unknown', lastSuccess: null, lastFailure: null,
+    failureCount: 0, consecutiveFailures: 0, lastResponseMs: null,
+    nextCheckAt: new Date(Date.now() + 30000).toISOString(),
+    tags: tags || [], notes: notes || '',
+  };
+  saveMonitors(monitors);
+  res.json({ ok: true, monitor: monitors[id] });
+});
+
+app.patch('/api/monitors/:id', auth, (req, res) => {
+  const monitors = loadMonitors();
+  const m = monitors[req.params.id];
+  if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  const fields = ['name','type','target','expectedStatus','resolver','intervalSeconds','timeoutSeconds','retries','notify','notifyAfterFailures','tags','notes'];
+  for (const f of fields) { if (req.body[f] !== undefined) m[f] = req.body[f]; }
+  saveMonitors(monitors);
+  res.json({ ok: true, monitor: m });
+});
+
+app.delete('/api/monitors/:id', auth, (req, res) => {
+  const monitors = loadMonitors();
+  if (!monitors[req.params.id]) return res.status(404).json({ error: 'Monitor not found' });
+  delete monitors[req.params.id];
+  saveMonitors(monitors);
+  const hist = loadMonitorHistory();
+  delete hist[req.params.id];
+  saveMonitorHistory(hist);
+  res.json({ ok: true });
+});
+
+app.post('/api/monitors/:id/enable', auth, (req, res) => {
+  const monitors = loadMonitors();
+  const m = monitors[req.params.id];
+  if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  m.enabled = true;
+  m.nextCheckAt = new Date(Date.now() + 30000).toISOString();
+  saveMonitors(monitors);
+  res.json({ ok: true });
+});
+
+app.post('/api/monitors/:id/disable', auth, (req, res) => {
+  const monitors = loadMonitors();
+  const m = monitors[req.params.id];
+  if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  m.enabled = false;
+  m.lastStatus = 'disabled';
+  saveMonitors(monitors);
+  res.json({ ok: true });
+});
+
+app.post('/api/monitors/:id/check', auth, async (req, res) => {
+  const monitors = loadMonitors();
+  const m = monitors[req.params.id];
+  if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  m.nextCheckAt = new Date().toISOString(); // mark as due immediately
+  saveMonitors(monitors);
+  const result = await runMonitorCheck(m);
+  const updated = loadMonitors()[m.id];
+  res.json({ ok: true, status: updated?.lastStatus, ms: result.ms, error: result.error });
+});
+
+app.get('/api/monitors/:id/history', auth, (req, res) => {
+  const hist = loadMonitorHistory();
+  res.json({ history: hist[req.params.id] || [] });
+});
+
+// ── Phase 3: Module B — Curated App Launcher ─────────────────────────────────
+
+app.get('/api/apps/catalog', auth, (req, res) => {
+  res.json({ catalog: Object.values(APP_CATALOG) });
+});
+
+app.get('/api/apps', auth, async (req, res) => {
+  const apps = loadApps();
+  const result = await Promise.all(Object.values(apps).map(async app => {
+    try {
+      const data = await dockerApiRequest(`/containers/${encodeURIComponent('easywg-' + app.id)}/json`);
+      return { ...app, containerStatus: data?.State?.Status || 'unknown', running: data?.State?.Running === true };
+    } catch { return { ...app, containerStatus: 'not_found', running: false }; }
+  }));
+  res.json({ apps: result });
+});
+
+app.post('/api/apps/:id/install', auth, async (req, res) => {
+  const catalogEntry = APP_CATALOG[req.params.id];
+  if (!catalogEntry) return res.status(404).json({ error: 'App not in catalog' });
+  const apps = loadApps();
+  if (apps[req.params.id]) return res.status(400).json({ error: 'App already installed' });
+
+  const { exposure, domain, confirmed } = req.body;
+  const mode = exposure === 'public' ? 'public' : 'vpn_only';
+  if (mode === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed:true' });
+
+  const containerName = `easywg-${catalogEntry.id}`;
+  try {
+    // Create container via Docker Engine API
+    const binds = (catalogEntry.namedVolumes || []).map(v => `${v.name}:${v.target}`);
+    const createBody = {
+      Image: catalogEntry.image,
+      Env: catalogEntry.env || [],
+      HostConfig: {
+        Binds: binds,
+        NetworkMode: 'host',
+        RestartPolicy: { Name: 'unless-stopped' },
+      },
+    };
+    const created = await dockerPost(`/containers/create?name=${encodeURIComponent(containerName)}`, createBody);
+    if (created.status !== 201) {
+      return res.status(500).json({ error: `Docker create failed: ${JSON.stringify(created.body)}` });
+    }
+    const containerId = created.body.Id;
+
+    // Start container
+    const started = await dockerPost(`/containers/${containerId}/start`, null);
+    if (started.status !== 204) {
+      return res.status(500).json({ error: `Docker start failed: ${JSON.stringify(started.body)}` });
+    }
+
+    const appRecord = {
+      id: catalogEntry.id, catalogId: catalogEntry.id,
+      containerId, containerName, status: 'running',
+      exposure: mode, domain: domain || '',
+      proxyServiceId: null, monitorId: null,
+      installedAt: new Date().toISOString(),
+    };
+
+    // Create proxy service if domain provided
+    if (domain) {
+      const services = loadProxyServices();
+      const svcId = `svc_app_${catalogEntry.id}`;
+      services[svcId] = {
+        id: svcId, name: catalogEntry.name, domain,
+        target: `http://127.0.0.1:${catalogEntry.internalPort}`,
+        exposure: mode, enabled: true,
+        createdAt: new Date().toISOString(), notes: `Auto-created for ${catalogEntry.name}`,
+      };
+      const reload = await writeCaddyServices(services);
+      if (reload.ok) { saveProxyServices(services); appRecord.proxyServiceId = svcId; }
+    }
+
+    // Create health monitor
+    const monitors = loadMonitors();
+    const monId = `mon_app_${catalogEntry.id}`;
+    monitors[monId] = {
+      id: monId, name: `${catalogEntry.name} (app)`,
+      type: catalogEntry.healthcheck.type || 'http',
+      target: `http://127.0.0.1:${catalogEntry.healthcheck.port}${catalogEntry.healthcheck.path || '/'}`,
+      expectedStatus: 200, resolver: null,
+      intervalSeconds: 120, timeoutSeconds: 5, retries: 2,
+      enabled: true, notify: true, notifyAfterFailures: 3,
+      lastCheck: null, lastStatus: 'unknown', lastSuccess: null, lastFailure: null,
+      failureCount: 0, consecutiveFailures: 0, lastResponseMs: null,
+      nextCheckAt: new Date(Date.now() + 60000).toISOString(), tags: ['app'], notes: '',
+    };
+    saveMonitors(monitors);
+    appRecord.monitorId = monId;
+
+    apps[catalogEntry.id] = appRecord;
+    saveApps(apps);
+
+    res.json({ ok: true, app: appRecord });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apps/:id/start', auth, async (req, res) => {
+  try {
+    const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/start`, null);
+    if (r.status === 204 || r.status === 304) return res.json({ ok: true });
+    res.status(500).json({ error: JSON.stringify(r.body) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apps/:id/stop', auth, async (req, res) => {
+  try {
+    const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/stop`, null);
+    if (r.status === 204 || r.status === 304) return res.json({ ok: true });
+    res.status(500).json({ error: JSON.stringify(r.body) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apps/:id/restart', auth, async (req, res) => {
+  try {
+    const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/restart`, null);
+    if (r.status === 204) return res.json({ ok: true });
+    res.status(500).json({ error: JSON.stringify(r.body) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/apps/:id/logs', auth, async (req, res) => {
+  try {
+    const tail = parseInt(req.query.tail || '200');
+    const data = await new Promise((resolve, reject) => {
+      const req2 = http.request({
+        socketPath: DOCKER_SOCK,
+        path: `/containers/${encodeURIComponent('easywg-' + req.params.id)}/logs?stdout=1&stderr=1&tail=${tail}&timestamps=1`,
+        method: 'GET',
+      }, r => {
+        const chunks = [];
+        r.on('data', d => chunks.push(d));
+        r.on('end', () => resolve(Buffer.concat(chunks)));
+      });
+      req2.on('error', reject);
+      req2.setTimeout(8000, () => { req2.destroy(); reject(new Error('timeout')); });
+      req2.end();
+    });
+    // Docker multiplexed log stream: strip 8-byte headers
+    let text = '';
+    let i = 0;
+    while (i + 8 <= data.length) {
+      const size = data.readUInt32BE(i + 4);
+      if (i + 8 + size > data.length) break;
+      text += data.slice(i + 8, i + 8 + size).toString('utf8');
+      i += 8 + size;
+    }
+    if (!text) text = data.toString('utf8');
+    res.json({ ok: true, logs: text });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apps/:id/update', auth, async (req, res) => {
+  try {
+    const cName = encodeURIComponent('easywg-' + req.params.id);
+    const catalogEntry = APP_CATALOG[req.params.id];
+    if (!catalogEntry) return res.status(404).json({ error: 'App not in catalog' });
+    // Pull new image
+    const pull = await dockerPost(`/images/create?fromImage=${encodeURIComponent(catalogEntry.image)}`, null);
+    // Restart container
+    await dockerPost(`/containers/${cName}/restart`, null);
+    res.json({ ok: true, pullStatus: pull.status });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apps/:id/remove', auth, async (req, res) => {
+  const { confirmed, deleteData } = req.body;
+  if (!confirmed) return res.status(400).json({ error: 'requires confirmed:true' });
+  const apps = loadApps();
+  const appRec = apps[req.params.id];
+  const cName = encodeURIComponent('easywg-' + req.params.id);
+  try {
+    // Stop + remove container
+    await dockerPost(`/containers/${cName}/stop`, null);
+    await dockerDelete(`/containers/${cName}?force=true`);
+    // Remove named volumes if deleteData
+    if (deleteData === true) {
+      const catalogEntry = APP_CATALOG[req.params.id];
+      if (catalogEntry) {
+        for (const v of (catalogEntry.namedVolumes || [])) {
+          await dockerDelete(`/volumes/${encodeURIComponent(v.name)}`);
+        }
+      }
+    }
+    // Remove proxy service
+    if (appRec?.proxyServiceId) {
+      const services = loadProxyServices();
+      delete services[appRec.proxyServiceId];
+      await writeCaddyServices(services);
+      saveProxyServices(services);
+    }
+    // Remove monitor
+    if (appRec?.monitorId) {
+      const monitors = loadMonitors();
+      delete monitors[appRec.monitorId];
+      saveMonitors(monitors);
+    }
+    delete apps[req.params.id];
+    saveApps(apps);
+    res.json({ ok: true, dataDeleted: !!deleteData });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Phase 3: Module C — Secure File Drop ─────────────────────────────────────
+
+app.get('/api/filedrop', auth, (req, res) => {
+  cleanupExpiredShares();
+  const shares = loadFiledropShares();
+  res.json({ shares: Object.values(shares) });
+});
+
+app.post('/api/filedrop/upload', auth, (req, res) => {
+  let responded = false;
+  const respond = (code, body) => { if (!responded) { responded = true; res.status(code).json(body); } };
+
+  // Ensure storage dir exists
+  try { fs.mkdirSync(FILEDROP_DIR, { recursive: true }); } catch {}
+
+  // Total storage check
+  if (getFiledropUsageMb() >= FILEDROP_TOTAL_GB * 1024) {
+    return respond(507, { error: `Storage limit of ${FILEDROP_TOTAL_GB} GB reached. Run cleanup first.` });
+  }
+
+  let Busboy;
+  try { Busboy = require('busboy'); } catch {
+    return respond(500, { error: 'busboy not installed — run: npm install in portal directory' });
+  }
+
+  const formFields = {};
+  let fileToken = null, origName = 'upload', mimeType = 'application/octet-stream';
+  let fileWriteDone = Promise.resolve(0);
+  let fileLimitHit = false;
+
+  const bb = Busboy({ headers: req.headers, limits: { fileSize: FILEDROP_MAX_MB * 1024 * 1024, files: 1 } });
+
+  bb.on('field', (name, val) => { formFields[name] = val; });
+
+  bb.on('file', (_name, stream, info) => {
+    fileToken = generateShareToken();
+    origName  = path.basename(info.filename || 'upload');
+    mimeType  = info.mimeType || 'application/octet-stream';
+    const destPath = path.join(FILEDROP_DIR, fileToken);
+    const ws = fs.createWriteStream(destPath);
+    stream.on('limit', () => { fileLimitHit = true; stream.resume(); });
+    fileWriteDone = new Promise((resolve, reject) => {
+      stream.pipe(ws);
+      ws.on('finish', () => resolve(ws.bytesWritten));
+      ws.on('error', reject);
+    });
+  });
+
+  bb.on('close', async () => {
+    if (!fileToken) return respond(400, { error: 'No file uploaded' });
+    try {
+      const fileSize = await fileWriteDone;
+      if (fileLimitHit) {
+        try { fs.unlinkSync(path.join(FILEDROP_DIR, fileToken)); } catch {}
+        return respond(400, { error: `File exceeds ${FILEDROP_MAX_MB} MB limit` });
+      }
+      const mode = formFields.mode === 'public' ? 'public' : 'vpn_only';
+      if (mode === 'public' && formFields.confirmed !== 'true') {
+        try { fs.unlinkSync(path.join(FILEDROP_DIR, fileToken)); } catch {}
+        return respond(400, { error: 'Public mode requires confirmed=true' });
+      }
+      const expiryDays = Math.min(FILEDROP_MAX_EXPIRY, Math.max(1, parseInt(formFields.expires || String(FILEDROP_DEFAULT_EXPIRY))));
+      const maxDownloads = Math.max(1, parseInt(formFields.maxDownloads || '5'));
+      const pass = formFields.password || '';
+      const expiresAt = new Date(Date.now() + expiryDays * 86400000).toISOString();
+      const share = {
+        id: fileToken, token: fileToken,
+        originalName: origName, storedName: fileToken,
+        sizeBytes: fileSize, mimeType,
+        uploadedAt: new Date().toISOString(), expiresAt,
+        maxDownloads, downloads: 0,
+        passwordProtected: !!pass,
+        passwordHash: pass ? hashFilePassword(pass) : null,
+        mode, status: 'active', notes: '',
+      };
+      const shares = loadFiledropShares();
+      shares[fileToken] = share;
+      saveFiledropShares(shares);
+      sendNotification('filedrop_shared', { name: origName, mode }).catch(() => {});
+      respond(200, { ok: true, id: fileToken, token: fileToken, url: `/files/${fileToken}`, expiresAt, originalName: origName });
+    } catch (e) { respond(500, { error: e.message }); }
+  });
+
+  bb.on('error', e => respond(500, { error: e.message }));
+  req.pipe(bb);
+});
+
+app.delete('/api/filedrop/:id', auth, (req, res) => {
+  const shares = loadFiledropShares();
+  const share = shares[req.params.id];
+  if (!share) return res.status(404).json({ error: 'Share not found' });
+  try { fs.unlinkSync(path.join(FILEDROP_DIR, share.storedName)); } catch {}
+  delete shares[req.params.id];
+  saveFiledropShares(shares);
+  res.json({ ok: true });
+});
+
+app.post('/api/filedrop/cleanup', auth, (req, res) => {
+  const cleaned = cleanupExpiredShares();
+  res.json({ ok: true, cleaned });
+});
+
+app.get('/api/filedrop/status', auth, (req, res) => {
+  const shares = loadFiledropShares();
+  const usageMb = getFiledropUsageMb();
+  res.json({
+    shares: Object.keys(shares).length,
+    usageMb, limitMb: FILEDROP_TOTAL_GB * 1024,
+    pct: Math.round(usageMb / (FILEDROP_TOTAL_GB * 1024) * 100),
+  });
+});
+
+// Public download endpoint (no auth — token is the secret)
+function serveFiledrop(req, res) {
+  const { token } = req.params;
+  const shares = loadFiledropShares();
+  const share = shares[token];
+  if (!share || share.status !== 'active') return res.status(404).json({ error: 'File not found' });
+  if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) {
+    return res.status(410).json({ error: 'Link has expired' });
+  }
+  if (share.maxDownloads && share.downloads >= share.maxDownloads) {
+    return res.status(410).json({ error: 'Download limit reached' });
+  }
+  // Password check
+  if (share.passwordProtected) {
+    const pw = (req.method === 'POST' ? req.body?.password : null) || req.query.pw || '';
+    if (!pw) return res.status(401).json({ error: 'Password required', passwordRequired: true });
+    if (!verifyFilePassword(pw, share.passwordHash)) return res.status(401).json({ error: 'Wrong password' });
+  }
+  const filePath = path.join(FILEDROP_DIR, share.storedName);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+
+  share.downloads += 1;
+  shares[token] = share;
+  saveFiledropShares(shares);
+  sendNotification('filedrop_downloaded', { name: share.originalName }).catch(() => {});
+
+  res.setHeader('Content-Disposition', `attachment; filename="${share.originalName.replace(/"/g, '')}"`);
+  res.setHeader('Content-Type', share.mimeType || 'application/octet-stream');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  fs.createReadStream(filePath).pipe(res);
+}
+
+app.get('/files/:token',  serveFiledrop);
+app.post('/files/:token', serveFiledrop);
+
+// ── Phase 3: Module D — VPS Migration Assistant ───────────────────────────────
+
+app.get('/api/migration/readiness', auth, async (req, res) => {
+  const [wg, ag, caddy] = await Promise.all([
+    checkService('wg-easy', `${WG_URL}/api/session`, [200, 401]),
+    checkService('adguard', `${AG_URL}/control/status`, [200, 401]),
+    tcpOpen(getHostIp(), 443).then(up => ({ name: 'caddy', up })),
+  ]);
+  const portal = { name: 'portal', up: true };
+  const services = loadProxyServices();
+  const devices  = loadDevices();
+  const monitors = loadMonitors();
+  const apps     = loadApps();
+  res.json({
+    vpsHost: VPS_HOST, vpnSubnet: VPN_SUBNET,
+    services: { wg, ag, caddy, portal },
+    counts: {
+      devices:  Object.keys(devices).length,
+      proxySvc: Object.keys(services).length,
+      monitors: Object.keys(monitors).length,
+      apps:     Object.keys(apps).length,
+    },
+    readyForMigration: wg.up && ag.up,
+  });
+});
+
+app.get('/api/migration/dns-plan', auth, (req, res) => {
+  const services = loadProxyServices();
+  const domains = [];
+  if (VPS_HOST) {
+    for (const svc of Object.values(services)) {
+      if (svc.exposure === 'public' && svc.domain) {
+        domains.push({ domain: svc.domain, currentIp: VPS_HOST, service: svc.name });
+      }
+    }
+  }
+  res.json({ currentIp: VPS_HOST, domains });
+});
+
+app.get('/api/migration/client-impact', auth, async (req, res) => {
+  try {
+    const cfgRaw = await wgFetch('/api/wireguard/client');
+    const clients = Array.isArray(cfgRaw) ? cfgRaw : (cfgRaw?.data || []);
+    const usesIp = VPS_HOST && /^\d+\.\d+\.\d+\.\d+$/.test(VPS_HOST);
+    res.json({
+      endpointType: usesIp ? 'ip' : 'hostname',
+      endpoint: VPS_HOST,
+      clientCount: clients.length,
+      clientsNeedUpdate: usesIp,
+      message: usesIp
+        ? 'WireGuard endpoint is an IP address. Clients must be regenerated or updated after migration.'
+        : 'WireGuard endpoint is a hostname. Clients will reconnect automatically after DNS update.',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/migration/export', auth, async (req, res) => {
+  try {
+    const filename = await createBackupArchive(false);
+    res.json({ ok: true, filename, path: path.join(BACKUP_DIR, filename) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/migration/checklist', auth, async (req, res) => {
+  const services = loadProxyServices();
+  const domains = Object.values(services).filter(s => s.exposure === 'public').map(s => s.domain);
+  const usesIp = VPS_HOST && /^\d+\.\d+\.\d+\.\d+$/.test(VPS_HOST);
+  const steps = [
+    { step: 1, title: 'Create migration backup on old VPS', cmd: './easywg backup', value: 'backup file in ./backups/' },
+    { step: 2, title: 'Download backup to local machine', detail: 'Download via portal Backups tab or scp', value: null },
+    { step: 3, title: 'Set up new VPS with Easy-WG-Combo', detail: 'Run bootstrap.sh on the new VPS', value: null },
+    { step: 4, title: 'Upload backup to new VPS', detail: 'scp backup.tar.gz root@new-vps:/root/Easy-WG-Combo/backups/', value: null },
+    { step: 5, title: 'Run restore dry-run on new VPS', cmd: './easywg restore --dry-run <file>', value: null },
+    { step: 6, title: 'Restore on new VPS', cmd: './easywg restore <file>', value: null },
+    { step: 7, title: 'Validate services on new VPS', detail: './easywg health', value: null },
+    { step: 8, title: 'Update DNS records', detail: domains.length ? `Update: ${domains.join(', ')} → new IP` : 'No public domains configured', value: VPS_HOST || 'unknown' },
+    { step: 9, title: 'Test WireGuard clients', detail: usesIp ? 'REQUIRED: Clients use old IP — regenerate configs' : 'Clients reconnect automatically after DNS TTL', value: VPS_HOST },
+    { step: 10, title: 'Decommission old VPS', detail: 'Verify all services work on new VPS first', value: null },
+  ];
+  res.json({ steps, currentIp: VPS_HOST, domains, endpointType: usesIp ? 'ip' : 'hostname' });
+});
+
+app.post('/api/migration/validate', auth, async (req, res) => {
+  const [wg, ag, caddyUp] = await Promise.all([
+    checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
+    checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
+    tcpOpen(getHostIp(), 443),
+  ]);
+  const monitors = loadMonitors();
+  const devices  = loadDevices();
+  const services = loadProxyServices();
+  const apps     = loadApps();
+  res.json({
+    services: {
+      'wg-easy': wg.up, 'adguard': ag.up, 'caddy': caddyUp, 'portal': true,
+    },
+    data: {
+      devices:  Object.keys(devices).length,
+      monitors: Object.keys(monitors).length,
+      services: Object.keys(services).length,
+      apps:     Object.keys(apps).length,
+    },
+    score: [wg.up, ag.up, caddyUp].filter(Boolean).length,
+    maxScore: 3,
+  });
+});
+
+// ── Phase 3: Monitor scheduler ────────────────────────────────────────────────
+setInterval(() => {
+  const monitors = loadMonitors();
+  for (const m of Object.values(monitors)) {
+    if (!m.enabled) continue;
+    if (m.nextCheckAt && Date.now() < new Date(m.nextCheckAt).getTime()) continue;
+    runMonitorCheck(m);
+  }
+}, 60_000);
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, HOST, () => console.log(`Portal listening on ${HOST}:${PORT}`));

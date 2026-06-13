@@ -57,6 +57,7 @@ services:
       - FAIL2BAN_LOG=/var/log/fail2ban.log
       - BACKUP_DIR=/backups
       - BACKUP_KEEP=${BACKUP_KEEP:-10}
+      - WG_HOST=${WG_HOST}
       - ALERT_DISK_THRESHOLD=${ALERT_DISK_THRESHOLD:-85}
       - ALERT_CERT_EXPIRY_DAYS=${ALERT_CERT_EXPIRY_DAYS:-14}
       - WG_DEFAULT_DNS=${WG_DEFAULT_DNS:-10.8.0.1}
@@ -65,8 +66,8 @@ services:
       - /var/run/fail2ban:/var/run/fail2ban
       - ./caddy/logs:/var/log/easy-wg-portal:ro
       - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
-      # Health module: Docker socket for container status
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Health module + App Launcher: Docker socket (writable for app lifecycle management)
+      - /var/run/docker.sock:/var/run/docker.sock
       # Security module: read host config files for security checks
       - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
       - /etc/ufw:/etc/ufw:ro
@@ -81,6 +82,8 @@ services:
       - ./backups:/backups
       # Phase 2: portal writes easywg-services.caddy; Caddyfile read for reload
       - ./caddy:/app-caddy:rw
+      # Phase 3: File Drop storage (separate from portal data for easy exclusion from backup)
+      - ./filedrop:/filedrop:rw
     depends_on:
       - wg-easy
       - adguard
