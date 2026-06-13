@@ -1789,17 +1789,29 @@ function generateCaddyServices(services) {
 async function reloadCaddy() {
   try {
     const caddyText = fs.readFileSync(CADDY_FILE, 'utf8');
-    const ctrl  = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const r = await fetch('http://localhost:2019/load', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/caddyfile', 'Cache-Control': 'must-revalidate' },
-      body: caddyText,
-      signal: ctrl.signal,
+    return await new Promise(resolve => {
+      const req = http.request({
+        host: '127.0.0.1',
+        port: 2019,
+        path: '/load',
+        method: 'POST',
+        headers: {
+          // Caddy v2.8+ uses Host header for DNS-rebinding protection — must match admin listen address
+          'Host': 'localhost:2019',
+          'Content-Type': 'text/caddyfile',
+          'Cache-Control': 'must-revalidate',
+          'Content-Length': Buffer.byteLength(caddyText),
+        },
+      }, res => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, body }));
+      });
+      req.setTimeout(8000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+      req.on('error', e => resolve({ ok: false, error: e.message }));
+      req.write(caddyText);
+      req.end();
     });
-    clearTimeout(timer);
-    const body = await r.text();
-    return { ok: r.ok, status: r.status, body };
   } catch (e) {
     return { ok: false, error: e.message };
   }
