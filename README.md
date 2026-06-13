@@ -14,6 +14,7 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 
 ## Features
 
+### Core VPN & DNS
 - **Dashboard** — connected clients, AdGuard stats (queries, blocked rate), Fail2Ban status
 - **VPN Clients** — create/delete clients with DNS preset choice and QR code displayed immediately
 - **Change DNS filter** — instant per-client filter change via AdGuard API (no reconnection needed)
@@ -24,6 +25,18 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Server name support** — prompted during deployment, shown in the dashboard, editable later from the UI, and embedded in generated `.conf` filenames
 - **Auto HTTPS admin access** — Caddy reverse proxy with automatic certificate management (domain) or internal TLS fallback (IP)
 - **Security tab** — full Fail2Ban management: ban/unban IPs, IP whitelist, live config edit, jail log viewer, active session management, TLS certificate info, access log viewer with filters, service health status, password change
+
+### Phase 2 — Devices, DNS Profiles & Gateway
+- **Device inventory** — per-device metadata, expiry dates, routing mode, enable/disable/revoke
+- **DNS profiles** — Filtered / Malware-only / No filter / Custom, per-device assignment, timed bypass
+- **Routing wizard** — Full-tunnel, Split-tunnel, Bypass modes per device
+- **Reverse proxy / Gateway** — manage Caddy services (domain → target) from the UI; VPN-only or public exposure
+
+### Phase 3 — Monitoring, Apps, File Drop & Migration
+- **Uptime Monitor** — http/https/tcp/dns/docker/tls/wireguard checks, 60 s background scheduler, alert notifications, history per monitor, auto-seeded defaults on first run
+- **App Launcher** — install and manage 5 curated self-hosted apps (Uptime Kuma, ntfy, FileBrowser, Stirling PDF, Vaultwarden) via Docker Engine API; auto proxy + monitor creation on install
+- **Secure File Drop** — drag-and-drop upload with expiry, download limit, optional password (PBKDF2), public or VPN-only mode; token-gated public download link (no auth required)
+- **Migration Assistant** — service readiness check, DNS plan from live proxy config, WireGuard client impact analysis, numbered checklist with live VPS values, one-click migration backup export
 
 ## Screenshots
 
@@ -217,6 +230,35 @@ echo "export PASSWORD_HASH='<paste hash here>'" > .env.secrets
 > **Always use `./compose.sh`**, not `docker compose` directly.
 > `compose.sh` sources `.env.secrets` which sets `PASSWORD_HASH` in the shell environment,
 > bypassing docker-compose's variable interpolation that would mangle the bcrypt hash.
+
+## CLI (`easywg`) — v3.0.0
+
+All portal features are available from the terminal via `./easywg <command>`.
+
+```
+./easywg status                    # System health summary
+./easywg backup                    # Create a configuration backup
+./easywg restore <file>            # Restore from backup
+
+./easywg device list               # List WireGuard devices
+./easywg dns profiles              # List DNS profiles
+./easywg route set <id> <mode>     # Set routing mode for a device
+./easywg proxy list                # List reverse proxy services
+
+./easywg monitor list              # List uptime monitors
+./easywg monitor check <id>        # Run a check immediately
+./easywg monitor add               # Add a new monitor (interactive)
+
+./easywg app catalog               # List installable apps
+./easywg app list                  # List installed apps
+./easywg app install <id>          # Install an app
+./easywg app logs <id>             # Show container logs
+
+./easywg filedrop list             # List active file shares
+./easywg filedrop upload <file>    # Upload a file, get share link
+./easywg filedrop status           # Show storage usage
+./easywg filedrop cleanup          # Remove expired shares
+```
 
 ## Admin access (SSH tunnel)
 
