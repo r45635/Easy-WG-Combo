@@ -2,13 +2,10 @@
 # App launcher CLI — wraps the portal API
 # Usage: ./easywg app <subcommand> [args]
 #
-# STATUS: EXPERIMENTAL — not yet validated on a live deployment.
-# Docker socket-based container management may fail depending on VPS configuration.
+# STATUS: EXPERIMENTAL — only the catalog command is enabled.
+# Install/start/stop/remove require Docker socket lifecycle management
+# which has not yet been validated on a live deployment.
 set -euo pipefail
-
-echo "⚠  App Launcher is EXPERIMENTAL and has not been validated on a live deployment." >&2
-echo "   Use with caution. Report issues at https://github.com/r45635/Easy-WG-Combo/issues" >&2
-echo "" >&2
 
 PORTAL_URL="${PORTAL_URL:-http://127.0.0.1:8080}"
 PORTAL_PASS="${ADMIN_PASSWORD:-}"
@@ -24,93 +21,40 @@ api() {
   local args=(-s -X "$method" -H "Content-Type: application/json")
   [ -n "$PORTAL_PASS" ] && args+=(-u "admin:${PORTAL_PASS}")
   [ -n "$body" ] && args+=(-d "$body")
-  curl "${args[@]}" "${PORTAL_URL}${path}"
+  local out http_code
+  out=$(curl "${args[@]}" -w '\n%{http_code}' "${PORTAL_URL}${path}")
+  http_code="${out##*$'\n'}"
+  out="${out%$'\n'*}"
+  if [ "$http_code" = "401" ]; then
+    echo "Error: Authentication failed. Check ADMIN_PASSWORD." >&2; exit 1
+  fi
+  if ! echo "$out" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
+    echo "Error: Portal API returned unexpected response (not JSON). Is the portal running?" >&2; exit 1
+  fi
+  echo "$out"
 }
 
-SUBCMD="${1:-list}"
+SUBCMD="${1:-catalog}"
 shift || true
 
 case "$SUBCMD" in
   catalog)
-    echo "=== Available Apps ==="
     api GET /api/apps/catalog | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-for a in data.get('catalog', []):
-    print(f\"  {a['id']:<20} {a['name']:<20} port={a['internalPort']}  min={a['minRamMb']}MB  {a['description']}\")
+catalog = data.get('catalog', [])
+if not catalog:
+    print('  (no apps in catalog)')
+    sys.exit(0)
+print(f'  {\"ID\":<20} {\"Name\":<20} {\"Port\":<8} {\"Min RAM\":<10} Description')
+print('  ' + '-'*90)
+for a in catalog:
+    print(f\"  {a['id']:<20} {a['name']:<20} {a['internalPort']:<8} {a['minRamMb']}MB  {a['description']}\")
 " 2>/dev/null || api GET /api/apps/catalog
     ;;
-  list)
-    echo "=== Installed Apps ==="
-    api GET /api/apps | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-apps = data.get('apps', [])
-if not apps:
-    print('  (none installed)')
-for a in apps:
-    status = 'RUNNING' if a.get('running') else a.get('containerStatus', 'stopped').upper()
-    domain = a.get('domain', '')
-    print(f\"  {a['id']:<20} {status:<12} {domain}\")
-" 2>/dev/null || api GET /api/apps
-    ;;
-  install)
-    ID="${1:?Usage: ./easywg app install <app-id>}"
-    read -r -p "Exposure [vpn_only/public] (default: vpn_only): " exposure
-    exposure="${exposure:-vpn_only}"
-    confirmed="false"
-    domain=""
-    if [ "$exposure" = "public" ]; then
-      read -r -p "WARNING: App will be publicly accessible. Confirm? [y/N]: " c
-      [ "${c,,}" = "y" ] || exit 0
-      confirmed="true"
-      read -r -p "Domain (e.g. app.example.com): " domain
-    fi
-    api POST "/api/apps/${ID}/install" "{\"exposure\":\"$exposure\",\"domain\":\"$domain\",\"confirmed\":$confirmed}"
-    echo "App $ID install requested."
-    ;;
-  start)
-    ID="${1:?Usage: ./easywg app start <app-id>}"
-    api POST "/api/apps/${ID}/start" '{}'
-    echo "App $ID started."
-    ;;
-  stop)
-    ID="${1:?Usage: ./easywg app stop <app-id>}"
-    api POST "/api/apps/${ID}/stop" '{}'
-    echo "App $ID stopped."
-    ;;
-  restart)
-    ID="${1:?Usage: ./easywg app restart <app-id>}"
-    api POST "/api/apps/${ID}/restart" '{}'
-    echo "App $ID restarted."
-    ;;
-  logs)
-    ID="${1:?Usage: ./easywg app logs <app-id>}"
-    api GET "/api/apps/${ID}/logs" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-print(data.get('logs', '(no logs)'))
-" 2>/dev/null || api GET "/api/apps/${ID}/logs"
-    ;;
-  update)
-    ID="${1:?Usage: ./easywg app update <app-id>}"
-    echo "Pulling latest image and restarting $ID..."
-    api POST "/api/apps/${ID}/update" '{}'
-    echo "App $ID updated."
-    ;;
-  remove)
-    ID="${1:?Usage: ./easywg app remove <app-id>}"
-    read -r -p "Remove app ${ID}? [y/N]: " confirm
-    [ "${confirm,,}" = "y" ] || exit 0
-    delete_data="false"
-    read -r -p "Also delete app data volumes? (cannot be undone) [y/N]: " del
-    [ "${del,,}" = "y" ] && delete_data="true"
-    api POST "/api/apps/${ID}/remove" "{\"confirmed\":true,\"deleteData\":${delete_data}}"
-    echo "App $ID removed."
-    ;;
   *)
-    echo "Unknown app subcommand: $SUBCMD" >&2
-    echo "Use: catalog | list | install | start | stop | restart | logs | update | remove" >&2
-    exit 1
+    echo "Apps module is experimental and not yet enabled." >&2
+    echo "Only 'catalog' is available: ./easywg app catalog" >&2
+    exit 2
     ;;
 esac
