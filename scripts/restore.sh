@@ -80,7 +80,6 @@ fi
 log "Creating pre-restore safety backup…"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_DIR/backups}"
 mkdir -p "$BACKUP_DIR"
-PRE_RESTORE_ARCHIVE="$BACKUP_DIR/pre-restore-$(date +%Y%m%d-%H%M%S).tar.gz"
 bash "$SCRIPT_DIR/backup.sh" --output "$BACKUP_DIR" 2>/dev/null || warn "Pre-restore backup failed — continuing anyway."
 ok "Pre-restore backup saved to $BACKUP_DIR"
 
