@@ -72,6 +72,7 @@ All endpoints require authentication (session cookie or HTTP Basic auth).
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/monitors` | List all monitors (seeds defaults if empty) |
+| GET | `/api/monitors/:id` | Get a single monitor by ID |
 | POST | `/api/monitors` | Create a monitor |
 | PATCH | `/api/monitors/:id` | Update monitor fields |
 | DELETE | `/api/monitors/:id` | Delete a monitor |
@@ -153,3 +154,12 @@ Monitor configuration and history are stored in `/data/monitors.json` and `/data
   ]
 }
 ```
+
+## Known Limitations
+
+- **TLS checks on Caddy internal certificates**: Caddy uses a self-signed "Caddy Local Authority" cert by default. The TLS monitor reports this as "down" because the cert is issued to a local CA not trusted externally. This is expected — Caddy auto-renews and the monitor will recover once a real ACME cert is in place.
+- **Scheduler first-tick delay**: The scheduler fires every 60 seconds from process start, not from when a monitor is created. A newly added monitor may take up to 90 seconds for its first auto-check.
+- **DNS resolver container reachability**: DNS checks use `127.0.0.1:53` (AdGuard Home) by default. A custom resolver must be reachable from within the portal container network.
+- **History cap**: Monitor history is capped at 100 entries per monitor. Older entries are dropped automatically.
+- **Notifications require configuration**: Alerts are not sent unless a notification channel (email or webhook) is configured under Settings → Notifications. Monitoring works without it.
+- **No alerting cooldown**: Once a monitor is "down", the system sends one alert and suppresses repeats until recovery. Recovery triggers a single "recovered" alert. There is currently no additional cooldown period beyond this.
