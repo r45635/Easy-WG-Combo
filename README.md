@@ -226,6 +226,7 @@ Run `./easywg help` for the full command list.
 | [Setup guide](docs/setup.md) | Bootstrap options, manual install, env variables, Fail2Ban, firewall |
 | [Interface modes](docs/interface-modes.md) | User / Super User / Advanced breakdown |
 | [Feature status](docs/feature-status.md) | Detailed status for all features |
+| [Experimental features](docs/experimental-features.md) | Gateway, Apps, File Drop, Migration — what works and what doesn't |
 | [Security model](docs/security-model.md) | Threat model, exposure modes, sensitive operations |
 | [Gateway](docs/gateway.md) | Reverse proxy / Caddy services |
 | [Monitoring](docs/monitoring.md) | Uptime check types, CLI, auto-seeded defaults |
