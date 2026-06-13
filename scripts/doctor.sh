@@ -124,8 +124,8 @@ fi
 
 echo ""
 
-# ── Phase 3 ───────────────────────────────────────────────────────────────────
-echo "Phase 3:"
+# ── Features ─────────────────────────────────────────────────────────────────
+echo "Features:"
 
 # monitor.sh present and executable
 if [ -x "$SCRIPT_DIR/scripts/monitor.sh" ]; then

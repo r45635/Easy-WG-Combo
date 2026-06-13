@@ -35,7 +35,7 @@ Commands:
   notify status             Show notification configuration status
   notify send "<message>"   Send a custom notification
 
-  migrate                   Migrate existing deployment to Phase 2 (run once after upgrade)
+  migrate                   Run in-place upgrade migration helper (run once after upgrading from early versions)
 
   device list               List all devices
   device create             Create a new WireGuard device

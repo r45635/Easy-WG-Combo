@@ -1,4 +1,4 @@
-# Uptime Monitor — Easy-WG-Combo Phase 3A
+# Uptime Monitor
 
 The Uptime Monitor checks your services on a configurable schedule and sends alerts when something goes down or recovers.
 

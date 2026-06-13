@@ -1,20 +1,20 @@
-# Migration Assistant — Phase 3 Preview
+# Migration Assistant — Preview
 
 The Migration Assistant helps with two related but distinct tasks:
 
-1. **Phase 2 upgrade migration** (currently available) — migrate an existing Easy-WG-Combo installation to Phase 2 features (device inventory, DNS profiles, gateway services).
+1. **In-place upgrade migration** (currently available) — migrate an existing Easy-WG-Combo installation to include device inventory, DNS profiles and gateway services.
 2. **Full VPS-to-VPS migration** (planned, not yet implemented) — move an entire Easy-WG-Combo deployment from one VPS to another.
 
-**Current status: Phase 2 helper only.** The portal UI shows a Migration tab with a checklist view, but assisted VPS migration is not yet implemented.
+**Current status: in-place upgrade helper only.* The portal UI shows a Migration tab with a checklist view, but assisted VPS migration is not yet implemented.
 
 ---
 
 ## What is currently available
 
-### Phase 2 upgrade helper (`./easywg migrate`)
+### In-place upgrade helper (`./easywg migrate`)
 
 Routes to `scripts/migrate-phase2.sh`, which:
-- Checks your current configuration against Phase 2 requirements
+- Checks your current configuration against current feature requirements
 - Guides you through the upgrade process
 - Is safe to run on an existing installation
 
@@ -64,4 +64,4 @@ The Migration tab will guide through each step with live status checks.
 
 ## When to use `./easywg migrate` today
 
-Run it when upgrading an existing Easy-WG-Combo installation that was set up before Phase 2 was introduced. It is safe to run on a live deployment and will not modify WireGuard client configurations.
+Run it when upgrading from early versions of Easy-WG-Combo. It is safe to run on a live deployment and will not modify WireGuard client configurations.

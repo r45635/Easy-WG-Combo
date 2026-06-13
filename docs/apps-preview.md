@@ -1,4 +1,4 @@
-# App Launcher — Phase 3 Preview
+# App Launcher — Preview
 
 The App Launcher lets you install and manage curated self-hosted applications via the Docker Engine API.
 

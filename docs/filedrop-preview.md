@@ -1,4 +1,4 @@
-# File Drop — Phase 3 Preview
+# File Drop — Preview
 
 File Drop provides temporary encrypted file sharing: upload a file, get an unguessable token link, share it with VPN users (or publicly with explicit confirmation).
 
