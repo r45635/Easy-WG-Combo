@@ -7,6 +7,8 @@ WireGuard + AdGuard DNS filtering + a clean admin portal — all self-hosted, no
 
 ![Easy-WG-Combo dashboard](docs/screenshots/dashboard.png)
 
+![Easy-WG-Combo settings — interface profiles](docs/screenshots/settings.png)
+
 - **VPN in minutes** — create clients with QR codes instantly, share with anyone
 - **DNS protection** — block ads and malware per device, switch presets without reconnecting
 - **Three UI levels** — from simple (just connect devices) to full control (raw config, apps, gateway)
