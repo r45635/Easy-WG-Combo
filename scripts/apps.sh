@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # App launcher CLI — wraps the portal API
 # Usage: ./easywg app <subcommand> [args]
+#
+# STATUS: EXPERIMENTAL — not yet validated on a live deployment.
+# Docker socket-based container management may fail depending on VPS configuration.
 set -euo pipefail
+
+echo "⚠  App Launcher is EXPERIMENTAL and has not been validated on a live deployment." >&2
+echo "   Use with caution. Report issues at https://github.com/r45635/Easy-WG-Combo/issues" >&2
+echo "" >&2
 
 PORTAL_URL="${PORTAL_URL:-http://127.0.0.1:8080}"
 PORTAL_PASS="${ADMIN_PASSWORD:-}"

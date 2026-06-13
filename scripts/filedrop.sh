@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # File drop CLI — wraps the portal API
 # Usage: ./easywg filedrop <subcommand> [args]
+#
+# STATUS: EXPERIMENTAL — not yet validated on a live deployment.
+# Requires busboy npm dependency and a writable ./filedrop volume.
 set -euo pipefail
+
+echo "⚠  File Drop is EXPERIMENTAL and has not been validated on a live deployment." >&2
+echo "   Requires: busboy npm package installed, ./filedrop volume mounted." >&2
+echo "" >&2
 
 PORTAL_URL="${PORTAL_URL:-http://127.0.0.1:8080}"
 PORTAL_PASS="${ADMIN_PASSWORD:-}"

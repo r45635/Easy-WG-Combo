@@ -32,11 +32,16 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Routing wizard** — Full-tunnel, Split-tunnel, Bypass modes per device
 - **Reverse proxy / Gateway** — manage Caddy services (domain → target) from the UI; VPN-only or public exposure
 
-### Phase 3 — Monitoring, Apps, File Drop & Migration
+### Phase 3A — Uptime Monitor *(MVP — validated)*
 - **Uptime Monitor** — http/https/tcp/dns/docker/tls/wireguard checks, 60 s background scheduler, alert notifications, history per monitor, auto-seeded defaults on first run
-- **App Launcher** — install and manage 5 curated self-hosted apps (Uptime Kuma, ntfy, FileBrowser, Stirling PDF, Vaultwarden) via Docker Engine API; auto proxy + monitor creation on install
-- **Secure File Drop** — drag-and-drop upload with expiry, download limit, optional password (PBKDF2), public or VPN-only mode; token-gated public download link (no auth required)
-- **Migration Assistant** — service readiness check, DNS plan from live proxy config, WireGuard client impact analysis, numbered checklist with live VPS values, one-click migration backup export
+- See [docs/monitoring.md](docs/monitoring.md) for full reference.
+
+### Phase 3B–D — App Launcher, File Drop, Migration *(Experimental — not yet validated)*
+> These features are implemented but have **not been validated** on a live deployment. They are accessible in the portal UI and CLI but may fail depending on VPS configuration. Use with caution.
+
+- **App Launcher** *(experimental)* — install/manage 5 curated self-hosted apps via Docker Engine API; requires writable Docker socket
+- **Secure File Drop** *(experimental)* — drag-and-drop upload, password protection, expiry, token-gated public download; requires `busboy` npm package and `./filedrop` volume
+- **Migration Assistant** *(experimental)* — service readiness check, DNS plan, WireGuard client impact analysis, migration checklist and backup export
 
 ## Screenshots
 

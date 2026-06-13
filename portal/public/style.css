@@ -582,3 +582,4 @@ tbody tr:last-child td { border-bottom: none; }
 .checklist-step::before { counter-increment: step; content: counter(step); position: absolute; left: .5rem; top: .65rem; background: var(--primary); color: #fff; border-radius: 50%; width: 1.3em; height: 1.3em; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; }
 .text-dim { color: var(--text-dim); }
 .text-muted { color: var(--text-muted, #6b7280); }
+.experimental-banner { background: #78350f30; border: 1px solid #92400e60; color: #fbbf24; border-radius: var(--radius); padding: .6rem .9rem; font-size: .82rem; margin-bottom: .9rem; }

@@ -657,6 +657,7 @@
             <button class="btn-ghost btn-sm" id="apps-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
           </div>
         </div>
+        <div class="experimental-banner">⚠ <strong>Experimental</strong> — App Launcher has not been validated on a live deployment. Docker socket management may fail depending on VPS configuration.</div>
         <div id="apps-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
         <div id="apps-wrap" class="hidden">
           <div class="section-header"><h3 data-i18n="apps.catalog">App Catalog</h3></div>
@@ -675,9 +676,10 @@
           <div><h2 data-i18n="nav.filedrop">File Drop</h2></div>
           <div class="page-actions">
             <button class="btn-ghost btn-sm" id="filedrop-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
-            <button class="btn-ghost btn-sm" id="filedrop-cleanup-btn" data-i18n="filedrop.cleanup">↻ Cleanup</button>
           </div>
         </div>
+        <div class="experimental-banner">⚠ <strong>Experimental</strong> — File Drop has not been validated on a live deployment. Requires the <code>busboy</code> npm package and the <code>./filedrop</code> volume mounted.</div>
+        <button class="btn-ghost btn-sm" id="filedrop-cleanup-btn" data-i18n="filedrop.cleanup" style="display:none">↻ Cleanup</button>
         <div id="filedrop-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
         <div id="filedrop-wrap" class="hidden">
           <!-- Upload area -->
