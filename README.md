@@ -43,6 +43,25 @@ All admin UIs are localhost-only. Access via SSH tunnel.
 - **Secure File Drop** *(experimental)* — drag-and-drop upload, password protection, expiry, token-gated public download; requires `busboy` npm package and `./filedrop` volume
 - **Migration Assistant** *(experimental)* — service readiness check, DNS plan, WireGuard client impact analysis, migration checklist and backup export
 
+## Feature Status
+
+| Area | Status |
+|---|---|
+| WireGuard client management | Stable |
+| AdGuard DNS filtering | Stable |
+| Security Center | Beta |
+| Backup / Restore | Beta |
+| Notifications | Beta |
+| Device Inventory | Experimental |
+| DNS Profiles | Experimental |
+| Gateway / Reverse Proxy | Experimental |
+| Monitoring | Phase 3A MVP |
+| Apps | Phase 3 preview |
+| File Drop | Phase 3 preview |
+| Migration Assistant | Phase 3 preview |
+
+See [docs/phase-3-status.md](docs/phase-3-status.md) for details on Phase 3 module status.
+
 ## Screenshots
 
 ### Dashboard
@@ -242,6 +261,7 @@ All portal features are available from the terminal via `./easywg <command>`.
 
 ```
 ./easywg status                    # System health summary
+./easywg doctor                    # Check installation health (containers, API, security)
 ./easywg backup                    # Create a configuration backup
 ./easywg restore <file>            # Restore from backup
 
@@ -254,15 +274,9 @@ All portal features are available from the terminal via `./easywg <command>`.
 ./easywg monitor check <id>        # Run a check immediately
 ./easywg monitor add               # Add a new monitor (interactive)
 
-./easywg app catalog               # List installable apps
-./easywg app list                  # List installed apps
-./easywg app install <id>          # Install an app
-./easywg app logs <id>             # Show container logs
+./easywg app catalog               # List available apps (preview — other commands disabled)
 
-./easywg filedrop list             # List active file shares
-./easywg filedrop upload <file>    # Upload a file, get share link
-./easywg filedrop status           # Show storage usage
-./easywg filedrop cleanup          # Remove expired shares
+# ./easywg filedrop ...            # File Drop is experimental — use portal UI
 ```
 
 ## Admin access (SSH tunnel)
@@ -288,6 +302,29 @@ Then open: `http://localhost:19080`
 | No filter | Nothing blocked, direct DNS | `10.8.0.1` → upstream `1.1.1.1` |
 
 **Changing filter for a connected client:** click ⚙ in the client table — takes effect immediately via AdGuard per-client settings API. Persistent across reconnections.
+
+## Admin Exposure Modes
+
+Easy-WG-Combo supports two admin exposure modes.
+
+### Local-only mode (safest)
+
+The portal, wg-easy, and AdGuard Home admin interfaces are bound to localhost and accessed via SSH tunnel. No admin port is reachable from the internet.
+
+This is the recommended mode for maximum security.
+
+```bash
+ssh -i ~/.ssh/your_key -L 19080:localhost:8080 -N root@YOUR_VPS_IP
+# Then open: http://localhost:19080
+```
+
+### Public HTTPS mode
+
+The portal can optionally be exposed publicly over HTTPS through Caddy (`PUBLIC_HTTPS_ENABLED=yes` in `.env`). This is convenient but increases the attack surface.
+
+**If you enable public HTTPS:** use a strong password, keep Fail2Ban active, and consider IP allowlisting.
+
+Public HTTPS is enabled by default in the current installer — check your `.env` file to confirm your chosen mode.
 
 ## Architecture notes
 
