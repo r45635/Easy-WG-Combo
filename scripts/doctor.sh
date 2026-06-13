@@ -55,8 +55,9 @@ else
   fail "wg-easy container is not running — start with: ./compose.sh up -d"
 fi
 
-# AdGuard container
-if docker inspect adguardhome --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
+# AdGuard container (may be named 'adguard' or 'adguardhome')
+if docker inspect adguard --format '{{.State.Running}}' 2>/dev/null | grep -q true || \
+   docker inspect adguardhome --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
   ok "AdGuard Home container is running"
 else
   fail "AdGuard Home container is not running — start with: ./compose.sh up -d"
