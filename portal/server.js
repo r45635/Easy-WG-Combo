@@ -2385,7 +2385,10 @@ async function checkDockerContainer(name) {
 async function checkTlsDaysLeft(host, port) {
   return new Promise(resolve => {
     const tls = require('tls');
-    const sock = tls.connect({ host, port, rejectUnauthorized: false, servername: host }, () => {
+    const isIp = /^[\d.:]+$/.test(host);
+    const opts = { host, port, rejectUnauthorized: false };
+    if (!isIp) opts.servername = host;
+    const sock = tls.connect(opts, () => {
       try {
         const cert = sock.getPeerCertificate();
         sock.destroy();
@@ -2464,7 +2467,7 @@ function seedDefaultMonitors() {
     { id: 'mon_wgeasy',  name: 'wg-easy',      type: 'docker', target: 'wg-easy' },
     { id: 'mon_adguard', name: 'AdGuard Home', type: 'docker', target: 'adguard' },
     { id: 'mon_caddy',   name: 'Caddy',        type: 'docker', target: 'caddy' },
-    { id: 'mon_dns',     name: 'AdGuard DNS',  type: 'dns',    target: 'example.com', resolver: VPN_DNS_IP },
+    { id: 'mon_dns',     name: 'AdGuard DNS',  type: 'dns',    target: 'example.com', resolver: '127.0.0.1' },
   ];
   if (VPS_HOST) {
     defaults.push({ id: 'mon_tls', name: 'TLS Certificate', type: 'tls', target: `${VPS_HOST}:443` });
