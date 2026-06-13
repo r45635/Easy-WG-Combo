@@ -802,11 +802,12 @@ async function checkService(name, url, okStatuses = [200, 401]) {
 }
 
 app.get('/api/system/status', auth, async (_req, res) => {
-  const [wg, ag, caddy] = await Promise.all([
+  const [wg, ag, caddyUp] = await Promise.all([
     checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
-    checkService('adguard',  `${AG_URL}/control/status`, [200]),
-    checkService('caddy',    'http://127.0.0.1:2019/',   [200]),
+    checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
+    tcpOpen(getHostIp(), 443),
   ]);
+  const caddy = { name: 'caddy', up: caddyUp };
   res.json({ 'wg-easy': wg, adguard: ag, caddy, portal: { name: 'portal', up: true } });
 });
 
@@ -875,6 +876,28 @@ app.get('/api/geoip/:ip', auth, async (req, res) => {
 });
 
 // ── Docker API (Unix socket) ──────────────────────────────────────────────────
+
+// Returns the first non-loopback IPv4 on the host (used for TLS / Caddy checks).
+function getHostIp() {
+  const ifaces = os.networkInterfaces();
+  for (const iface of Object.values(ifaces)) {
+    for (const addr of (iface || [])) {
+      if (addr.family === 'IPv4' && !addr.internal) return addr.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+// TCP port-open check (used for Caddy whose admin API is disabled).
+function tcpOpen(host, port, timeoutMs = 2500) {
+  return new Promise(resolve => {
+    const net = require('net');
+    const sock = net.createConnection({ host, port });
+    const timer = setTimeout(() => { sock.destroy(); resolve(false); }, timeoutMs);
+    sock.once('connect', () => { clearTimeout(timer); sock.destroy(); resolve(true); });
+    sock.once('error',   () => { clearTimeout(timer); resolve(false); });
+  });
+}
 
 function dockerApiRequest(apiPath) {
   return new Promise((resolve, reject) => {
@@ -964,11 +987,12 @@ app.get('/api/health', auth, async (_req, res) => {
 
 app.get('/api/health/services', auth, async (_req, res) => {
   try {
-    const [wg, ag, caddy] = await Promise.all([
+    const [wg, ag, caddyUp] = await Promise.all([
       checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
-      checkService('adguard',  `${AG_URL}/control/status`, [200]),
-      checkService('caddy',    'http://127.0.0.1:2019/',   [200]),
+      checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
+      tcpOpen(getHostIp(), 443),
     ]);
+    const caddy = { name: 'caddy', up: caddyUp };
 
     // Docker containers via socket
     let containers = [];
@@ -1062,7 +1086,8 @@ async function computeSecurityScore() {
   try {
     const tls = require('tls');
     await new Promise((resolve, reject) => {
-      const sock = tls.connect({ host: '127.0.0.1', port: 443, rejectUnauthorized: false, servername: 'localhost' }, () => {
+      const hostIp = getHostIp();
+      const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => {
         const cert = sock.getPeerCertificate();
         sock.destroy();
         if (cert.valid_to) {
@@ -1446,11 +1471,12 @@ async function checkAlerts() {
 
   // Services down
   try {
-    const [wg, ag, caddy] = await Promise.all([
+    const [wg, ag, caddyUp] = await Promise.all([
       checkService('wg-easy', `${WG_URL}/api/session`, [200, 401]),
-      checkService('adguard', `${AG_URL}/control/status`, [200]),
-      checkService('caddy', 'http://127.0.0.1:2019/', [200]),
+      checkService('adguard', `${AG_URL}/control/status`, [200, 401]),
+      tcpOpen(getHostIp(), 443),
     ]);
+    const caddy = { name: 'caddy', up: caddyUp };
     for (const svc of [wg, ag, caddy]) {
       if (!svc.up) await sendNotification('service_down', { service: svc.name });
     }
