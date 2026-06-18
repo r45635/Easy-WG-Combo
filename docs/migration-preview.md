@@ -5,7 +5,7 @@ The Migration Assistant helps with two related but distinct tasks:
 1. **In-place upgrade migration** (currently available) — migrate an existing Easy-WG-Combo installation to include device inventory, DNS profiles and gateway services.
 2. **Full VPS-to-VPS migration** (planned, not yet implemented) — move an entire Easy-WG-Combo deployment from one VPS to another.
 
-**Current status: in-place upgrade helper only.* The portal UI shows a Migration tab with a checklist view, but assisted VPS migration is not yet implemented.
+**Current status: in-place upgrade helper only.** The portal UI shows a Migration tab with a checklist view, but assisted VPS migration is not yet implemented.
 
 ---
 
@@ -13,7 +13,7 @@ The Migration Assistant helps with two related but distinct tasks:
 
 ### In-place upgrade helper (`./easywg migrate`)
 
-Routes to `scripts/migrate-phase2.sh`, which:
+Routes to `scripts/migrate.sh`, which:
 - Checks your current configuration against current feature requirements
 - Guides you through the upgrade process
 - Is safe to run on an existing installation

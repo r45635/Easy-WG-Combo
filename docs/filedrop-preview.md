@@ -64,4 +64,4 @@ File Drop is security-sensitive. The following audit items must be completed bef
 
 ## How to track progress
 
-To enable File Drop, all items in the requirements table above must be validated on a live VPS deployment. Open an issue or PR referencing this file.
+To enable File Drop, all items in the requirements table above must be validated on a live VPS deployment.

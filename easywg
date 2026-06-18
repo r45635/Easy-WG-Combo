@@ -139,7 +139,7 @@ case "${1:-}" in
     bash "$SCRIPTS_DIR/notify.sh" "$SUBCMD" "$@"
     ;;
   migrate)
-    bash "$SCRIPTS_DIR/migrate-phase2.sh"
+    bash "$SCRIPTS_DIR/migrate.sh"
     ;;
   device)
     shift

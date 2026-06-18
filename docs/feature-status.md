@@ -45,7 +45,7 @@
 | Gateway / Reverse Proxy | Experimental | Caddy-based service exposure; VPN-only or public HTTPS |
 | Apps | Preview | Catalog readable; install/manage not validated for production |
 | File Drop | Preview | UI available; public link security not fully audited |
-| Migration Assistant | Preview | Checklist and Phase-2 in-place upgrade helper only; VPS-to-VPS not implemented |
+| Migration Assistant | Preview | In-place upgrade helper only; VPS-to-VPS migration not implemented |
 
 ---
 
