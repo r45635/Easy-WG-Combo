@@ -15,6 +15,8 @@ services:
       - WG_PERSISTENT_KEEPALIVE=${WG_PERSISTENT_KEEPALIVE:-25}
       - UI_TRAFFIC_STATS=true
       - UI_CHART_TYPE=1
+      - WG_POST_UP=iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -A INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A PREROUTING -i wg0 -p udp --dport 53 -d 10.8.0.1 -j DNAT --to-destination $$(ip route | awk '/default/ {print $$3; exit}'):53; iptables -t nat -A PREROUTING -i wg0 -p tcp --dport 53 -d 10.8.0.1 -j DNAT --to-destination $$(ip route | awk '/default/ {print $$3; exit}'):53
+      - WG_POST_DOWN=iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables -D INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D PREROUTING -i wg0 -p udp --dport 53 -d 10.8.0.1 -j DNAT --to-destination $$(ip route | awk '/default/ {print $$3; exit}'):53; iptables -t nat -D PREROUTING -i wg0 -p tcp --dport 53 -d 10.8.0.1 -j DNAT --to-destination $$(ip route | awk '/default/ {print $$3; exit}'):53
     volumes:
       - ./wireguard:/etc/wireguard
       - /lib/modules:/lib/modules:ro
@@ -80,9 +82,9 @@ services:
       - ./docker-compose.yml:/backup-src/docker-compose.yml:ro
       - ./compose.sh:/backup-src/compose.sh:ro
       - ./backups:/backups
-      # Phase 2: portal writes easywg-services.caddy; Caddyfile read for reload
+      # Gateway: portal writes easywg-services.caddy; Caddyfile read for reload
       - ./caddy:/app-caddy:rw
-      # Phase 3: File Drop storage (separate from portal data for easy exclusion from backup)
+      # File Drop: storage volume (excluded from portal data for clean backups)
       - ./filedrop:/filedrop:rw
     depends_on:
       - wg-easy
