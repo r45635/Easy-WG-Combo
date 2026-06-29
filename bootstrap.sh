@@ -712,6 +712,9 @@ configure_firewall() {
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
   fi
+  # Allow AdGuard DNS from Docker bridge (wg-easy DNAT forwards VPN client DNS here)
+  run_root ufw allow from 172.16.0.0/12 to any port 53 proto udp comment "AdGuard DNS from Docker"
+  run_root ufw allow from 172.16.0.0/12 to any port 53 proto tcp comment "AdGuard DNS from Docker"
   run_root ufw --force enable
 }
 

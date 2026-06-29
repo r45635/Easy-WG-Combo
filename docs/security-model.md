@@ -102,7 +102,7 @@ Additional ports when public HTTPS is enabled:
 
 Admin ports (8080, 51821, 3000) are always bound to localhost.
 
-Port 53 is open on the `wg0` interface only — only VPN clients can use the DNS resolver.
+Port 53 is exposed on the VPN interface (`wg0` inside the wg-easy container) and on the Docker bridge network (for internal forwarding). VPN client DNS queries are DNAT'd from `wg0` to AdGuard Home on the host; the bridge subnet is allowed through UFW. Port 53 is not exposed publicly on the host's external interface.
 
 ---
 

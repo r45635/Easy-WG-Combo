@@ -57,12 +57,42 @@ fail2ban-client set easy-wg-portal unbanip YOUR_IP
 
 ---
 
+## VPN connected but websites don't load (DNS not working)
+
+WireGuard shows as connected (handshake OK) but DNS lookups fail or browsers can't reach sites.
+
+The client config sends DNS to `10.8.0.1` (the `wg0` address inside the wg-easy container). This must be forwarded via iptables DNAT to AdGuard Home on the Docker bridge gateway.
+
+**Check the DNAT rules are in place inside wg-easy:**
+```bash
+docker exec wg-easy iptables -t nat -L PREROUTING -n -v | grep DNAT
+```
+Expected output: two DNAT lines redirecting UDP and TCP port 53 from wg0 to the Docker gateway.
+
+**Check AdGuard responds from the Docker network:**
+```bash
+docker exec wg-easy nslookup google.com 172.18.0.1
+```
+If this times out, the UFW rule is missing. Add it:
+```bash
+ufw allow from 172.16.0.0/12 to any port 53 proto udp comment "AdGuard DNS from Docker"
+ufw allow from 172.16.0.0/12 to any port 53 proto tcp comment "AdGuard DNS from Docker"
+```
+
+**If DNAT rules are missing** (after a container restart), restart wg-easy — the PostUp in `docker-compose.yml` adds them automatically:
+```bash
+./compose.sh restart wg-easy
+```
+
+---
+
 ## DNS filtering not working for a client
 
 1. Confirm AdGuard Home is running: `./compose.sh ps`
 2. Check the client's DNS is set to `10.8.0.1` in the WireGuard config
 3. In the portal, open the device settings and verify the DNS preset
 4. Check AdGuard Home is listening on port 53: `ss -ulnp | grep :53`
+5. Verify DNAT forwarding (see section above)
 
 ---
 

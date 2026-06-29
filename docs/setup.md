@@ -111,20 +111,24 @@ Ports opened automatically by the installer:
 | `22/tcp` (or `SSH_PORT`) | SSH |
 | `51820/udp` | WireGuard VPN |
 | `80/tcp`, `443/tcp` | HTTPS (only when `PUBLIC_HTTPS_ENABLED=yes`) |
+| `53/udp+tcp` from `172.16.0.0/12` | AdGuard DNS reachable from Docker bridge |
 
 All admin ports (8080, 51821, 3000) are bound to localhost — not reachable from the internet.
 
-Port 53 is open on the `wg0` interface only (VPN clients get DNS).
+Port 53 is exposed to the internet only on the VPN interface (wg0, inside the wg-easy container). VPN clients send DNS to `10.8.0.1`, which is forwarded via iptables DNAT inside the container to AdGuard Home running on the host.
 
 ## Architecture
 
-| Container | Role | Binding |
-|---|---|---|
-| `wg-easy` v14 | WireGuard peer management | `127.0.0.1:51821` |
-| `adguard` | DNS filtering | `0.0.0.0:3000`, `0.0.0.0:53` |
-| `portal` | Admin UI + API | `0.0.0.0:8080` |
+| Container | Network | Role | Admin access |
+|---|---|---|---|
+| `wg-easy` v14 | Docker bridge | WireGuard peer management | `127.0.0.1:51821` |
+| `adguard` | host | DNS filtering + AdGuard UI | `127.0.0.1:3000`, `0.0.0.0:53` |
+| `portal` | host | Admin UI + API | `127.0.0.1:8080` |
+| `caddy` | host | HTTPS reverse proxy | `0.0.0.0:80/443` |
 
-`adguard` and `portal` use `network_mode: host` — required for DNS on port 53 and WireGuard interface access.
+`adguard`, `portal`, and `caddy` use `network_mode: host` — AdGuard needs port 53 on the host; Caddy needs ports 80/443 for ACME.
+
+`wg-easy` runs in a Docker bridge network. Its `wg0` interface (`10.8.0.1`) is inside the container. DNS queries from VPN clients arrive on `wg0` and are DNAT'd to the Docker bridge gateway (`172.18.x.1`) where AdGuard listens.
 
 `wg-easy` is pinned to `v14` — the v1.0.x line has an incompatible API rewrite.
 
