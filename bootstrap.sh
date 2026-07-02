@@ -1001,12 +1001,15 @@ main() {
 
   log "Starting the stack (attempting image rebuild first)..."
   if "$SCRIPT_DIR/compose.sh" up -d --build; then
+    # Reload Caddy to apply the regenerated Caddyfile (compose only restarts on spec change)
+    "$SCRIPT_DIR/compose.sh" restart caddy >/dev/null 2>&1 || true
     print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}" "$xray_enabled" "$caddy_https_port"
     exit 0
   fi
 
   log "Image rebuild failed; retrying without rebuild..."
   "$SCRIPT_DIR/compose.sh" up -d
+  "$SCRIPT_DIR/compose.sh" restart caddy >/dev/null 2>&1 || true
   print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}" "$xray_enabled" "$caddy_https_port"
 }
 
