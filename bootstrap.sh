@@ -150,18 +150,19 @@ print_final_summary() {
   local public_https_enabled="$6"
   local admin_password="$7"
   local tls_email="$8"
+  local xray_enabled="${9:-no}"
+  local caddy_https_port="${10:-8443}"
   local ssh_port="${SSH_PORT:-22}"
   local admin_url=""
 
-  if is_truthy "$public_https_enabled"; then
+  if is_truthy "$xray_enabled"; then
+    admin_url="SSH tunnel → ssh -L 19443:localhost:${caddy_https_port} -N root@${wg_host}"
+  elif is_truthy "$public_https_enabled"; then
     if is_ip_address "${admin_domain:-}"; then
-      # IP-mode: Caddy uses tls internal, access via IP directly
       admin_url="https://${admin_domain}"
     elif [ -n "${tls_email:-}" ] && [ -n "${admin_domain:-}" ]; then
-      # Real FQDN with ACME cert
       admin_url="https://${admin_domain}"
     else
-      # No TLS email or no domain: Caddy uses tls internal, use IP
       admin_url="https://${wg_host}"
     fi
   else
@@ -176,6 +177,11 @@ print_final_summary() {
   log "Admin URL: ${admin_url}"
   log "Admin password: ${admin_password}"
   log "SSH port: ${ssh_port}/tcp"
+  if is_truthy "$xray_enabled"; then
+    log "Xray VLESS+Reality: enabled on port 443"
+    log "  → Client URI: ./easywg xray client-uri"
+    log "  → Admin portal: https://localhost:19443 (after SSH tunnel)"
+  fi
   log "GitHub: ${BOOTSTRAP_REPO_URL}"
   log "Script version: ${BOOTSTRAP_VERSION}"
   log "Script revision: $(git_head_short)"
@@ -601,6 +607,7 @@ resolve_admin_domain() {
 
 configure_caddy() {
   local admin_domain="$1"
+  local caddy_https_port="${2:-}"   # when set, Caddy binds to localhost:$caddy_https_port (Xray mode)
   local portal_port="${PORTAL_PORT:-8080}"
   local tls_email="${TLS_EMAIL:-}"
   local caddy_dir="$SCRIPT_DIR/caddy"
@@ -614,21 +621,29 @@ configure_caddy() {
     printf '# Easy-WG-Combo managed proxy services — edited by the portal, do not edit manually\n' > "$services_file"
   fi
 
-  if [ -z "$admin_domain" ]; then
-    admin_domain=":443"
-  fi
-
   {
     printf '{\n'
-    if [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+    # In Xray mode Caddy is localhost-only; no ACME email needed (tls internal always)
+    if [ -z "$caddy_https_port" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
       printf '  email %s\n' "$tls_email"
     fi
     printf '  admin localhost:2019\n'
     printf '}\n\n'
-    printf '%s {\n' "$admin_domain"
-    if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ] || [ -z "$tls_email" ]; then
+
+    if [ -n "$caddy_https_port" ]; then
+      # Xray mode: Caddy on localhost:$caddy_https_port, SSH tunnel access only
+      printf 'localhost:%s {\n' "$caddy_https_port"
       printf '  tls internal\n'
+    else
+      if [ -z "$admin_domain" ]; then
+        admin_domain=":443"
+      fi
+      printf '%s {\n' "$admin_domain"
+      if is_ip_address "$admin_domain" || [ "$admin_domain" = ":443" ] || [ -z "$tls_email" ]; then
+        printf '  tls internal\n'
+      fi
     fi
+
     printf '  encode zstd gzip\n'
     printf '  log {\n'
     printf '    output file /var/log/easy-wg-portal/access.log\n'
@@ -704,11 +719,15 @@ configure_firewall() {
   local wg_port="$1"
   local ssh_port="${SSH_PORT:-22}"
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
+  local xray_enabled="${XRAY_ENABLED:-no}"
 
   log "Configuring UFW..."
   run_root ufw allow "${ssh_port}/tcp"
   run_root ufw allow "${wg_port}/udp"
-  if is_truthy "$public_https_enabled"; then
+  if is_truthy "$xray_enabled"; then
+    # Xray owns port 443; no HTTP redirect needed. Port 8443 stays localhost-only.
+    run_root ufw allow 443/tcp
+  elif is_truthy "$public_https_enabled"; then
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
   fi
@@ -740,6 +759,110 @@ generate_password_hash() {
   local admin_password="$1"
 
   docker run --rm ghcr.io/wg-easy/wg-easy:14 wgpw "$admin_password" | sed -n "s/^PASSWORD_HASH='\(.*\)'$/\1/p"
+}
+
+set_secret_export() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp_file
+  tmp_file="$(mktemp)"
+  grep -vE "^(export[[:space:]]+)?${key}=" "$file" > "$tmp_file" || true
+  printf "export %s='%s'\n" "$key" "$value" >> "$tmp_file"
+  mv "$tmp_file" "$file"
+}
+
+configure_xray() {
+  local xray_dir="$SCRIPT_DIR/xray"
+  local uuid private_key public_key short_id keypair
+  local sni_target="${XRAY_SNI_TARGET:-www.cloudflare.com}"
+  local xray_port="${XRAY_PORT:-443}"
+
+  mkdir -p "$xray_dir/logs"
+
+  # UUID — non-secret, stored in .env
+  uuid="${XRAY_UUID:-}"
+  if [ -z "$uuid" ]; then
+    if [ -f /proc/sys/kernel/random/uuid ]; then
+      uuid="$(cat /proc/sys/kernel/random/uuid)"
+    else
+      uuid="$(od -x /dev/urandom | head -1 | awk '{OFS="-"; print substr($2$3,1,8), substr($3$4,1,4), "4"substr($4,2,3), substr($5,1,4), $6$7}' | tr '[:upper:]' '[:lower:]')"
+    fi
+    set_env_value "$ENV_FILE" "XRAY_UUID" "$uuid"
+    log "Generated Xray UUID."
+  fi
+
+  # X25519 key pair — private key is secret, public key goes in .env
+  private_key="${XRAY_PRIVATE_KEY:-}"
+  public_key="${XRAY_PUBLIC_KEY:-}"
+  if [ -z "$private_key" ] || [ -z "$public_key" ]; then
+    log "Generating Xray X25519 key pair (pulling image if needed)..."
+    keypair="$(docker run --rm ghcr.io/xtls/xray-core:latest x25519 2>/dev/null)"
+    private_key="$(printf '%s' "$keypair" | grep -i 'private' | awk '{print $NF}')"
+    public_key="$(printf '%s' "$keypair" | grep -i 'public' | awk '{print $NF}')"
+    [ -n "$private_key" ] || die "Failed to generate Xray private key."
+    set_secret_export "$SECRETS_FILE" "XRAY_PRIVATE_KEY" "$private_key"
+    set_env_value "$ENV_FILE" "XRAY_PUBLIC_KEY" "$public_key"
+    log "Generated Xray key pair."
+  fi
+
+  # Short ID — secret, 8 random bytes as hex
+  short_id="${XRAY_SHORT_ID:-}"
+  if [ -z "$short_id" ]; then
+    short_id="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+    set_secret_export "$SECRETS_FILE" "XRAY_SHORT_ID" "$short_id"
+    log "Generated Xray short ID."
+  fi
+
+  set_env_value "$ENV_FILE" "XRAY_SNI_TARGET" "$sni_target"
+  set_env_value "$ENV_FILE" "XRAY_PORT" "$xray_port"
+
+  cat > "$xray_dir/config.json" <<EOF
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/var/log/xray/access.log",
+    "error": "/var/log/xray/error.log"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": ${xray_port},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "${uuid}",
+            "flow": "xtls-rprx-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "${sni_target}:443",
+          "xver": 0,
+          "serverNames": ["${sni_target}"],
+          "privateKey": "${private_key}",
+          "shortIds": ["${short_id}"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    { "protocol": "freedom", "tag": "direct" },
+    { "protocol": "blackhole", "tag": "block" }
+  ]
+}
+EOF
+  log "Xray config written to $xray_dir/config.json"
 }
 
 main() {
@@ -841,10 +964,21 @@ main() {
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
 
+  local xray_enabled="${XRAY_ENABLED:-no}"
+  local caddy_https_port="${CADDY_HTTPS_PORT:-8443}"
+
   configure_sysctl
   configure_firewall "$wg_port"
 
-  if is_truthy "$public_https_enabled"; then
+  if is_truthy "$xray_enabled"; then
+    log "Configuring Xray VLESS+Reality..."
+    configure_xray
+    set_env_value "$ENV_FILE" "CADDY_HTTPS_PORT" "$caddy_https_port"
+    log "Configuring Caddy on localhost:${caddy_https_port} (SSH tunnel access only)..."
+    configure_caddy "$admin_domain" "$caddy_https_port"
+    log "Configuring Fail2Ban protection..."
+    configure_fail2ban
+  elif is_truthy "$public_https_enabled"; then
     log "Configuring Caddy HTTPS reverse proxy..."
     configure_caddy "$admin_domain"
     log "Configuring Fail2Ban protection..."
@@ -853,13 +987,13 @@ main() {
 
   log "Starting the stack (attempting image rebuild first)..."
   if "$SCRIPT_DIR/compose.sh" up -d --build; then
-    print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}"
+    print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}" "$xray_enabled" "$caddy_https_port"
     exit 0
   fi
 
   log "Image rebuild failed; retrying without rebuild..."
   "$SCRIPT_DIR/compose.sh" up -d
-  print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}"
+  print_final_summary "$action_label" "$wg_host" "$wg_port" "$server_name" "$admin_domain" "$public_https_enabled" "$admin_password" "${TLS_EMAIL:-}" "$xray_enabled" "$caddy_https_port"
 }
 
 main "$@"

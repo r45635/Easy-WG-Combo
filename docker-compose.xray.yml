@@ -1,0 +1,26 @@
+# Xray VLESS+Reality overlay — loaded by compose.sh when XRAY_ENABLED=yes
+# Do not use directly; always use ./compose.sh
+
+services:
+
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    container_name: xray
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./xray/config.json:/etc/xray/config.json:ro
+      - ./xray/logs:/var/log/xray
+    command: ["run", "-config", "/etc/xray/config.json"]
+
+  portal:
+    environment:
+      - XRAY_ENABLED=yes
+      - XRAY_UUID=${XRAY_UUID}
+      - XRAY_PUBLIC_KEY=${XRAY_PUBLIC_KEY}
+      - XRAY_SHORT_ID=${XRAY_SHORT_ID}
+      - XRAY_SNI_TARGET=${XRAY_SNI_TARGET:-www.cloudflare.com}
+      - XRAY_PORT=${XRAY_PORT:-443}
+      - CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-8443}
+    volumes:
+      - ./xray:/xray-config:ro

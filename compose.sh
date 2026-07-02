@@ -15,6 +15,17 @@ fi
 set -a
 # shellcheck source=/dev/null
 source "$SECRETS_FILE"
+# Load .env to pick up XRAY_ENABLED (non-secret)
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/.env"
+fi
 set +a
 
-exec docker compose -f "$SCRIPT_DIR/docker-compose.yml" "$@"
+COMPOSE_FILES="-f $SCRIPT_DIR/docker-compose.yml"
+if [ "${XRAY_ENABLED:-no}" = "yes" ] && [ -f "$SCRIPT_DIR/docker-compose.xray.yml" ]; then
+  COMPOSE_FILES="$COMPOSE_FILES -f $SCRIPT_DIR/docker-compose.xray.yml"
+fi
+
+# shellcheck disable=SC2086
+exec docker compose $COMPOSE_FILES "$@"

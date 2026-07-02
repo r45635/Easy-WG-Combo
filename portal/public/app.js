@@ -282,6 +282,22 @@ const I18N = {
     'nav.apps': 'Apps',
     'nav.filedrop': 'File Drop',
     'nav.migration': 'Migration',
+    // Xray
+    'nav.xray': 'VLESS+Reality',
+    'xray.status': 'Service Status',
+    'xray.connectionInfo': 'Connection Parameters',
+    'xray.clientUri': 'Client Configuration',
+    'xray.generate': 'Generate URI',
+    'xray.restart': '↺ Restart Xray',
+    'xray.running': 'Running',
+    'xray.stopped': 'Stopped',
+    'xray.protocol': 'Protocol',
+    'xray.port': 'Port',
+    'xray.sni': 'SNI Target',
+    'xray.publicKey': 'Public Key',
+    'xray.uriHint': 'Import with v2rayN (Windows/Linux), v2rayNG (Android), Shadowrocket or Sing-box (iOS/macOS).',
+    'xray.copyDone': '✓ Copied',
+    'xray.notEnabled': 'Xray VLESS+Reality is not enabled. Set XRAY_ENABLED=yes in .env and re-run bootstrap.sh.',
     'monitoring.add': '+ Add Monitor',
     'monitoring.empty': 'No monitors. Click + Add Monitor to create one.',
     'monitoring.col.name': 'Name',
@@ -635,6 +651,22 @@ const I18N = {
     'nav.apps': 'Applications',
     'nav.filedrop': 'Partage fichiers',
     'nav.migration': 'Migration',
+    // Xray
+    'nav.xray': 'VLESS+Reality',
+    'xray.status': 'État du service',
+    'xray.connectionInfo': 'Paramètres de connexion',
+    'xray.clientUri': 'Configuration client',
+    'xray.generate': 'Générer URI',
+    'xray.restart': '↺ Redémarrer Xray',
+    'xray.running': 'En cours',
+    'xray.stopped': 'Arrêté',
+    'xray.protocol': 'Protocole',
+    'xray.port': 'Port',
+    'xray.sni': 'Cible SNI',
+    'xray.publicKey': 'Clé publique',
+    'xray.uriHint': 'Importer avec v2rayN (Windows/Linux), v2rayNG (Android), Shadowrocket ou Sing-box (iOS/macOS).',
+    'xray.copyDone': '✓ Copié',
+    'xray.notEnabled': 'Xray VLESS+Reality n\'est pas activé. Définir XRAY_ENABLED=yes dans .env et relancer bootstrap.sh.',
     'monitoring.add': '+ Ajouter moniteur',
     'monitoring.empty': 'Aucun moniteur. Cliquez + Ajouter moniteur.',
     'monitoring.col.name': 'Nom',
@@ -988,6 +1020,22 @@ const I18N = {
     'nav.apps': '应用',
     'nav.filedrop': '文件分享',
     'nav.migration': '迁移',
+    // Xray
+    'nav.xray': 'VLESS+Reality',
+    'xray.status': '服务状态',
+    'xray.connectionInfo': '连接参数',
+    'xray.clientUri': '客户端配置',
+    'xray.generate': '生成URI',
+    'xray.restart': '↺ 重启 Xray',
+    'xray.running': '运行中',
+    'xray.stopped': '已停止',
+    'xray.protocol': '协议',
+    'xray.port': '端口',
+    'xray.sni': 'SNI目标',
+    'xray.publicKey': '公钥',
+    'xray.uriHint': '使用 v2rayN（Windows/Linux）、v2rayNG（Android）、Shadowrocket 或 Sing-box（iOS/macOS）导入。',
+    'xray.copyDone': '✓ 已复制',
+    'xray.notEnabled': 'Xray VLESS+Reality 未启用。在 .env 中设置 XRAY_ENABLED=yes 并重新运行 bootstrap.sh。',
     'monitoring.add': '+ 添加监控',
     'monitoring.empty': '无监控项。点击 + 添加监控 创建。',
     'monitoring.col.name': '名称',
@@ -1104,6 +1152,7 @@ const state = {
   filedropShares:   [],
   interfaceMode:    'super_user',
   capabilities:     null,
+  xrayEnabled:      false,
 };
 
 function canDo(action) {
@@ -1309,6 +1358,7 @@ function switchTab(name) {
   if (name === 'apps')         loadAppsTab();
   if (name === 'filedrop')     loadFiledropTab();
   if (name === 'migration')    loadMigrationTab();
+  if (name === 'xray')         loadXrayTab();
   if (name === 'settings')     loadSettingsTab();
   if (name !== 'security' && state.logAutoRefreshId) {
     clearInterval(state.logAutoRefreshId);
@@ -1333,6 +1383,7 @@ async function loadConfig() {
   state.iframePaths.adguard = cfg.adguardPath || '/adguard/';
   state.serverName = cfg.serverName || 'vpn-server';
   if (cfg.interfaceMode) state.interfaceMode = cfg.interfaceMode;
+  state.xrayEnabled = cfg.xrayEnabled === true;
   renderServerName();
   await loadCapabilities();
 }
@@ -3658,4 +3709,73 @@ document.getElementById('settings-mode-save-btn').addEventListener('click', asyn
   } else {
     await applyInterfaceMode(selected);
   }
+});
+
+// ── Xray VLESS+Reality ────────────────────────────────────────────────────────
+
+async function loadXrayTab() {
+  const loading = document.getElementById('xray-loading');
+  const wrap    = document.getElementById('xray-wrap');
+  loading.classList.remove('hidden');
+  loading.textContent = t('common.loading');
+  wrap.classList.add('hidden');
+
+  const data = await GET('/api/xray/status');
+  if (!data) return;
+
+  if (!data.enabled) {
+    loading.textContent = t('xray.notEnabled');
+    return;
+  }
+
+  const statusEl = document.getElementById('xray-status-body');
+  const badge = data.running
+    ? `<span class="status-badge status-online">${t('xray.running')}</span>`
+    : `<span class="status-badge status-offline">${t('xray.stopped')}</span>`;
+  const since = data.startedAt ? ` — ${new Date(data.startedAt).toLocaleString()}` : '';
+  statusEl.innerHTML = `<p>${badge}${esc(since)}</p>`;
+
+  const connEl = document.getElementById('xray-conn-info');
+  connEl.innerHTML = `
+    <table class="data-table" style="font-size:.85rem">
+      <tr><td><strong>${t('xray.protocol')}</strong></td><td>VLESS + XTLS-Vision + Reality</td></tr>
+      <tr><td><strong>${t('xray.port')}</strong></td><td>${data.port}</td></tr>
+      <tr><td><strong>${t('xray.sni')}</strong></td><td><code>${esc(data.sniTarget)}</code></td></tr>
+      <tr><td><strong>${t('xray.publicKey')}</strong></td>
+          <td><code style="font-size:.75rem;word-break:break-all">${esc(data.publicKey)}</code></td></tr>
+    </table>`;
+
+  const labelInput = document.getElementById('xray-label-input');
+  if (!labelInput.value) labelInput.value = state.serverName || 'vpn';
+
+  loading.classList.add('hidden');
+  wrap.classList.remove('hidden');
+}
+
+document.getElementById('xray-refresh-btn').addEventListener('click', loadXrayTab);
+
+document.getElementById('xray-restart-btn').addEventListener('click', async () => {
+  if (!confirm(t('xray.restart') + '?')) return;
+  const r = await POST('/api/xray/restart', {});
+  if (r?.ok) await loadXrayTab();
+  else alert(r?.error || 'Restart failed.');
+});
+
+document.getElementById('xray-gen-btn').addEventListener('click', async () => {
+  const label = document.getElementById('xray-label-input').value.trim() || (state.serverName || 'vpn');
+  const data  = await GET(`/api/xray/client-config?label=${encodeURIComponent(label)}`);
+  if (!data?.uri) { alert(data?.error || 'Error generating URI'); return; }
+  document.getElementById('xray-qr').src = data.qrcode;
+  document.getElementById('xray-uri-text').textContent = data.uri;
+  document.getElementById('xray-uri-result').classList.remove('hidden');
+});
+
+document.getElementById('xray-copy-btn').addEventListener('click', () => {
+  const uri = document.getElementById('xray-uri-text').textContent;
+  navigator.clipboard.writeText(uri).then(() => {
+    const btn = document.getElementById('xray-copy-btn');
+    const orig = btn.textContent;
+    btn.textContent = t('xray.copyDone');
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
 });
