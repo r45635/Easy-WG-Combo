@@ -632,7 +632,8 @@ configure_caddy() {
 
     if [ -n "$caddy_https_port" ]; then
       # Xray mode: Caddy on public port $caddy_https_port (self-signed TLS, session auth)
-      printf ':%s {\n' "$caddy_https_port"
+      # Use explicit admin_domain so Caddy issues the cert for the correct IP/hostname
+      printf '%s:%s {\n' "${admin_domain:-:}" "$caddy_https_port"
       printf '  tls internal\n'
     else
       if [ -z "$admin_domain" ]; then
