@@ -156,7 +156,7 @@ print_final_summary() {
   local admin_url=""
 
   if is_truthy "$xray_enabled"; then
-    admin_url="SSH tunnel → ssh -L 19443:localhost:${caddy_https_port} -N root@${wg_host}"
+    admin_url="https://${wg_host}:${caddy_https_port}"
   elif is_truthy "$public_https_enabled"; then
     if is_ip_address "${admin_domain:-}"; then
       admin_url="https://${admin_domain}"
@@ -180,7 +180,7 @@ print_final_summary() {
   if is_truthy "$xray_enabled"; then
     log "Xray VLESS+Reality: enabled on port 443"
     log "  → Client URI: ./easywg xray client-uri"
-    log "  → Admin portal: https://localhost:19443 (after SSH tunnel)"
+    log "  → Admin portal: https://${wg_host}:${caddy_https_port} (accept self-signed cert)"
   fi
   log "GitHub: ${BOOTSTRAP_REPO_URL}"
   log "Script version: ${BOOTSTRAP_VERSION}"
@@ -631,8 +631,8 @@ configure_caddy() {
     printf '}\n\n'
 
     if [ -n "$caddy_https_port" ]; then
-      # Xray mode: Caddy on localhost:$caddy_https_port, SSH tunnel access only
-      printf 'localhost:%s {\n' "$caddy_https_port"
+      # Xray mode: Caddy on public port $caddy_https_port (self-signed TLS, session auth)
+      printf ':%s {\n' "$caddy_https_port"
       printf '  tls internal\n'
     else
       if [ -z "$admin_domain" ]; then
@@ -717,21 +717,25 @@ install_packages() {
 
 configure_firewall() {
   local wg_port="$1"
+  local xray_enabled="${2:-no}"
+  local caddy_https_port="${3:-8443}"
   local ssh_port="${SSH_PORT:-22}"
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
-  local xray_enabled="${XRAY_ENABLED:-no}"
 
   log "Configuring UFW..."
   run_root ufw allow "${ssh_port}/tcp"
   run_root ufw allow "${wg_port}/udp"
   if is_truthy "$xray_enabled"; then
-    # Xray owns port 443; no HTTP redirect needed. Port 8443 stays localhost-only.
+    # Xray on 443; portal on caddy_https_port (public, self-signed TLS)
     run_root ufw allow 443/tcp
+    run_root ufw allow "${caddy_https_port}/tcp"
     # Remove port 80 rule if present (may have been opened in a previous non-Xray install)
     run_root ufw delete allow 80/tcp 2>/dev/null || true
   elif is_truthy "$public_https_enabled"; then
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
+    # Close caddy_https_port if it was opened by a previous Xray install
+    run_root ufw delete allow "${caddy_https_port}/tcp" 2>/dev/null || true
   fi
   # Allow AdGuard DNS from Docker bridge (wg-easy DNAT forwards VPN client DNS here)
   run_root ufw allow from 172.16.0.0/12 to any port 53 proto udp comment "AdGuard DNS from Docker"
@@ -980,7 +984,7 @@ main() {
   local caddy_https_port="${CADDY_HTTPS_PORT:-${_env_caddy_port:-8443}}"
 
   configure_sysctl
-  configure_firewall "$wg_port"
+  configure_firewall "$wg_port" "$xray_enabled" "$caddy_https_port"
 
   if is_truthy "$xray_enabled"; then
     log "Configuring Xray VLESS+Reality..."
