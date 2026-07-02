@@ -984,11 +984,19 @@ main() {
     configure_caddy "$admin_domain" "$caddy_https_port"
     log "Configuring Fail2Ban protection..."
     configure_fail2ban
-  elif is_truthy "$public_https_enabled"; then
-    log "Configuring Caddy HTTPS reverse proxy..."
-    configure_caddy "$admin_domain"
-    log "Configuring Fail2Ban protection..."
-    configure_fail2ban
+  else
+    # Ensure xray container is stopped if it was previously running
+    if docker inspect xray >/dev/null 2>&1; then
+      log "Stopping xray container (XRAY_ENABLED=no)..."
+      docker stop xray 2>/dev/null || true
+      docker rm xray 2>/dev/null || true
+    fi
+    if is_truthy "$public_https_enabled"; then
+      log "Configuring Caddy HTTPS reverse proxy..."
+      configure_caddy "$admin_domain"
+      log "Configuring Fail2Ban protection..."
+      configure_fail2ban
+    fi
   fi
 
   log "Starting the stack (attempting image rebuild first)..."
