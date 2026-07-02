@@ -783,8 +783,15 @@ configure_xray() {
   mkdir -p "$xray_dir/logs"
   chmod 777 "$xray_dir/logs"
 
+  # Read existing values from .env / .env.secrets (bootstrap never sources these files)
+  local _env_uuid _env_pub _env_priv _env_sid
+  _env_uuid="$(sed -n 's/^XRAY_UUID=//p' "$ENV_FILE" 2>/dev/null | head -1)"
+  _env_pub="$(sed -n 's/^XRAY_PUBLIC_KEY=//p' "$ENV_FILE" 2>/dev/null | head -1)"
+  _env_priv="$(sed -n "s/^export XRAY_PRIVATE_KEY='\(.*\)'/\1/p" "$SECRETS_FILE" 2>/dev/null | head -1)"
+  _env_sid="$(sed -n "s/^export XRAY_SHORT_ID='\(.*\)'/\1/p" "$SECRETS_FILE" 2>/dev/null | head -1)"
+
   # UUID — non-secret, stored in .env
-  uuid="${XRAY_UUID:-}"
+  uuid="${XRAY_UUID:-${_env_uuid:-}}"
   if [ -z "$uuid" ]; then
     if [ -f /proc/sys/kernel/random/uuid ]; then
       uuid="$(cat /proc/sys/kernel/random/uuid)"
@@ -796,8 +803,8 @@ configure_xray() {
   fi
 
   # X25519 key pair — private key is secret, public key goes in .env
-  private_key="${XRAY_PRIVATE_KEY:-}"
-  public_key="${XRAY_PUBLIC_KEY:-}"
+  private_key="${XRAY_PRIVATE_KEY:-${_env_priv:-}}"
+  public_key="${XRAY_PUBLIC_KEY:-${_env_pub:-}}"
   if [ -z "$private_key" ] || [ -z "$public_key" ]; then
     log "Generating Xray X25519 key pair (pulling image if needed)..."
     keypair="$(docker run --rm ghcr.io/xtls/xray-core:latest x25519 2>/dev/null)"
@@ -810,13 +817,12 @@ configure_xray() {
   fi
 
   # Short ID — secret, 8 random bytes as hex
-  short_id="${XRAY_SHORT_ID:-}"
+  short_id="${XRAY_SHORT_ID:-${_env_sid:-}}"
   if [ -z "$short_id" ]; then
     short_id="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
     set_secret_export "$SECRETS_FILE" "XRAY_SHORT_ID" "$short_id"
     log "Generated Xray short ID."
   fi
-
   set_env_value "$ENV_FILE" "XRAY_SNI_TARGET" "$sni_target"
   set_env_value "$ENV_FILE" "XRAY_PORT" "$xray_port"
 
