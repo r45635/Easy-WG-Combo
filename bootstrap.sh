@@ -727,6 +727,8 @@ configure_firewall() {
   if is_truthy "$xray_enabled"; then
     # Xray owns port 443; no HTTP redirect needed. Port 8443 stays localhost-only.
     run_root ufw allow 443/tcp
+    # Remove port 80 rule if present (may have been opened in a previous non-Xray install)
+    run_root ufw delete allow 80/tcp 2>/dev/null || true
   elif is_truthy "$public_https_enabled"; then
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
