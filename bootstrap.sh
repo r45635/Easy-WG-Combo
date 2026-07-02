@@ -964,8 +964,11 @@ main() {
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi
 
-  local xray_enabled="${XRAY_ENABLED:-no}"
-  local caddy_https_port="${CADDY_HTTPS_PORT:-8443}"
+  local _env_xray _env_caddy_port
+  _env_xray="$(sed -n 's/^XRAY_ENABLED=//p' "$ENV_FILE" 2>/dev/null | head -1)"
+  _env_caddy_port="$(sed -n 's/^CADDY_HTTPS_PORT=//p' "$ENV_FILE" 2>/dev/null | head -1)"
+  local xray_enabled="${XRAY_ENABLED:-${_env_xray:-no}}"
+  local caddy_https_port="${CADDY_HTTPS_PORT:-${_env_caddy_port:-8443}}"
 
   configure_sysctl
   configure_firewall "$wg_port"
