@@ -56,20 +56,15 @@ When prompted about existing config, choose **keep**. Bootstrap will:
 
 ## Accessing the admin portal with Xray active
 
-Caddy moves to `localhost:8443`. Use an SSH tunnel:
+Caddy is exposed on `CADDY_HTTPS_PORT` (default **8443**) on all interfaces. Access it directly:
 
-```bash
-# On your local Mac/PC:
-ssh -i ~/.ssh/vps_wg_155_138_131_219 \
-    -L 19443:localhost:8443 \
-    -N root@155.138.131.219
+```
+https://<VPS_IP>:8443
 ```
 
-Then open: `https://localhost:19443`
+The browser will warn about a self-signed certificate — add an exception (Caddy uses its own internal CA). This is expected and safe for a personal admin console.
 
-The browser will warn about a self-signed certificate — add an exception (Caddy uses its own internal CA).
-
-> If you have the `admin-tunnel.sh` script, update the forwarded port from `19080:localhost:8080` to `19443:localhost:8443`.
+Login with your admin password as usual.
 
 ---
 
