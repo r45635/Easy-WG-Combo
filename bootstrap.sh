@@ -779,6 +779,7 @@ configure_xray() {
   local xray_port="${XRAY_PORT:-443}"
 
   mkdir -p "$xray_dir/logs"
+  chmod 777 "$xray_dir/logs"
 
   # UUID — non-secret, stored in .env
   uuid="${XRAY_UUID:-}"
