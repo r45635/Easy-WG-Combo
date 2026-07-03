@@ -14,7 +14,7 @@ Each device gets its own VLESS UUID. Revoking a device immediately removes its V
 - You need a tunnel that survives active probing (GFW-style detection)
 - You still want the Easy-WG-Combo admin portal and DNS filtering
 
-**Trade-off:** when Xray is active, the admin portal is no longer accessible over public HTTPS. It becomes localhost-only, accessible only via SSH tunnel. This is the safest configuration regardless.
+**Trade-off:** when Xray is active, port 443 is owned by Xray. Caddy moves to port `8443` — the admin portal remains accessible at `https://<VPS_IP>:8443`, but with a self-signed certificate (Caddy internal CA, not a Let's Encrypt cert). The browser will warn about the certificate on first access — add an exception once.
 
 ---
 
