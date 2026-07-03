@@ -2869,7 +2869,8 @@ function renderDevicesTable() {
       <td>${formatExpiry(dev)}</td>
       <td class="actions">
         <button class="btn-sm btn-ghost" data-action="dev-config" data-id="${dev.id}" title="Download config">↓</button>
-        <button class="btn-sm btn-ghost" data-action="dev-qr" data-id="${dev.id}" title="QR code">⊡</button>
+        <button class="btn-sm btn-ghost" data-action="dev-qr" data-id="${dev.id}" title="WireGuard QR">⊡</button>
+        ${state.modules?.includes('xray') && !dev.revokedAt ? `<button class="btn-sm btn-ghost" data-action="dev-xray" data-id="${dev.id}" title="VLESS URI">⊛</button>` : ''}
         ${dev.revokedAt ? '' : `<button class="btn-sm btn-ghost" data-action="dev-disable" data-id="${dev.id}">${dev.wgClient?.enabled === false ? '▶' : '‖'}</button>`}
         ${dev.revokedAt ? '' : `<button class="btn-sm btn-danger" data-action="dev-revoke" data-id="${dev.id}">✕</button>`}
       </td>
@@ -2906,6 +2907,16 @@ document.getElementById('devices-tbody').addEventListener('click', async e => {
     w.document.write(`<html><body style="background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="/api/devices/${id}/qr" style="max-width:400px"></body></html>`);
     return;
   }
+  if (action === 'dev-xray') {
+    const data = await GET(`/api/devices/${id}/xray-qr`);
+    if (!data?.uri) { alert(data?.error || 'Error generating VLESS URI'); return; }
+    document.getElementById('xray-device-modal-title').textContent = `VLESS — ${data.deviceName}`;
+    document.getElementById('xray-device-qr').src = data.qrcode;
+    document.getElementById('xray-device-uri').textContent = data.uri;
+    document.getElementById('xray-device-copy-btn').textContent = t('common.copy') || '⎘ Copy URI';
+    document.getElementById('xray-device-overlay').classList.remove('hidden');
+    return;
+  }
   const dev = state.devices.find(d => d.id === id);
   if (!dev) return;
 
@@ -2923,6 +2934,26 @@ document.getElementById('devices-tbody').addEventListener('click', async e => {
     return;
   }
 });
+
+// VLESS device modal — close + copy
+(function () {
+  const overlay = document.getElementById('xray-device-overlay');
+  const closeBtn = document.getElementById('xray-device-modal-close');
+  const copyBtn  = document.getElementById('xray-device-copy-btn');
+  if (!overlay) return;
+
+  function closeModal() { overlay.classList.add('hidden'); }
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  copyBtn.addEventListener('click', () => {
+    const uri = document.getElementById('xray-device-uri').textContent;
+    navigator.clipboard.writeText(uri).then(() => {
+      const orig = copyBtn.textContent;
+      copyBtn.textContent = t('xray.copyDone') || '✓ Copied';
+      setTimeout(() => { copyBtn.textContent = orig; }, 2000);
+    });
+  });
+})();
 
 // ── Phase 2: DNS Profiles (Module A) ─────────────────────────────────────────
 

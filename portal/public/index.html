@@ -1020,6 +1020,24 @@
     </div>
   </div>
 
+  <!-- VLESS device QR modal -->
+  <div id="xray-device-overlay" class="hidden">
+    <div class="modal xray-device-modal">
+      <div class="modal-header">
+        <h3 id="xray-device-modal-title">VLESS</h3>
+        <button class="modal-close" id="xray-device-modal-close">✕</button>
+      </div>
+      <div class="modal-body xray-device-modal-body">
+        <img id="xray-device-qr" src="" alt="VLESS QR" class="xray-device-qr-img">
+        <code id="xray-device-uri" class="xray-device-uri-code"></code>
+        <button class="btn-ghost btn-sm" id="xray-device-copy-btn">⎘ Copy URI</button>
+      </div>
+      <div class="modal-footer">
+        <p class="text-dim xray-device-hint" data-i18n="xray.uriHint"></p>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

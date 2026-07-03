@@ -227,7 +227,7 @@ tbody tr:last-child td { border-bottom: none; }
 .btn-sm { padding: .35rem .75rem; font-size: .82rem; }
 
 /* ── Modal ── */
-#modal-overlay, #filter-overlay, #help-overlay, #advanced-confirm-overlay {
+#modal-overlay, #filter-overlay, #help-overlay, #advanced-confirm-overlay, #xray-device-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.65);
   display: flex; align-items: center; justify-content: center;
   z-index: 100; padding: 1rem;
@@ -688,3 +688,14 @@ body[data-interface-mode="super_user"] [data-show-min="advanced"] { display: non
   .page-actions { width: 100%; flex-wrap: wrap; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── VLESS device QR modal ── */
+.xray-device-modal { max-width: 420px; }
+.xray-device-modal-body { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.xray-device-qr-img { max-width: 240px; border-radius: 8px; }
+.xray-device-uri-code {
+  word-break: break-all; font-size: .72rem;
+  background: var(--surface2); padding: .5rem .75rem;
+  border-radius: 4px; width: 100%; display: block; box-sizing: border-box;
+}
+.xray-device-hint { font-size: .8rem; margin: 0; }
