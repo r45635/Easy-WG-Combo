@@ -25,16 +25,17 @@ The Uptime Monitor checks your services on a configurable schedule and sends ale
 
 On the first `GET /api/monitors` call (opening the Monitoring tab), if no monitors exist, the following are created automatically:
 
-| Monitor | Type | Target |
-|---|---|---|
-| Portal | http | `http://127.0.0.1:<PORTAL_PORT>` |
-| wg-easy | docker | `wg-easy` |
-| AdGuard Home | docker | `adguard` |
-| Caddy | docker | `caddy` |
-| VPN DNS | dns | `dns.google` via `10.8.0.1` |
-| TLS Certificate | tls | `<WG_HOST>:443` (if `WG_HOST` is set) |
+| Monitor | Type | Target | Notes |
+|---|---|---|---|
+| Portal | http | `http://127.0.0.1:<PORTAL_PORT>` | |
+| wg-easy | docker | `wg-easy` | |
+| AdGuard Home | docker | `adguard` | |
+| Caddy | docker | `caddy` | |
+| AdGuard DNS | dns | `example.com` via `127.0.0.1` | Direct DNS check to AdGuard Home |
+| TLS Certificate | tls | `<WG_HOST>:443` | Only created if `WG_HOST` is set |
+| Xray | docker | `xray` | Only created if `XRAY_ENABLED=yes` |
 
-> **Note when Xray is enabled:** Port 443 is owned by Xray, not Caddy. The auto-seeded TLS Certificate monitor targets `<WG_HOST>:443` and will check the Xray Reality handshake, not a TLS certificate. If you want to monitor the Caddy HTTPS portal, add a custom TLS monitor targeting `<WG_HOST>:8443` (or whatever `CADDY_HTTPS_PORT` is set to).
+> **Note when Xray is enabled:** Port 443 is owned by Xray, not Caddy. The auto-seeded TLS Certificate monitor targets `<WG_HOST>:443` and will check the Xray Reality handshake, not a TLS certificate. To monitor the Caddy admin portal, add a custom TLS monitor targeting `<WG_HOST>:8443` (or your `CADDY_HTTPS_PORT` value).
 
 ## Using the portal UI
 
@@ -127,7 +128,7 @@ All endpoints require authentication (session cookie or HTTP Basic auth).
 
 Alerts use the existing notification system. To enable:
 
-1. Go to **Settings → Notifications** in the portal.
+1. Open the **Notifications** tab in the portal sidebar.
 2. Configure an email address or webhook URL.
 3. Enable the notification channel.
 
@@ -161,7 +162,7 @@ Monitor configuration and history are stored in `/data/monitors.json` and `/data
 
 - **TLS checks on Caddy internal certificates**: Caddy uses a self-signed "Caddy Local Authority" cert by default. The TLS monitor reports this as "down" because the cert is issued to a local CA not trusted externally. This is expected — Caddy auto-renews and the monitor will recover once a real ACME cert is in place.
 - **Scheduler first-tick delay**: The scheduler fires every 60 seconds from process start, not from when a monitor is created. A newly added monitor may take up to 90 seconds for its first auto-check.
-- **DNS resolver container reachability**: DNS checks use `127.0.0.1:53` (AdGuard Home) by default. A custom resolver must be reachable from within the portal container network.
+- **DNS resolver container reachability**: DNS checks use `10.8.0.1` (the VPN DNS address) as the default resolver unless overridden per monitor. The auto-seeded AdGuard DNS monitor uses `127.0.0.1` (direct AdGuard Home access from the portal container). Any custom resolver must be reachable from within the portal container network.
 - **History cap**: Monitor history is capped at 100 entries per monitor. Older entries are dropped automatically.
-- **Notifications require configuration**: Alerts are not sent unless a notification channel (email or webhook) is configured under Settings → Notifications. Monitoring works without it.
+- **Notifications require configuration**: Alerts are not sent unless a notification channel (email or webhook) is configured in the **Notifications** tab. Monitoring works without it.
 - **No alerting cooldown**: Once a monitor is "down", the system sends one alert and suppresses repeats until recovery. Recovery triggers a single "recovered" alert. There is currently no additional cooldown period beyond this.

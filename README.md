@@ -174,7 +174,7 @@ An optional DPI-resistant tunnel that runs alongside WireGuard. Designed for cen
 
 ---
 
-The following features are available in **Advanced** mode and are described as experimental. They may change and are not recommended for critical production usage.
+The following features are available in **Advanced** mode. Gateway is experimental; Apps, File Drop and Migration are preview features — not recommended for production.
 
 ### Gateway / Reverse Proxy
 
