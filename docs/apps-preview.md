@@ -10,13 +10,15 @@ The App Launcher lets you install and manage curated self-hosted applications vi
 
 The following 5 apps are included in the static catalog:
 
-| ID | Name | Port | Min RAM | Description |
+| ID | Name | Container port | Min RAM | Description |
 |---|---|---|---|---|
 | `uptime-kuma` | Uptime Kuma | 3001 | 256 MB | Self-hosted uptime monitor with a clean UI |
 | `ntfy` | ntfy | 8080 | 64 MB | Push notification server (HTTP + mobile) |
 | `filebrowser` | File Browser | 8080 | 64 MB | Web-based file manager |
 | `stirling-pdf` | Stirling PDF | 8080 | 512 MB | Local PDF toolbox (split, merge, convert) |
 | `vaultwarden` | Vaultwarden | 80 | 128 MB | Bitwarden-compatible password manager |
+
+> These are default internal container ports. The host port mapping is configured at install time and must not conflict with the existing stack (portal: 8080, Caddy: 80/443 or 8443).
 
 Browse the catalog:
 

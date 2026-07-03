@@ -53,11 +53,12 @@ Open **Gateway** in the sidebar. From there you can:
 
 ## Requirements
 
-- A domain name pointed at your VPS IP (for public HTTPS with a real certificate)
-- Or a subdomain of your existing admin domain
-- `PUBLIC_HTTPS_ENABLED=yes` in `.env` for Caddy to be managing certificates
+- A domain name pointed at your VPS IP (for public HTTPS with a real ACME certificate)
+- `PUBLIC_HTTPS_ENABLED=yes` in `.env` so Caddy provisions real certificates (ACME via Let's Encrypt)
+  - Without this, Caddy uses an internal self-signed CA — fine for VPN-only exposure, unusable for public HTTPS
+- VPN-only services work without a public domain or ACME certificate
 
-> **Xray compatibility:** When `XRAY_ENABLED=yes`, Caddy runs on port `8443` and port `443` is owned by Xray. Public HTTPS Gateway services still work via Caddy on `8443`, but ACME certificate provisioning (which uses HTTP-01 challenge on port 80) is unaffected. Clients accessing public Gateway services must use `https://<domain>:8443` or you must configure a domain proxy to forward to `8443`.
+> **Xray compatibility:** When `XRAY_ENABLED=yes`, Caddy runs on port `8443` and port `443` is owned by Xray. ACME certificate provisioning still works (it uses HTTP-01 challenge on port 80, unaffected by Xray). Clients accessing public Gateway services will need to reach Caddy on `8443` — you may need a domain-level proxy or firewall rule to forward port 443 to 8443 for seamless access.
 
 ---
 

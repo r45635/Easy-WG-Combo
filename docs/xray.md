@@ -44,7 +44,7 @@ When prompted about existing config, choose **keep**. Bootstrap will:
 - Generate a UUID, X25519 key pair, and short ID
 - Write private secrets to `.env.secrets`
 - Write `./xray/config.json`
-- Regenerate the Caddyfile with Caddy on `localhost:8443`
+- Regenerate the Caddyfile with Caddy on `<admin_domain>:8443` (public, all interfaces)
 - Start all containers including Xray
 
 ### 3. Verify deployment
@@ -125,8 +125,9 @@ A shared fallback URI (using the server-wide UUID) is also available:
 | Android | v2rayNG | [Play Store](https://play.google.com/store/apps/details?id=com.v2ray.ang) |
 | iOS | Sing-box | [App Store](https://apps.apple.com/us/app/sing-box/id6451272673) — free |
 | iOS | Shadowrocket | [App Store](https://apps.apple.com/us/app/shadowrocket/id932747118) — paid (~$3), most reliable |
+| macOS | Sing-box | [sing-box.sagernet.org](https://sing-box.sagernet.org/) — free |
+| macOS | Nekoray | [GitHub](https://github.com/MatsuriDayo/nekoray) — free |
 | Windows / Linux | v2rayN | [GitHub](https://github.com/2dust/v2rayN) |
-| macOS | Nekoray | [GitHub](https://github.com/MatsuriDayo/nekoray) |
 
 Import the VLESS URI or scan the QR code. No other configuration needed.
 
@@ -189,7 +190,7 @@ Caddy will move back to port 443, the public HTTPS portal returns, and the Xray 
 - Ensure the public key and short ID in the client match what `./easywg xray status` shows
 
 **Portal unreachable after activation:**
-- Remember the portal is now at `localhost:8443` — use the SSH tunnel
+- The portal is at `https://<VPS_IP>:8443` (or your admin domain) — accept the self-signed certificate warning on first access
 - Check Caddy is running: `./compose.sh ps`
 
 **Xray container exits immediately:**

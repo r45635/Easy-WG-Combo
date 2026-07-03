@@ -18,7 +18,8 @@
 | WireGuard device management | Stable | Create devices, QR codes and client configs |
 | AdGuard DNS filtering | Stable | Global and per-device DNS filtering via AdGuard Home |
 | Multilingual UI | Stable | English, French, Chinese |
-| Auto HTTPS via Caddy | Stable | Domain cert via ACME or internal TLS fallback |
+| Mobile-responsive UI | Stable | Hamburger menu, collapsible sidebar, touch-friendly nav |
+| Auto HTTPS via Caddy | Stable | Domain cert via ACME or self-signed (internal CA) fallback |
 | SSH tunnel access | Stable | Recommended for safest admin access |
 
 ---
@@ -43,7 +44,6 @@
 | Feature | Status | Notes |
 |---|---|---|
 | VLESS+Reality (Xray) | Beta | DPI-resistant tunnel; per-device UUIDs; QR from Devices tab; visible in Super User + Advanced |
-| Mobile-responsive UI | Stable | Hamburger menu, collapsible sidebar, touch-friendly nav |
 | Gateway / Reverse Proxy | Experimental | Caddy-based service exposure; VPN-only or public HTTPS |
 | Apps | Preview | Catalog readable; install/manage not validated for production |
 | File Drop | Preview | UI available; public link security not fully audited |

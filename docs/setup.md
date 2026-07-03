@@ -21,7 +21,7 @@ The installer will:
 - Create `.env` and `.env.secrets`
 - Generate the WireGuard password hash
 - Apply firewall rules
-- Start all three containers
+- Start all four containers (wg-easy, adguard, portal, caddy)
 
 ## Interactive install
 
@@ -79,7 +79,7 @@ echo "export PASSWORD_HASH='<hash>'" > .env.secrets
 | Mode | How | Security |
 |---|---|---|
 | **SSH tunnel** *(default, safest)* | `ssh -L 19080:localhost:8080 ...` | No admin port reachable from internet |
-| **Public HTTPS** | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` | Caddy auto-cert; use strong password + Fail2Ban |
+| **Public HTTPS** | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` | Caddy ACME cert (or self-signed if using IP / no `TLS_EMAIL`); use strong password + Fail2Ban |
 
 Public HTTPS is enabled by default in the installer. Check your `.env` to confirm.
 
