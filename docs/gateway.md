@@ -57,6 +57,8 @@ Open **Gateway** in the sidebar. From there you can:
 - Or a subdomain of your existing admin domain
 - `PUBLIC_HTTPS_ENABLED=yes` in `.env` for Caddy to be managing certificates
 
+> **Xray compatibility:** When `XRAY_ENABLED=yes`, Caddy runs on port `8443` and port `443` is owned by Xray. Public HTTPS Gateway services still work via Caddy on `8443`, but ACME certificate provisioning (which uses HTTP-01 challenge on port 80) is unaffected. Clients accessing public Gateway services must use `https://<domain>:8443` or you must configure a domain proxy to forward to `8443`.
+
 ---
 
 ## Security considerations
@@ -78,7 +80,8 @@ Open **Gateway** in the sidebar. From there you can:
 
 **Certificate not provisioned:**
 - Confirm the domain resolves to your VPS IP
-- Confirm ports 80 and 443 are open in UFW
+- Confirm port 80 is open in UFW (ACME HTTP-01 challenge)
+- If Xray is not active: confirm port 443 is open; if Xray is active, Caddy is on 8443 — confirm 8443 is open
 - Caddy logs will show ACME challenge failures
 
 **Route accessible but backend returns errors:**

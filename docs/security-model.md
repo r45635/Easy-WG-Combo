@@ -44,6 +44,16 @@ This is convenient for remote access without an SSH client, but it increases the
 
 > The installer currently enables public HTTPS by default. Set `PUBLIC_HTTPS_ENABLED=no` in `.env` to use local-only mode.
 
+### Public HTTPS with Xray enabled
+
+When `XRAY_ENABLED=yes`, Xray takes over port 443. Caddy moves to `CADDY_HTTPS_PORT` (default `8443`). In this configuration:
+
+- The admin portal is accessible at `https://<VPS_IP>:8443` using Caddy's internal self-signed certificate
+- The login page is still protected by Fail2Ban via Caddy access logs
+- Port 443 is fully owned by the Xray VLESS+Reality service — traffic on that port is not admin traffic
+
+This is effectively a hardened configuration: the admin interface is not on a well-known port, and traffic analysis cannot distinguish it from standard HTTPS. The same rules apply: use a strong password and keep Fail2Ban active.
+
 ---
 
 ## Sensitive operations and their risks
@@ -78,6 +88,12 @@ Backup archives contain:
 
 Store backups securely. Do not leave them in a world-readable location.
 
+### Xray VLESS+Reality
+
+When Xray is enabled, `.env.secrets` contains the X25519 private key used for the Reality handshake. Exposing this key allows an attacker to impersonate the server. Treat it like any other private key — do not commit it to version control, and rotate it by re-running `./bootstrap.sh`.
+
+Each device has its own VLESS UUID. Revoking a device removes its UUID from `xray/config.json` and restarts the Xray container, invalidating that device's tunnel access immediately.
+
 ### SSH hardening
 
 The `./easywg security harden-ssh` command modifies `/etc/ssh/sshd_config`. It runs safety checks and prompts for confirmation, but an incorrect configuration could lock you out. Always test SSH access in a new window before closing your existing session.
@@ -93,12 +109,21 @@ Ports exposed to the internet by default after install:
 | `22/tcp` (or `SSH_PORT`) | SSH |
 | `51820/udp` | WireGuard VPN |
 
-Additional ports when public HTTPS is enabled:
+Additional ports when public HTTPS is enabled (`PUBLIC_HTTPS_ENABLED=yes`):
 
 | Port | Purpose |
 |---|---|
 | `80/tcp` | HTTP (redirects to HTTPS) |
 | `443/tcp` | HTTPS (Caddy) |
+
+When Xray is enabled (`XRAY_ENABLED=yes`), the port assignment changes:
+
+| Port | Purpose |
+|---|---|
+| `443/tcp` | VLESS+Reality tunnel (Xray) — takes over from Caddy |
+| `8443/tcp` | HTTPS admin portal (Caddy moves here when Xray is active) |
+
+> When Xray is enabled, Caddy vacates port 443 and listens on `CADDY_HTTPS_PORT` (default `8443`). Port 443 is fully owned by Xray.
 
 Admin ports (8080, 51821, 3000) are always bound to localhost.
 
