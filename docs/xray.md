@@ -70,6 +70,19 @@ Login with your admin password as usual.
 
 ---
 
+## Screenshots
+
+**Devices tab — ⊛ VLESS button per device**
+![Devices with VLESS button](screenshots/clients.png)
+
+**VLESS QR modal — scan or copy the URI**
+![VLESS QR modal](screenshots/xray-modal.png)
+
+**VLESS+Reality tab — service status and global URI generator**
+![VLESS+Reality tab](screenshots/xray-tab.png)
+
+---
+
 ## Generating a client configuration
 
 ### Per device — from the Devices tab (recommended)
