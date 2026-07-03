@@ -118,13 +118,15 @@ A shared fallback URI (using the server-wide UUID) is also available:
 
 ## Client apps
 
+→ [Full client app list with download links](clients.md#vlessreality-xray)
+
 | Platform | App | Notes |
 |---|---|---|
-| Android | v2rayNG | Free, open source |
-| iOS / macOS | Sing-box | Free, supports Reality |
-| iOS | Shadowrocket | Paid (~$3), very reliable |
-| Windows / Linux | v2rayN | Free, open source |
-| macOS | Nekobox | Free, open source |
+| Android | v2rayNG | [Play Store](https://play.google.com/store/apps/details?id=com.v2ray.ang) |
+| iOS | Sing-box | [App Store](https://apps.apple.com/us/app/sing-box/id6451272673) — free |
+| iOS | Shadowrocket | [App Store](https://apps.apple.com/us/app/shadowrocket/id932747118) — paid (~$3), most reliable |
+| Windows / Linux | v2rayN | [GitHub](https://github.com/2dust/v2rayN) |
+| macOS | Nekoray | [GitHub](https://github.com/MatsuriDayo/nekoray) |
 
 Import the VLESS URI or scan the QR code. No other configuration needed.
 
