@@ -10,6 +10,7 @@ const http       = require('http');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
+const { randomUUID } = require('crypto');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -1975,11 +1976,13 @@ app.post('/api/devices', auth, async (req, res) => {
       tags: [], notes, createdAt: new Date().toISOString(),
     };
     const devices = loadDevices();
+    if (XRAY_ENABLED) device.xrayUuid = randomUUID();
     devices[device.id] = device;
     saveDevices(devices);
     if (wgClient.address) {
       try { await agSetClientFilter(device.name, wgClient.address, getAdguardPolicy(dnsProfile)); } catch { /* non-fatal */ }
     }
+    if (XRAY_ENABLED) syncXrayClients().catch(() => {});
     res.json({ device, wgClient });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2040,6 +2043,7 @@ app.post('/api/devices/:id/revoke', auth, async (req, res) => {
     dev.revokedAt = new Date().toISOString();
     await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' });
     saveDevices(devices);
+    if (XRAY_ENABLED) syncXrayClients().catch(() => {});
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2057,6 +2061,7 @@ app.delete('/api/devices/:id', auth, async (req, res) => {
     }
     delete devices[req.params.id];
     saveDevices(devices);
+    if (XRAY_ENABLED) syncXrayClients().catch(() => {});
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -2080,6 +2085,32 @@ app.get('/api/devices/:id/qr', auth, async (req, res) => {
     const patched = patchClientConfig(configText, dev);
     const svg = await QRCode.toString(patched, { type: 'svg', errorCorrectionLevel: 'L' });
     res.type('image/svg+xml').send(svg);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/devices/:id/xray-qr', auth, async (req, res) => {
+  if (!XRAY_ENABLED) return res.json({ enabled: false });
+  try {
+    const devices = loadDevices();
+    const dev = devices[req.params.id];
+    if (!dev) return res.status(404).json({ error: 'Device not found' });
+    if (dev.revokedAt) return res.status(403).json({ error: 'Device is revoked' });
+    if (!dev.xrayUuid) {
+      dev.xrayUuid = randomUUID();
+      devices[req.params.id] = dev;
+      saveDevices(devices);
+      await syncXrayClients();
+    }
+    const label  = String(req.query.label || dev.name || getServerName()).slice(0, 64);
+    const host   = VPS_HOST || '0.0.0.0';
+    const params = new URLSearchParams({
+      encryption: 'none', flow: 'xtls-rprx-vision', security: 'reality',
+      sni: XRAY_SNI_TARGET, fp: 'chrome', pbk: XRAY_PUBLIC_KEY,
+      sid: XRAY_SHORT_ID, type: 'tcp',
+    });
+    const uri     = `vless://${dev.xrayUuid}@${host}:${XRAY_PORT}?${params.toString()}#${encodeURIComponent(label)}`;
+    const qrcode  = await QRCode.toDataURL(uri, { width: 256, margin: 2 });
+    res.json({ enabled: true, uri, qrcode, label, deviceName: dev.name });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3195,6 +3226,27 @@ app.post('/api/migration/validate', auth, async (req, res) => {
     maxScore: 3,
   });
 });
+
+// ── Xray helpers ─────────────────────────────────────────────────────────────
+
+async function syncXrayClients() {
+  if (!XRAY_ENABLED) return;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(XRAY_CONFIG_PATH, 'utf8'));
+    const devices = loadDevices();
+    const clients = [];
+    if (XRAY_UUID) clients.push({ id: XRAY_UUID, flow: 'xtls-rprx-vision' });
+    for (const dev of Object.values(devices)) {
+      if (!dev.revokedAt && dev.xrayUuid && dev.xrayUuid !== XRAY_UUID)
+        clients.push({ id: dev.xrayUuid, flow: 'xtls-rprx-vision' });
+    }
+    cfg.inbounds[0].settings.clients = clients;
+    fs.writeFileSync(XRAY_CONFIG_PATH, JSON.stringify(cfg, null, 2));
+    await dockerPost('/containers/xray/restart', null);
+  } catch (e) {
+    console.error('syncXrayClients failed:', e.message);
+  }
+}
 
 // ── Xray VLESS+Reality routes ────────────────────────────────────────────────
 
