@@ -9,11 +9,13 @@ It combines WireGuard, AdGuard Home, a custom admin portal, HTTPS access, securi
 ## What It Does
 
 - **WireGuard VPN** — create and manage devices, generate QR codes, share configs
+- **VLESS+Reality** — optional DPI-resistant tunnel (Xray); per-device QR codes; for censored networks
 - **AdGuard Home DNS** — block ads and malware per device; switch presets without reconnecting
 - **Security Center** — Fail2Ban monitoring, UFW status, TLS certificate, session management, security score
 - **Backups** — local backup and restore with a guided workflow
 - **Monitoring** — HTTP, HTTPS, TCP, DNS, Docker, TLS and service checks with alerts
 - **Notifications** — email and webhook alerts for monitor events
+- **Mobile-friendly** — responsive UI with hamburger sidebar for smartphone access
 - **Multilingual** — English, French, Chinese
 
 Optional advanced features: reverse proxy/gateway, app launcher, secure file drop, migration assistant.
@@ -38,12 +40,14 @@ It is not intended to replace enterprise VPN gateways, zero-trust platforms or m
 |---|---|---|
 | WireGuard device management | Stable | Devices, QR codes, configs |
 | AdGuard DNS filtering | Stable | Per-device presets |
+| Mobile-responsive UI | Stable | Hamburger menu, collapsible sidebar |
 | Security Center | Beta | Fail2Ban, UFW, sessions, TLS, security score |
 | Backup / Restore | Beta | Local backup and guided restore |
 | Notifications | Beta | SMTP and webhook |
 | Device Inventory | Beta | User-friendly device management |
 | DNS Profiles | Beta | Per-device DNS profiles with timed bypass |
 | Monitoring | Beta | HTTP, TCP, DNS, Docker, TLS checks |
+| VLESS+Reality (Xray) | Beta | DPI-resistant tunnel; per-device UUIDs; QR from Devices tab |
 | Gateway / Reverse Proxy | Experimental | VPN-only and public HTTPS exposure |
 | Apps | Preview | Catalog visible; install/manage not production-ready |
 | File Drop | Preview | UI available; not recommended for sensitive use yet |
@@ -60,7 +64,7 @@ The portal has three modes so users are not exposed to unnecessary complexity. S
 | Mode | Intended user | Visible features |
 |---|---|---|
 | **User** | Basic VPN user | Devices, QR codes, simple DNS protection |
-| **Super User** *(default)* | Appliance operator | Devices, DNS profiles, backups, monitoring, notifications, security overview |
+| **Super User** *(default)* | Appliance operator | Devices (incl. VLESS QR), DNS profiles, backups, monitoring, notifications, security overview |
 | **Advanced** | Full administrator | WireGuard, AdGuard, Gateway, Apps, File Drop, Migration, logs and advanced security controls |
 
 → [Interface modes reference](docs/interface-modes.md)
@@ -155,7 +159,20 @@ Open **Monitoring** to see the status of all configured checks. Alerts are sent 
 
 ## Advanced Features
 
-These features are available in **Advanced** mode and are described as experimental. They may change and are not recommended for critical production usage.
+### VLESS+Reality (Xray)
+
+An optional DPI-resistant tunnel that runs alongside WireGuard. Designed for censored networks where WireGuard is blocked.
+
+- Enable with `XRAY_ENABLED=yes` in `.env`, then re-run `./bootstrap.sh`
+- Each device gets its own VLESS UUID — tap **⊛** in the Devices tab to get a QR code
+- Revoking a device also revokes its VLESS access
+- Available from **Super User** mode (not Advanced-only)
+
+→ [Xray documentation](docs/xray.md)
+
+---
+
+The following features are available in **Advanced** mode and are described as experimental. They may change and are not recommended for critical production usage.
 
 ### Gateway / Reverse Proxy
 
@@ -200,6 +217,10 @@ All features are available from the terminal:
 
 ./easywg proxy list                # List reverse proxy services
 ./easywg app catalog               # List available apps (preview)
+
+./easywg xray status               # Xray service status
+./easywg xray client-uri [label]   # Print VLESS URI (global)
+./easywg xray restart              # Restart Xray container
 ```
 
 Run `./easywg help` for the full command list.
@@ -226,6 +247,7 @@ Run `./easywg help` for the full command list.
 | [Setup guide](docs/setup.md) | Bootstrap options, manual install, env variables, Fail2Ban, firewall |
 | [Interface modes](docs/interface-modes.md) | User / Super User / Advanced breakdown |
 | [Feature status](docs/feature-status.md) | Detailed status for all features |
+| [Xray VLESS+Reality](docs/xray.md) | DPI-resistant tunnel — setup, per-device QR, client apps |
 | [Experimental features](docs/experimental-features.md) | Gateway, Apps, File Drop, Migration — what works and what doesn't |
 | [Security model](docs/security-model.md) | Threat model, exposure modes, sensitive operations |
 | [Gateway](docs/gateway.md) | Reverse proxy / Caddy services |
