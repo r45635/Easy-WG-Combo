@@ -475,7 +475,11 @@ app.post('/api/settings/interface-mode', auth, (req, res) => {
 app.get('/api/settings/ui-capabilities', auth, (_req, res) => {
   const mode = getInterfaceMode();
   const caps = UI_CAPABILITIES[mode];
-  res.json({ interfaceMode: mode, modules: caps.modules, actions: caps.actions });
+  const modules = [...caps.modules];
+  if (XRAY_ENABLED && mode !== 'user' && !modules.includes('xray')) {
+    modules.push('xray');
+  }
+  res.json({ interfaceMode: mode, modules, actions: caps.actions });
 });
 
 // ── WireGuard clients ─────────────────────────────────────────────────────────
