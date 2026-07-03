@@ -34,6 +34,8 @@ On the first `GET /api/monitors` call (opening the Monitoring tab), if no monito
 | VPN DNS | dns | `dns.google` via `10.8.0.1` |
 | TLS Certificate | tls | `<WG_HOST>:443` (if `WG_HOST` is set) |
 
+> **Note when Xray is enabled:** Port 443 is owned by Xray, not Caddy. The auto-seeded TLS Certificate monitor targets `<WG_HOST>:443` and will check the Xray Reality handshake, not a TLS certificate. If you want to monitor the Caddy HTTPS portal, add a custom TLS monitor targeting `<WG_HOST>:8443` (or whatever `CADDY_HTTPS_PORT` is set to).
+
 ## Using the portal UI
 
 1. Open the **Monitoring** tab in the portal.

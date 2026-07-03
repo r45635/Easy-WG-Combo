@@ -113,6 +113,13 @@ Ports opened automatically by the installer:
 | `80/tcp`, `443/tcp` | HTTPS (only when `PUBLIC_HTTPS_ENABLED=yes`) |
 | `53/udp+tcp` from `172.16.0.0/12` | AdGuard DNS reachable from Docker bridge |
 
+When Xray is enabled (`XRAY_ENABLED=yes`), the installer also opens:
+
+| Port | Purpose |
+|---|---|
+| `443/tcp` | VLESS+Reality tunnel (Xray takes over from Caddy) |
+| `8443/tcp` | HTTPS admin portal (Caddy moves to this port) |
+
 All admin ports (8080, 51821, 3000) are bound to localhost — not reachable from the internet.
 
 Port 53 is exposed to the internet only on the VPN interface (wg0, inside the wg-easy container). VPN clients send DNS to `10.8.0.1`, which is forwarded via iptables DNAT inside the container to AdGuard Home running on the host.
@@ -124,12 +131,15 @@ Port 53 is exposed to the internet only on the VPN interface (wg0, inside the wg
 | `wg-easy` v14 | Docker bridge | WireGuard peer management | `127.0.0.1:51821` |
 | `adguard` | host | DNS filtering + AdGuard UI | `127.0.0.1:3000`, `0.0.0.0:53` |
 | `portal` | host | Admin UI + API | `127.0.0.1:8080` |
-| `caddy` | host | HTTPS reverse proxy | `0.0.0.0:80/443` |
+| `caddy` | host | HTTPS reverse proxy | `0.0.0.0:80/443` (or `8443` when Xray active) |
+| `xray` *(optional)* | host | VLESS+Reality DPI-resistant tunnel | `0.0.0.0:443` (when `XRAY_ENABLED=yes`) |
 
-`adguard`, `portal`, and `caddy` use `network_mode: host` — AdGuard needs port 53 on the host; Caddy needs ports 80/443 for ACME.
+`adguard`, `portal`, and `caddy` use `network_mode: host` — AdGuard needs port 53 on the host; Caddy needs ports 80/443 for ACME (or 8443 when Xray takes 443).
 
 `wg-easy` runs in a Docker bridge network. Its `wg0` interface (`10.8.0.1`) is inside the container. DNS queries from VPN clients arrive on `wg0` and are DNAT'd to the Docker bridge gateway (`172.18.x.1`) where AdGuard listens.
 
 `wg-easy` is pinned to `v14` — the v1.0.x line has an incompatible API rewrite.
 
 `PASSWORD_HASH` lives in `.env.secrets` (gitignored) and is injected via shell environment — docker-compose variable interpolation mangles bcrypt `$` signs when read from `env_file:` or `.env`.
+
+The `xray` container is added automatically by `compose.sh` when `XRAY_ENABLED=yes` in `.env`. Enable it by re-running `./bootstrap.sh` after setting the flag. See [Xray documentation](xray.md) for full setup instructions.

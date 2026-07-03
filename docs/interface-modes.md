@@ -32,6 +32,7 @@ For the person managing the VPS. Full operational control without needing to tou
 - Monitoring — uptime checks with alert notifications
 - Notifications — configure email and webhook channels
 - Security — security score, service health, TLS certificate info, change password
+- VLESS+Reality (Xray) — per-device QR codes from the Devices tab; VLESS+Reality sidebar tab (if Xray is enabled)
 
 **Hidden:** WireGuard config, AdGuard admin UI, Gateway, Apps, File Drop, Migration, raw Fail2Ban controls, access log
 
@@ -74,6 +75,7 @@ The selected mode is saved to `/data/portal-config.json` and persists across res
 | Dashboard | Simplified | Full stats | Full stats + Fail2Ban details |
 | Devices | ✓ | ✓ | ✓ |
 | DNS Protection | Simple (3 options) | Full profiles | Full profiles |
+| VLESS+Reality (Xray) | — | ✓ (if enabled) | ✓ (if enabled) |
 | Backups | — | ✓ | ✓ + encrypted + dry-run |
 | Monitoring | — | ✓ | ✓ |
 | Notifications | — | ✓ | ✓ + raw config |
@@ -99,6 +101,7 @@ Enforced actions:
 | Assign DNS profile | — | ✓ | ✓ |
 | Create / restore backup | — | ✓ | ✓ |
 | Configure notifications | — | ✓ | ✓ |
+| Get VLESS QR (per device) | — | ✓ | ✓ |
 | Public gateway services | — | — | ✓ |
 | App lifecycle | — | — | ✓ |
 | File Drop public link | — | — | ✓ |

@@ -24,7 +24,7 @@ Each device gets its own VLESS UUID. Revoking a device immediately removes its V
 
 ```bash
 # Edit on the VPS
-nano /opt/vps-toronto/.env
+nano /root/Easy-WG-Combo/.env
 
 # Change:
 XRAY_ENABLED=no
@@ -35,7 +35,7 @@ XRAY_ENABLED=yes
 ### 2. Re-run bootstrap.sh
 
 ```bash
-cd /opt/vps-toronto
+cd /root/Easy-WG-Combo
 ./bootstrap.sh
 ```
 

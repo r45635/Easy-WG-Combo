@@ -170,6 +170,20 @@ Common causes:
 
 ---
 
+## Xray / VLESS+Reality issues
+
+See the dedicated [Xray troubleshooting section](xray.md#troubleshooting) in the Xray documentation.
+
+Common checks:
+```bash
+./compose.sh ps                    # confirm xray container is running
+./compose.sh logs xray --tail=50   # check for startup errors
+ufw status | grep 443              # confirm port 443 is open
+./easywg xray status               # show service status, port, public key
+```
+
+---
+
 ## How to get logs
 
 ```bash
@@ -177,6 +191,7 @@ Common causes:
 ./compose.sh logs wg-easy --tail=100     # WireGuard
 ./compose.sh logs adguard --tail=100     # AdGuard Home
 ./compose.sh logs caddy --tail=100       # Caddy / HTTPS
+./compose.sh logs xray --tail=100        # Xray (if enabled)
 ```
 
 Or check the access log in the Security tab (Advanced mode) for HTTP-level errors.
