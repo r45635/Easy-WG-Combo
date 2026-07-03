@@ -2870,7 +2870,7 @@ function renderDevicesTable() {
       <td class="actions">
         <button class="btn-sm btn-ghost" data-action="dev-config" data-id="${dev.id}" title="Download config">↓</button>
         <button class="btn-sm btn-ghost" data-action="dev-qr" data-id="${dev.id}" title="WireGuard QR">⊡</button>
-        ${state.modules?.includes('xray') && !dev.revokedAt ? `<button class="btn-sm btn-ghost" data-action="dev-xray" data-id="${dev.id}" title="VLESS URI">⊛</button>` : ''}
+        ${hasModule('xray') && !dev.revokedAt ? `<button class="btn-sm btn-ghost" data-action="dev-xray" data-id="${dev.id}" title="VLESS URI">⊛</button>` : ''}
         ${dev.revokedAt ? '' : `<button class="btn-sm btn-ghost" data-action="dev-disable" data-id="${dev.id}">${dev.wgClient?.enabled === false ? '▶' : '‖'}</button>`}
         ${dev.revokedAt ? '' : `<button class="btn-sm btn-danger" data-action="dev-revoke" data-id="${dev.id}">✕</button>`}
       </td>
