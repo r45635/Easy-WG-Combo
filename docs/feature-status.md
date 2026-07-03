@@ -42,6 +42,8 @@
 
 | Feature | Status | Notes |
 |---|---|---|
+| VLESS+Reality (Xray) | Beta | DPI-resistant tunnel; per-device UUIDs; QR from Devices tab; visible in Super User + Advanced |
+| Mobile-responsive UI | Stable | Hamburger menu, collapsible sidebar, touch-friendly nav |
 | Gateway / Reverse Proxy | Experimental | Caddy-based service exposure; VPN-only or public HTTPS |
 | Apps | Preview | Catalog readable; install/manage not validated for production |
 | File Drop | Preview | UI available; public link security not fully audited |
@@ -66,6 +68,7 @@
 | `./easywg app catalog` | Preview (catalog only) |
 | `./easywg app install/remove/start/stop` | Preview (disabled) |
 | `./easywg filedrop *` | Preview (disabled) |
+| `./easywg xray *` | Beta |
 
 ---
 
@@ -80,6 +83,7 @@ Safe for regular personal VPS use:
 - Device Inventory
 - DNS Profiles
 - Monitoring
+- VLESS+Reality (Xray) — per-device UUIDs, QR from Devices tab
 
 Use with care:
 - Gateway / Reverse Proxy (can expose services publicly if misconfigured)

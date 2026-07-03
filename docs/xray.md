@@ -4,6 +4,8 @@ Easy-WG-Combo can optionally add **Xray VLESS+Reality** alongside WireGuard for 
 
 VLESS+Reality is designed for high-censorship environments (China GFW-level, Iran, etc.). It borrows the TLS fingerprint from a legitimate public site (e.g. cloudflare.com) — the traffic is indistinguishable from a browser connecting to that site, and active probing returns a genuine response from the borrowed server.
 
+Each device gets its own VLESS UUID. Revoking a device immediately removes its VLESS access alongside WireGuard access.
+
 ---
 
 ## When to use this
@@ -70,19 +72,33 @@ Login with your admin password as usual.
 
 ## Generating a client configuration
 
-### Via the portal (recommended)
+### Per device — from the Devices tab (recommended)
 
-1. Open the portal in Advanced mode
+Each device gets a unique VLESS UUID. To get the QR code for a specific device:
+
+1. Open **Devices** (available in Super User and Advanced mode)
+2. Click the **⊛** button on the device row
+3. A modal opens with a scannable QR code and a copyable VLESS URI specific to that device
+4. Scan with your client app or tap **Copy URI**
+
+Revoking the device from the same table immediately invalidates its VLESS URI.
+
+### Global URI — from the VLESS+Reality tab
+
+A shared fallback URI (using the server-wide UUID) is also available:
+
+1. Open the portal in Super User or Advanced mode
 2. Click **VLESS+Reality** in the sidebar
-3. Enter a label (e.g. `iPhone-Vincent`)
-4. Click **Generate URI** — a QR code and VLESS URI appear
-5. Scan the QR code or copy the URI into your client app
+3. Enter a label (e.g. `iPhone-Vincent`) and click **Generate URI**
+4. Scan the QR code or copy the URI
+
+> This URI is shared across all devices and cannot be revoked per device. Prefer the per-device method above.
 
 ### Via CLI
 
 ```bash
 ./easywg xray client-uri "iPhone-Vincent"
-# prints the VLESS URI directly
+# prints the global VLESS URI with the given label
 ```
 
 ---
@@ -128,9 +144,10 @@ The SNI target can be changed via `XRAY_SNI_TARGET` in `.env`. Any large HTTPS s
 ## Security notes
 
 - `.env.secrets` contains the X25519 private key — treat it like any private key
-- The VLESS UUID is equivalent to a password; rotate it by re-running `./bootstrap.sh` (new install)
+- Each device has its own VLESS UUID — revoking a device invalidates its UUID in xray/config.json
+- The server-wide UUID (`XRAY_UUID`) is a fallback; rotate it by re-running `./bootstrap.sh` (new install)
 - Port 443 is fully owned by Xray — nothing else is publicly accessible on that port
-- Port 8443 (Caddy) is `localhost`-only and not exposed in UFW
+- Port 8443 (Caddy) is accessible on all interfaces (direct IP) — restrict by IP in UFW if desired
 
 ---
 
