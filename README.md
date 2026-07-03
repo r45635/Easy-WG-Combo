@@ -141,6 +141,8 @@ This is convenient but increases the attack surface. If you enable it: use a str
 
 Open **Devices** → **+ New device** → choose a DNS preset → share the QR code or `.conf` file.
 
+Install a WireGuard client app on the device to scan the QR code. → [Client apps](docs/clients.md)
+
 ### Change DNS protection
 
 In **Devices**, click the settings icon on any device to change its DNS preset instantly — no reconnection needed.
@@ -245,6 +247,7 @@ Run `./easywg help` for the full command list.
 | Document | Contents |
 |---|---|
 | [Setup guide](docs/setup.md) | Bootstrap options, manual install, env variables, Fail2Ban, firewall |
+| [Client apps](docs/clients.md) | WireGuard and VLESS+Reality apps for Android, iOS, macOS, Windows, Linux |
 | [Interface modes](docs/interface-modes.md) | User / Super User / Advanced breakdown |
 | [Feature status](docs/feature-status.md) | Detailed status for all features |
 | [Xray VLESS+Reality](docs/xray.md) | DPI-resistant tunnel — setup, per-device QR, client apps |
