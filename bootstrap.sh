@@ -420,6 +420,13 @@ set_password_hash_secret() {
 set_portal_server_name() {
   local server_name="$1"
 
+  # portal-config.json is owned by the portal and also holds adminPassword and
+  # interfaceMode. Never overwrite it on a re-run — that would reset the admin's
+  # password and interface mode. SERVER_NAME in .env already provides the display
+  # name (see DEFAULT_SERVER_NAME in portal/server.js), so only seed the file on a
+  # fresh install where it does not exist yet.
+  [ -f "$PORTAL_SETTINGS_FILE" ] && return 0
+
   mkdir -p "$(dirname "$PORTAL_SETTINGS_FILE")"
   printf '{\n  "serverName": "%s"\n}\n' "$server_name" > "$PORTAL_SETTINGS_FILE"
 }
@@ -634,6 +641,8 @@ resolve_admin_domain() {
   printf '%s' "$admin_domain"
 }
 
+# Keep this in sync with generateMainCaddyfile() in portal/server.js — the portal
+# regenerates the same Caddyfile when the admin changes the Server Endpoint from the UI.
 configure_caddy() {
   local admin_domain="$1"
   local caddy_https_port="${2:-}"   # when set, Caddy binds to localhost:$caddy_https_port (Xray mode)
