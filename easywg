@@ -80,6 +80,10 @@ Commands:
   filedrop status           Show storage usage
   filedrop cleanup          Delete expired and exhausted shares
 
+  xray status               Show Xray VLESS+Reality service status
+  xray client-uri [label]   Generate VLESS+Reality URI for a client
+  xray restart              Restart the Xray container
+
 Options:
   --help, -h                Show this help
   --version, -v             Show version
@@ -168,6 +172,10 @@ case "${1:-}" in
   filedrop)
     shift
     bash "$SCRIPTS_DIR/filedrop.sh" "$@"
+    ;;
+  xray)
+    shift
+    bash "$SCRIPTS_DIR/xray.sh" "$@"
     ;;
   *)
     echo "Unknown command: ${1:-}" >&2

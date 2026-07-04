@@ -643,3 +643,8 @@ body[data-interface-mode="super_user"] [data-show-min="advanced"] { display: non
 .dns-basic-card.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--surface2)); }
 .dns-basic-card-title { font-weight: 600; margin-bottom: .3rem; }
 .dns-basic-card-desc  { font-size: .78rem; color: var(--text-dim); }
+
+/* ── Xray VLESS+Reality tab ── */
+.xray-gen-row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
+.xray-gen-row input { flex: 1; min-width: 200px; max-width: 320px; }
+.xray-uri-block { font-size: .8rem; word-break: break-all; background: var(--surface2); padding: .6rem .75rem; border-radius: 4px; margin-bottom: .5rem; }

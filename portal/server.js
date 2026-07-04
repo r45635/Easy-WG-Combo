@@ -37,6 +37,15 @@ const ALERT_DISK_THRESHOLD  = parseInt(process.env.ALERT_DISK_THRESHOLD  || '85'
 const ALERT_CERT_EXPIRY_DAYS = parseInt(process.env.ALERT_CERT_EXPIRY_DAYS || '14', 10);
 const runCmd = promisify(execFile);
 
+// ── Xray VLESS+Reality ────────────────────────────────────────────────────────
+const XRAY_ENABLED    = (process.env.XRAY_ENABLED || 'no').toLowerCase() === 'yes';
+const XRAY_UUID       = process.env.XRAY_UUID       || '';
+const XRAY_PUBLIC_KEY = process.env.XRAY_PUBLIC_KEY || '';
+const XRAY_SHORT_ID   = process.env.XRAY_SHORT_ID   || '';
+const XRAY_SNI_TARGET = process.env.XRAY_SNI_TARGET || 'www.cloudflare.com';
+const XRAY_PORT       = parseInt(process.env.XRAY_PORT || '443', 10);
+const XRAY_CONFIG_PATH = '/xray-config/config.json';
+
 // ── Phase 2: constants ─────────────────────────────────────────────────────────
 
 const DEVICES_FILE        = '/data/devices.json';
@@ -107,7 +116,7 @@ const UI_CAPABILITIES = {
   advanced: {
     modules: ['dashboard', 'devices', 'clients', 'wireguard', 'adguard',
               'dns_profiles', 'gateway', 'monitoring', 'apps', 'filedrop',
-              'migration', 'security', 'backups', 'notifications', 'settings'],
+              'migration', 'security', 'backups', 'notifications', 'xray', 'settings'],
     actions: { all: true },
   },
 };
@@ -435,6 +444,7 @@ app.get('/api/config', auth, (_req, res) => res.json({
   adguardPath: '/adguard/',
   serverName: getServerName(),
   interfaceMode: getInterfaceMode(),
+  xrayEnabled: XRAY_ENABLED,
 }));
 
 app.post('/api/server-name', auth, (req, res) => {
@@ -2549,6 +2559,9 @@ function seedDefaultMonitors() {
   if (VPS_HOST) {
     defaults.push({ id: 'mon_tls', name: 'TLS Certificate', type: 'tls', target: `${VPS_HOST}:443` });
   }
+  if (XRAY_ENABLED) {
+    defaults.push({ id: 'mon_xray', name: 'Xray', type: 'docker', target: 'xray' });
+  }
   const services = loadProxyServices();
   for (const svc of Object.values(services)) {
     if (svc.enabled && svc.exposure === 'public') {
@@ -3177,6 +3190,81 @@ app.post('/api/migration/validate', auth, async (req, res) => {
     score: [wg.up, ag.up, caddyUp].filter(Boolean).length,
     maxScore: 3,
   });
+});
+
+// ── Xray VLESS+Reality routes ────────────────────────────────────────────────
+
+app.get('/api/xray/status', auth, async (_req, res) => {
+  if (!XRAY_ENABLED) return res.json({ enabled: false });
+  try {
+    const data = await dockerApiRequest('/containers/xray/json');
+    res.json({
+      enabled:   true,
+      running:   data?.State?.Running === true,
+      status:    data?.State?.Status || 'unknown',
+      startedAt: data?.State?.StartedAt || null,
+      uuid:      XRAY_UUID,
+      publicKey: XRAY_PUBLIC_KEY,
+      sniTarget: XRAY_SNI_TARGET,
+      port:      XRAY_PORT,
+    });
+  } catch (e) {
+    res.json({ enabled: true, running: false, status: 'error', error: e.message });
+  }
+});
+
+app.get('/api/xray/config', auth, (_req, res) => {
+  if (!XRAY_ENABLED) return res.json({ enabled: false });
+  try {
+    const cfg = JSON.parse(fs.readFileSync(XRAY_CONFIG_PATH, 'utf8'));
+    // Redact private key before returning to browser
+    if (cfg?.inbounds?.[0]?.streamSettings?.realitySettings) {
+      cfg.inbounds[0].streamSettings.realitySettings.privateKey = '***';
+    }
+    res.json({ enabled: true, config: cfg });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/xray/client-config', auth, async (req, res) => {
+  if (!XRAY_ENABLED) return res.json({ enabled: false });
+  const label = String(req.query.label || getServerName()).slice(0, 64);
+  const host  = VPS_HOST || '0.0.0.0';
+  const params = new URLSearchParams({
+    encryption: 'none',
+    flow:       'xtls-rprx-vision',
+    security:   'reality',
+    sni:        XRAY_SNI_TARGET,
+    fp:         'chrome',
+    pbk:        XRAY_PUBLIC_KEY,
+    sid:        XRAY_SHORT_ID,
+    type:       'tcp',
+  });
+  const uri = `vless://${XRAY_UUID}@${host}:${XRAY_PORT}?${params.toString()}#${encodeURIComponent(label)}`;
+  try {
+    const qrcode = await QRCode.toDataURL(uri, { width: 256, margin: 2 });
+    res.json({ enabled: true, uri, qrcode, label });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/xray/restart', auth, async (_req, res) => {
+  if (!XRAY_ENABLED) return res.status(404).json({ error: 'Xray not enabled' });
+  try {
+    await new Promise((resolve, reject) => {
+      const req2 = http.request({ socketPath: DOCKER_SOCK, path: '/containers/xray/restart', method: 'POST' }, r => {
+        if (r.statusCode === 204) return resolve();
+        reject(new Error(`Docker restart returned ${r.statusCode}`));
+      });
+      req2.on('error', reject);
+      req2.end();
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Phase 3: Monitor scheduler ────────────────────────────────────────────────

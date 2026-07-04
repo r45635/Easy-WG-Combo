@@ -86,6 +86,9 @@
         <a href="#" class="nav-item" data-tab="migration" data-requires-module="migration">
           <span class="nav-icon">⇌</span> <span data-i18n="nav.migration">Migration</span>
         </a>
+        <a href="#" class="nav-item" data-tab="xray" data-requires-module="xray">
+          <span class="nav-icon">⊛</span> <span data-i18n="nav.xray">VLESS+Reality</span>
+        </a>
         <a href="#" class="nav-item" data-tab="settings" data-requires-module="settings">
           <span class="nav-icon">⚙</span> <span data-i18n="nav.settings">Settings</span>
         </a>
@@ -766,6 +769,50 @@
           <div style="margin-top:1.5rem">
             <button class="btn-primary" id="migration-export-btn" data-i18n="migration.export">Create Migration Backup</button>
             <span id="migration-export-result" style="margin-left:.8rem;font-size:.85rem"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Xray VLESS+Reality -->
+      <section id="tab-xray" class="tab-content hidden">
+        <div class="page-header">
+          <div><h2 data-i18n="nav.xray">VLESS+Reality</h2></div>
+          <div class="page-actions">
+            <button class="btn-ghost btn-sm" id="xray-refresh-btn" data-i18n="common.refresh">↻ Refresh</button>
+            <button class="btn-ghost btn-sm" id="xray-restart-btn" data-i18n="xray.restart">↺ Restart Xray</button>
+          </div>
+        </div>
+        <div id="xray-loading" class="text-dim" style="font-size:.85rem" data-i18n="common.loading">Loading…</div>
+        <div id="xray-wrap" class="hidden">
+          <!-- Status card -->
+          <div class="security-panel" id="xray-status-panel">
+            <h3 data-i18n="xray.status">Service Status</h3>
+            <div id="xray-status-body"></div>
+          </div>
+          <!-- Connection parameters -->
+          <div class="security-panel">
+            <h3 data-i18n="xray.connectionInfo">Connection Parameters</h3>
+            <div id="xray-conn-info"></div>
+          </div>
+          <!-- Client URI generator -->
+          <div class="security-panel">
+            <h3 data-i18n="xray.clientUri">Client Configuration</h3>
+            <div class="xray-gen-row">
+              <input type="text" id="xray-label-input" placeholder="Client label (e.g. iPhone-Vincent)">
+              <button type="button" class="btn-primary btn-sm" id="xray-gen-btn" data-i18n="xray.generate">Generate URI</button>
+            </div>
+            <div id="xray-uri-result" class="hidden">
+              <div class="qr-wrap">
+                <img id="xray-qr" src="" alt="VLESS QR Code">
+              </div>
+              <div class="xray-uri-block">
+                <code id="xray-uri-text"></code>
+              </div>
+              <button type="button" class="btn-ghost btn-sm" id="xray-copy-btn" data-i18n="common.copy">⎘ Copy URI</button>
+              <p class="qr-hint" data-i18n="xray.uriHint">
+                Import with v2rayN (Windows/Linux), v2rayNG (Android), Shadowrocket or Sing-box (iOS/macOS).
+              </p>
+            </div>
           </div>
         </div>
       </section>
