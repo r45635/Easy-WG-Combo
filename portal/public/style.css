@@ -699,3 +699,25 @@ body[data-interface-mode="super_user"] [data-show-min="advanced"] { display: non
   border-radius: 4px; width: 100%; display: block; box-sizing: border-box;
 }
 .xray-device-hint { font-size: .8rem; margin: 0; }
+
+
+/* ── Server Endpoint settings ── */
+.endpoint-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.endpoint-input {
+  flex: 1; min-width: 220px; padding: .45rem .6rem;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-input, var(--bg-card)); color: var(--text);
+}
+.endpoint-status { margin-top: .5rem; font-size: .85rem; }
+.endpoint-warning {
+  margin-top: .5rem; padding: .5rem .75rem;
+  background: var(--warn-bg, #fffbe622); border: 1px solid var(--warn-border, #f5c518);
+  border-radius: 6px; font-size: .82rem; color: var(--text);
+}
+.endpoint-actions { margin-top: .75rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.endpoint-reconnect { font-size: .85rem; color: var(--text-dim); }
+.endpoint-spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid var(--text-dim); border-top-color: var(--accent, #4f8ef7);
+  border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle;
+}
