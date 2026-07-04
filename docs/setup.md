@@ -119,6 +119,7 @@ When Xray is enabled (`XRAY_ENABLED=yes`), the installer also opens:
 |---|---|
 | `443/tcp` | VLESS+Reality tunnel (Xray takes over from Caddy) |
 | `8443/tcp` | HTTPS admin portal (Caddy moves to this port) |
+| `80/tcp` | Opened only with a real domain + `TLS_EMAIL` — Let's Encrypt HTTP-01 challenge (TLS-ALPN-01 is impossible since Xray owns 443). Stays closed for a bare-IP / self-signed setup. |
 
 All admin ports (8080, 51821, 3000) are bound to localhost — not reachable from the internet.
 
@@ -134,7 +135,7 @@ Port 53 is exposed to the internet only on the VPN interface (wg0, inside the wg
 | `caddy` | host | HTTPS reverse proxy | `0.0.0.0:80/443` (or `8443` when Xray active) |
 | `xray` *(optional)* | host | VLESS+Reality DPI-resistant tunnel | `0.0.0.0:443` (when `XRAY_ENABLED=yes`) |
 
-`adguard`, `portal`, and `caddy` use `network_mode: host` — AdGuard needs port 53 on the host; Caddy needs ports 80/443 for ACME (or 8443 when Xray takes 443).
+`adguard`, `portal`, and `caddy` use `network_mode: host` — AdGuard needs port 53 on the host; Caddy needs ports 80/443 for ACME (or `8443` + port 80 for the HTTP-01 challenge when Xray takes 443).
 
 `wg-easy` runs in a Docker bridge network. Its `wg0` interface (`10.8.0.1`) is inside the container. DNS queries from VPN clients arrive on `wg0` and are DNAT'd to the Docker bridge gateway (`172.18.x.1`) where AdGuard listens.
 

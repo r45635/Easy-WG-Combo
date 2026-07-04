@@ -48,7 +48,8 @@ This is convenient for remote access without an SSH client, but it increases the
 
 When `XRAY_ENABLED=yes`, Xray takes over port 443. Caddy moves to `CADDY_HTTPS_PORT` (default `8443`). In this configuration:
 
-- The admin portal is accessible at `https://<VPS_IP>:8443` using Caddy's internal self-signed certificate
+- With a real domain (`ADMIN_DOMAIN` FQDN) + `TLS_EMAIL`, the portal is at `https://<your-domain>:8443` with a **valid Let's Encrypt certificate** (issued via HTTP-01 on port 80, since Xray owns 443). Access is by hostname only — a public cert cannot cover a bare IP.
+- With a bare IP or no `TLS_EMAIL`, the portal is at `https://<VPS_IP>:8443` using Caddy's internal **self-signed** certificate (browser warning on first access).
 - The login page is still protected by Fail2Ban via Caddy access logs
 - Port 443 is fully owned by the Xray VLESS+Reality service — traffic on that port is not admin traffic
 

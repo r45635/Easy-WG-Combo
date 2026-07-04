@@ -155,8 +155,14 @@ print_final_summary() {
   local ssh_port="${SSH_PORT:-22}"
   local admin_url=""
 
+  # Public (Let's Encrypt) cert requires a real FQDN + ACME email — matches configure_caddy.
+  local xray_public_tls="no"
+  if [ -n "${admin_domain:-}" ] && [ -n "${tls_email:-}" ] && ! is_ip_address "${admin_domain:-}"; then
+    xray_public_tls="yes"
+  fi
+
   if is_truthy "$xray_enabled"; then
-    admin_url="https://${wg_host}:${caddy_https_port}"
+    admin_url="https://${admin_domain:-$wg_host}:${caddy_https_port}"
   elif is_truthy "$public_https_enabled"; then
     if is_ip_address "${admin_domain:-}"; then
       admin_url="https://${admin_domain}"
@@ -180,7 +186,15 @@ print_final_summary() {
   if is_truthy "$xray_enabled"; then
     log "Xray VLESS+Reality: enabled on port 443"
     log "  → Client URI: ./easywg xray client-uri"
-    log "  → Admin portal: https://${wg_host}:${caddy_https_port} (accept self-signed cert)"
+    if [ "$xray_public_tls" = "yes" ]; then
+      log "  → Admin portal: https://${admin_domain}:${caddy_https_port} (valid Let's Encrypt cert)"
+      log "     ⚠ Use the hostname, NOT the IP — a public cert cannot cover https://${wg_host}:${caddy_https_port}"
+      log "     ⚠ The cert is issued via HTTP-01 on port 80: DNS for ${admin_domain} must point here and port 80 must be reachable."
+      log "        If issuance fails, Caddy serves a self-signed cert and retries. Check: ./compose.sh logs caddy | grep -i certificate"
+    else
+      log "  → Admin portal: https://${admin_domain:-$wg_host}:${caddy_https_port} (self-signed cert — accept the browser warning)"
+      log "     ℹ For a warning-free cert, set a real ADMIN_DOMAIN (FQDN pointing here) + TLS_EMAIL in .env and re-run bootstrap."
+    fi
   fi
   log "GitHub: ${BOOTSTRAP_REPO_URL}"
   log "Script version: ${BOOTSTRAP_VERSION}"
