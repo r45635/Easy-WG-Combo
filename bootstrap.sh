@@ -636,20 +636,38 @@ configure_caddy() {
     printf '# Easy-WG-Combo managed proxy services — edited by the portal, do not edit manually\n' > "$services_file"
   fi
 
+  # Whether Caddy can obtain a publicly-trusted (Let's Encrypt) cert:
+  # requires a real FQDN (not a bare IP) and an ACME contact email.
+  local use_public_tls="no"
+  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+    use_public_tls="yes"
+  fi
+
   {
     printf '{\n'
-    # In Xray mode Caddy is localhost-only; no ACME email needed (tls internal always)
-    if [ -z "$caddy_https_port" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+    if [ "$use_public_tls" = "yes" ]; then
       printf '  email %s\n' "$tls_email"
     fi
     printf '  admin localhost:2019\n'
     printf '}\n\n'
 
     if [ -n "$caddy_https_port" ]; then
-      # Xray mode: Caddy on public port $caddy_https_port (self-signed TLS, session auth)
-      # Use explicit admin_domain so Caddy issues the cert for the correct IP/hostname
+      # Xray mode: Caddy serves the portal publicly on $caddy_https_port (443 is held by Xray).
+      # Use explicit admin_domain so the cert is issued for the correct hostname/IP.
       printf '%s:%s {\n' "${admin_domain:-:}" "$caddy_https_port"
-      printf '  tls internal\n'
+      if [ "$use_public_tls" = "yes" ]; then
+        # Real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is impossible —
+        # force the HTTP-01 challenge (served by Caddy on :80).
+        printf '  tls {\n'
+        printf '    issuer acme {\n'
+        printf '      email %s\n' "$tls_email"
+        printf '      disable_tlsalpn_challenge\n'
+        printf '    }\n'
+        printf '  }\n'
+      else
+        # Bare IP or no email: fall back to a self-signed cert (browser warning).
+        printf '  tls internal\n'
+      fi
     else
       if [ -z "$admin_domain" ]; then
         admin_domain=":443"
@@ -735,18 +753,31 @@ configure_firewall() {
   local wg_port="$1"
   local xray_enabled="${2:-no}"
   local caddy_https_port="${3:-8443}"
+  local admin_domain="${4:-}"
   local ssh_port="${SSH_PORT:-22}"
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
+  local tls_email="${TLS_EMAIL:-}"
+
+  # Caddy can obtain a public (Let's Encrypt) cert only with a real FQDN + ACME email.
+  local use_public_tls="no"
+  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+    use_public_tls="yes"
+  fi
 
   log "Configuring UFW..."
   run_root ufw allow "${ssh_port}/tcp"
   run_root ufw allow "${wg_port}/udp"
   if is_truthy "$xray_enabled"; then
-    # Xray on 443; portal on caddy_https_port (public, self-signed TLS)
+    # Xray on 443; portal on caddy_https_port
     run_root ufw allow 443/tcp
     run_root ufw allow "${caddy_https_port}/tcp"
-    # Remove port 80 rule if present (may have been opened in a previous non-Xray install)
-    run_root ufw delete allow 80/tcp 2>/dev/null || true
+    if [ "$use_public_tls" = "yes" ]; then
+      # Xray owns :443, so Caddy validates its cert via HTTP-01 on :80 — keep it open.
+      run_root ufw allow 80/tcp
+    else
+      # Self-signed cert (bare IP or no email): port 80 is not needed.
+      run_root ufw delete allow 80/tcp 2>/dev/null || true
+    fi
   elif is_truthy "$public_https_enabled"; then
     run_root ufw allow 80/tcp
     run_root ufw allow 443/tcp
@@ -1001,13 +1032,13 @@ main() {
   local caddy_https_port="${CADDY_HTTPS_PORT:-${_env_caddy_port:-8443}}"
 
   configure_sysctl
-  configure_firewall "$wg_port" "$xray_enabled" "$caddy_https_port"
+  configure_firewall "$wg_port" "$xray_enabled" "$caddy_https_port" "$admin_domain"
 
   if is_truthy "$xray_enabled"; then
     log "Configuring Xray VLESS+Reality..."
     configure_xray
     set_env_value "$ENV_FILE" "CADDY_HTTPS_PORT" "$caddy_https_port"
-    log "Configuring Caddy on localhost:${caddy_https_port} (SSH tunnel access only)..."
+    log "Configuring Caddy on public port ${caddy_https_port}..."
     configure_caddy "$admin_domain" "$caddy_https_port"
     log "Configuring Fail2Ban protection..."
     configure_fail2ban
