@@ -14,7 +14,12 @@ Each device gets its own VLESS UUID. Revoking a device immediately removes its V
 - You need a tunnel that survives active probing (GFW-style detection)
 - You still want the Easy-WG-Combo admin portal and DNS filtering
 
-**Trade-off:** when Xray is active, port 443 is owned by Xray. Caddy moves to port `8443` — the admin portal remains accessible at `https://<VPS_IP>:8443`, but with a self-signed certificate (Caddy internal CA, not a Let's Encrypt cert). The browser will warn about the certificate on first access — add an exception once.
+**Trade-off:** when Xray is active, port 443 is owned by Xray. Caddy moves to port `8443`. How the admin portal's certificate is handled depends on your `.env`:
+
+- **With a real domain** (`ADMIN_DOMAIN` = an FQDN pointing at the VPS) **and `TLS_EMAIL` set** → Caddy obtains a **valid Let's Encrypt certificate** via the HTTP-01 challenge on port 80 (443 is taken by Xray, so TLS-ALPN-01 is disabled automatically). Access the portal at `https://<your-domain>:8443` with **no browser warning**. You must use the hostname — a public cert cannot cover a bare IP, so `https://<VPS_IP>:8443` will fail with a TLS/cipher error.
+- **With a bare IP or no `TLS_EMAIL`** → Caddy falls back to a **self-signed certificate** (internal CA). Access at `https://<VPS_IP>:8443`; the browser warns on first access — add an exception once.
+
+> **Prerequisite for the valid cert:** DNS for your domain must resolve to the VPS **and** port 80 must be reachable from the internet (bootstrap opens it in UFW automatically in this mode). If issuance fails, Caddy keeps serving a self-signed cert and retries in the background.
 
 ---
 
@@ -44,7 +49,8 @@ When prompted about existing config, choose **keep**. Bootstrap will:
 - Generate a UUID, X25519 key pair, and short ID
 - Write private secrets to `.env.secrets`
 - Write `./xray/config.json`
-- Regenerate the Caddyfile with Caddy on `<admin_domain>:8443` (public, all interfaces)
+- Regenerate the Caddyfile with Caddy on `<admin_domain>:8443` (public, all interfaces) — a valid Let's Encrypt cert if a real domain + `TLS_EMAIL` are set, otherwise a self-signed cert
+- Open port 80 in UFW when a valid cert is used (needed for the HTTP-01 challenge)
 - Start all containers including Xray
 
 ### 3. Verify deployment
@@ -58,13 +64,21 @@ When prompted about existing config, choose **keep**. Bootstrap will:
 
 ## Accessing the admin portal with Xray active
 
-Caddy is exposed on `CADDY_HTTPS_PORT` (default **8443**) on all interfaces. Access it directly:
+Caddy is exposed on `CADDY_HTTPS_PORT` (default **8443**) on all interfaces.
+
+**If you configured a real domain + `TLS_EMAIL`** (recommended) — access via the hostname, with a valid certificate and no warning:
+
+```
+https://<your-domain>:8443
+```
+
+> Use the hostname, **not** the IP. `https://<VPS_IP>:8443` will fail the TLS handshake (cipher error) because the public certificate is issued for the domain only.
+
+**If you use a bare IP or left `TLS_EMAIL` empty** — access by IP; accept the self-signed certificate warning on first access (Caddy uses its own internal CA):
 
 ```
 https://<VPS_IP>:8443
 ```
-
-The browser will warn about a self-signed certificate — add an exception (Caddy uses its own internal CA). This is expected and safe for a personal admin console.
 
 Login with your admin password as usual.
 
@@ -163,7 +177,8 @@ The SNI target can be changed via `XRAY_SNI_TARGET` in `.env`. Any large HTTPS s
 - Each device has its own VLESS UUID — revoking a device invalidates its UUID in xray/config.json
 - The server-wide UUID (`XRAY_UUID`) is a fallback; rotate it by re-running `./bootstrap.sh` (new install)
 - Port 443 is fully owned by Xray — nothing else is publicly accessible on that port
-- Port 8443 (Caddy) is accessible on all interfaces (direct IP) — restrict by IP in UFW if desired
+- Port 8443 (Caddy) is accessible on all interfaces — restrict by IP in UFW if desired
+- Port 80 is opened only when a real domain + `TLS_EMAIL` are set, so Caddy can complete the Let's Encrypt HTTP-01 challenge; with a bare IP / self-signed cert it stays closed
 
 ---
 
@@ -190,8 +205,16 @@ Caddy will move back to port 443, the public HTTPS portal returns, and the Xray 
 - Ensure the public key and short ID in the client match what `./easywg xray status` shows
 
 **Portal unreachable after activation:**
-- The portal is at `https://<VPS_IP>:8443` (or your admin domain) — accept the self-signed certificate warning on first access
+- With a real domain: the portal is at `https://<your-domain>:8443` — **use the hostname, not the IP** (the public cert doesn't cover a bare IP; hitting the IP gives a cipher/TLS error)
+- With a bare IP / no `TLS_EMAIL`: the portal is at `https://<VPS_IP>:8443` — accept the self-signed certificate warning on first access
 - Check Caddy is running: `./compose.sh ps`
+
+**Browser shows a cipher / `ERR_SSL_VERSION_OR_CIPHER_MISMATCH` error:**
+- You are hitting the portal **by IP** while a public (domain) certificate is configured. Use `https://<your-domain>:8443` instead.
+
+**Certificate stays self-signed even with a domain configured:**
+- The Let's Encrypt HTTP-01 challenge needs DNS pointing at the VPS and port 80 reachable. Verify: `dig +short <your-domain>` (must return the VPS IP) and `ufw status | grep 80`.
+- Inspect issuance: `./compose.sh logs caddy | grep -i certificate` — look for "certificate obtained" vs an error.
 
 **Xray container exits immediately:**
 - Check `./xray/config.json` is valid JSON
