@@ -30,8 +30,8 @@ const I18N = {
     'fail2ban.unbanError': 'Unable to unban this IP.',
     'server.label': 'Server',
     'server.rename': '✎ Rename server',
-    'server.prompt': 'Server name (letters, numbers, - and _ only):',
-    'server.invalid': 'Invalid server name. Use only letters, numbers, - or _.',
+    'server.prompt': 'Server name (letters, numbers, -, _ and . allowed):',
+    'server.invalid': 'Invalid server name. Use only letters, numbers, -, _ or .',
     'dns.helpButton': '? DNS Filters',
     'common.loading': 'Loading…',
     'common.cancel': 'Cancel',
@@ -407,8 +407,8 @@ const I18N = {
     'fail2ban.unbanError': 'Impossible de débannir cette IP.',
     'server.label': 'Serveur',
     'server.rename': '✎ Renommer le serveur',
-    'server.prompt': 'Nom du serveur (lettres, chiffres, - et _ uniquement) :',
-    'server.invalid': 'Nom invalide. Utilisez uniquement des lettres, chiffres, - ou _.',
+    'server.prompt': 'Nom du serveur (lettres, chiffres, -, _ et . autorisés) :',
+    'server.invalid': 'Nom invalide. Utilisez uniquement des lettres, chiffres, -, _ ou .',
     'dns.helpButton': '? Filtres DNS',
     'common.loading': 'Chargement…',
     'common.cancel': 'Annuler',
@@ -776,8 +776,8 @@ const I18N = {
     'fail2ban.unbanError': '无法解封该 IP。',
     'server.label': '服务器',
     'server.rename': '✎ 重命名服务器',
-    'server.prompt': '服务器名称（仅允许字母、数字、- 和 _）：',
-    'server.invalid': '服务器名称无效。仅允许字母、数字、- 和 _。',
+    'server.prompt': '服务器名称（允许字母、数字、-、_ 和 .）：',
+    'server.invalid': '服务器名称无效。仅允许字母、数字、-、_ 和 .。',
     'dns.helpButton': '? DNS 过滤说明',
     'common.loading': '加载中…',
     'common.cancel': '取消',
@@ -1282,7 +1282,7 @@ function renderServerName() {
 }
 
 function isValidServerName(name) {
-  return /^[A-Za-z0-9_-]+$/.test(String(name || '').trim());
+  return /^[A-Za-z0-9._-]+$/.test(String(name || '').trim());
 }
 
 function safeFileToken(name) {

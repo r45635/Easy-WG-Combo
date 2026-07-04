@@ -351,11 +351,11 @@ escape_sed_replacement() {
 }
 
 sanitize_server_name() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g'
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g'
 }
 
 validate_server_name() {
-  [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]
+  [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]
 }
 
 current_server_name() {
@@ -417,7 +417,7 @@ resolve_server_name() {
   default_name="$(current_server_name)"
 
   if [ -n "$server_name" ]; then
-    validate_server_name "$server_name" || die "Invalid SERVER_NAME '$server_name'. Use only letters, numbers, '-' or '_' without spaces."
+    validate_server_name "$server_name" || die "Invalid SERVER_NAME '$server_name'. Use only letters, numbers, '-', '_' or '.' without spaces."
     printf '%s' "$server_name"
     return
   fi
@@ -430,7 +430,7 @@ resolve_server_name() {
         printf '%s' "$server_name"
         return
       fi
-      printf '%s\n' "Server name must be short and use only letters, numbers, '-' or '_' without spaces."
+      printf '%s\n' "Server name must use only letters, numbers, '-', '_' or '.' without spaces."
     done
   fi
 

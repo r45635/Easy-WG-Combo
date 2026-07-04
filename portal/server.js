@@ -126,14 +126,14 @@ function sanitizeServerName(value) {
   return String(value || '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-')
     || 'vpn-server';
 }
 
 function isValidServerName(value) {
-  return /^[A-Za-z0-9_-]+$/.test(String(value || ''));
+  return /^[A-Za-z0-9._-]+$/.test(String(value || ''));
 }
 
 function loadSettings() {
