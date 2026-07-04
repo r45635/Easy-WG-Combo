@@ -1044,6 +1044,15 @@ main() {
     set_env_value "$ENV_FILE" "ADMIN_DOMAIN" "$admin_domain"
   fi
 
+  # bootstrap reads .env values via sed rather than sourcing the file, so TLS_EMAIL is
+  # not in the environment on a re-run. Load it here so the Caddy ACME path
+  # (configure_caddy), the firewall (configure_firewall) and the summary all see it —
+  # otherwise a configured FQDN + email still falls back to a self-signed cert.
+  if [ -z "${TLS_EMAIL:-}" ]; then
+    TLS_EMAIL="$(sed -n 's/^TLS_EMAIL=//p' "$ENV_FILE" 2>/dev/null | head -n 1)"
+    export TLS_EMAIL
+  fi
+
   if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"
   fi

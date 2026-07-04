@@ -24,4 +24,6 @@ services:
       - XRAY_PORT=${XRAY_PORT:-443}
       - CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-8443}
     volumes:
-      - ./xray:/xray-config:ro
+      # read-write: the portal reconciles config.json's client list from devices.json
+      # (per-device UUIDs) on boot and on device add/revoke via syncXrayClients()
+      - ./xray:/xray-config
