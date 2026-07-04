@@ -72,7 +72,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Security module: read host config files for security checks
       - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
-      - /etc/ufw:/etc/ufw:ro
+      # Security module reads UFW config; the Server Endpoint feature also opens port 80
+      # (Let's Encrypt HTTP-01) when switching to a public cert — needs write + NET_ADMIN.
+      - /etc/ufw:/etc/ufw
       - /etc/apt/apt.conf.d:/etc/apt/apt.conf.d:ro
       # Backup module: source directories (read-only) + output directory (writable)
       - ./wireguard:/backup-src/wireguard:ro
@@ -86,6 +88,10 @@ services:
       - ./caddy:/app-caddy:rw
       # File Drop: storage volume (excluded from portal data for clean backups)
       - ./filedrop:/filedrop:rw
+    cap_add:
+      # Lets the portal run `ufw allow 80/tcp` for the Let's Encrypt HTTP-01 challenge
+      # when the admin sets a public Server Endpoint while Xray owns :443.
+      - NET_ADMIN
     depends_on:
       - wg-easy
       - adguard

@@ -1,7 +1,7 @@
 FROM node:20-bookworm-slim
 WORKDIR /app
 RUN apt-get update \
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends fail2ban ca-certificates tar \
+	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends fail2ban ca-certificates tar ufw \
 	&& rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci --omit=dev

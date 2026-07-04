@@ -163,19 +163,34 @@ function readEnvValue(key) {
   } catch { return ''; }
 }
 
+// Keep this in sync with configure_caddy() in bootstrap.sh — the two generators must
+// produce the same Caddyfile. A public (Let's Encrypt) cert needs a real FQDN + email;
+// otherwise Caddy falls back to a self-signed internal cert.
 function generateMainCaddyfile(adminDomain, tlsEmail) {
   const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(adminDomain);
-  const useAcme = !caddyHttpsPort && !!tlsEmail && !isIp;
+  const usePublicTls = !!adminDomain && !!tlsEmail && !isIp;
 
   let out = '{\n';
-  if (useAcme) out += `  email ${tlsEmail}\n`;
+  if (usePublicTls) out += `  email ${tlsEmail}\n`;
   out += '  admin localhost:2019\n';
   out += '}\n\n';
 
   if (caddyHttpsPort) {
+    // Xray mode: portal is public on caddyHttpsPort (Xray owns :443).
     out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
-    out += '  tls internal\n';
+    if (usePublicTls) {
+      // Real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is impossible —
+      // force HTTP-01 (served by Caddy on :80). Requires port 80 open in UFW.
+      out += '  tls {\n';
+      out += '    issuer acme {\n';
+      out += `      email ${tlsEmail}\n`;
+      out += '      disable_tlsalpn_challenge\n';
+      out += '    }\n';
+      out += '  }\n';
+    } else {
+      out += '  tls internal\n';
+    }
   } else {
     const binding = adminDomain || ':443';
     out += `${binding} {\n`;
@@ -196,6 +211,19 @@ function generateMainCaddyfile(adminDomain, tlsEmail) {
   out += '}\n\n';
   out += 'import /etc/caddy/easywg-services.caddy\n';
   return out;
+}
+
+// Best-effort: open port 80 so Caddy can complete the Let's Encrypt HTTP-01 challenge
+// (used in Xray mode, where Xray owns :443 and TLS-ALPN-01 is impossible). Requires the
+// portal to have NET_ADMIN + writable /etc/ufw (see docker-compose.yml). Resolves to
+// true on success, false otherwise — the caller surfaces a manual-fallback hint on false.
+function openHttpChallengePort() {
+  return new Promise((resolve) => {
+    execFile('ufw', ['allow', '80/tcp'], (err, _stdout, stderr) => {
+      if (err) { console.error('ufw allow 80/tcp failed:', (stderr || err.message || '').trim()); resolve(false); }
+      else resolve(true);
+    });
+  });
 }
 
 let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
@@ -591,9 +619,22 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
   const effective = tlsEmail || readEnvValue('TLS_EMAIL');
   const caddyContent = generateMainCaddyfile(host, effective);
   fs.writeFileSync(CADDY_FILE, caddyContent);
+
+  // When switching to a public cert while Xray owns :443, Caddy validates via HTTP-01 on
+  // port 80 — open it so issuance succeeds. Bare-IP / self-signed setups don't need it.
+  const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
+  const usePublicTls = !isIp && !!effective;
+  let portMsg = '';
+  if (caddyHttpsPort && usePublicTls) {
+    const opened = await openHttpChallengePort();
+    portMsg = opened
+      ? ' Port 80 opened for the Let’s Encrypt (HTTP-01) challenge.'
+      : ' ⚠ Could not open port 80 automatically — run “ufw allow 80/tcp” on the host, or the certificate will stay self-signed.';
+  }
+
   await reloadCaddy();
 
-  res.json({ ok: true, message: 'Endpoint saved, Caddy reloaded. Portal restarting…' });
+  res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${portMsg} Portal restarting…` });
   setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
 });
 
@@ -3344,6 +3385,9 @@ app.post('/api/migration/validate', auth, async (req, res) => {
 
 // ── Xray helpers ─────────────────────────────────────────────────────────────
 
+// Reconcile the derived xray/config.json client list from devices.json, which is
+// the source of truth for per-device UUIDs. Idempotent: only rewrites the file and
+// restarts Xray when the client set actually changed, so it is cheap to call on boot.
 async function syncXrayClients() {
   if (!XRAY_ENABLED) return;
   try {
@@ -3355,6 +3399,10 @@ async function syncXrayClients() {
       if (!dev.revokedAt && dev.xrayUuid && dev.xrayUuid !== XRAY_UUID)
         clients.push({ id: dev.xrayUuid, flow: 'xtls-rprx-vision' });
     }
+    const current = cfg.inbounds?.[0]?.settings?.clients || [];
+    const inSync = current.length === clients.length &&
+      current.every((c, i) => c.id === clients[i].id && c.flow === clients[i].flow);
+    if (inSync) return;
     cfg.inbounds[0].settings.clients = clients;
     fs.writeFileSync(XRAY_CONFIG_PATH, JSON.stringify(cfg, null, 2));
     await dockerPost('/containers/xray/restart', null);
@@ -3450,4 +3498,9 @@ setInterval(() => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, HOST, () => console.log(`Portal listening on ${HOST}:${PORT}`));
+app.listen(PORT, HOST, () => {
+  console.log(`Portal listening on ${HOST}:${PORT}`);
+  // Re-derive xray/config.json from devices.json on boot so per-device UUIDs survive a
+  // bootstrap.sh re-run (configure_xray regenerates config.json with only the global UUID).
+  if (XRAY_ENABLED) syncXrayClients().catch(() => {});
+});
