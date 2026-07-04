@@ -40,9 +40,15 @@ Do not use File Drop for sensitive files until the audit is complete.
 
 ## Migration Assistant — Preview
 
-A checklist and helper for in-place upgrades. Full VPS-to-VPS migration is not yet implemented.
+A guided VPS-to-VPS migration tool. The portal tab shows:
+- Service readiness (all containers must be ✓ before migrating)
+- DNS records to update (public Gateway domains)
+- WireGuard endpoint type warning (IP vs hostname — affects client reconfiguration)
+- A 10-step migration checklist with your actual VPS IP and domain values filled in
 
-`./easywg migrate` runs the in-place upgrade helper, which checks configuration compatibility after a version upgrade. It does not move data between servers.
+`./easywg migrate` runs an in-place upgrade helper for version upgrades on the same VPS.
+
+Full assisted migration (automated SSH transfer, DNS TTL management) is not yet implemented.
 
 → [Migration documentation](migration-preview.md)
 

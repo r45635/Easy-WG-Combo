@@ -963,12 +963,12 @@ async function checkService(name, url, okStatuses = [200, 401]) {
 }
 
 app.get('/api/system/status', auth, async (_req, res) => {
-  const [wg, ag, caddyUp] = await Promise.all([
+  const [wg, ag, caddyR] = await Promise.all([
     checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
-    checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
-    tcpOpen(getHostIp(), 443),
+    checkService('adguard',  `${AG_URL}/control/status`, [200, 401, 403]),
+    checkDockerContainer('caddy'),
   ]);
-  const caddy = { name: 'caddy', up: caddyUp };
+  const caddy = { name: 'caddy', up: caddyR.ok };
   res.json({ 'wg-easy': wg, adguard: ag, caddy, portal: { name: 'portal', up: true } });
 });
 
@@ -1149,12 +1149,12 @@ app.get('/api/health', auth, async (_req, res) => {
 
 app.get('/api/health/services', auth, async (_req, res) => {
   try {
-    const [wg, ag, caddyUp] = await Promise.all([
+    const [wg, ag, caddyR] = await Promise.all([
       checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
-      checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
-      tcpOpen(getHostIp(), 443),
+      checkService('adguard',  `${AG_URL}/control/status`, [200, 401, 403]),
+      checkDockerContainer('caddy'),
     ]);
-    const caddy = { name: 'caddy', up: caddyUp };
+    const caddy = { name: 'caddy', up: caddyR.ok };
 
     // Docker containers via socket
     let containers = [];
@@ -3123,11 +3123,12 @@ app.post('/files/:token', serveFiledrop);
 // ── Phase 3: Module D — VPS Migration Assistant ───────────────────────────────
 
 app.get('/api/migration/readiness', auth, async (req, res) => {
-  const [wg, ag, caddy] = await Promise.all([
+  const [wg, ag, caddyR] = await Promise.all([
     checkService('wg-easy', `${WG_URL}/api/session`, [200, 401]),
-    checkService('adguard', `${AG_URL}/control/status`, [200, 401]),
-    tcpOpen(getHostIp(), 443).then(up => ({ name: 'caddy', up })),
+    checkService('adguard', `${AG_URL}/control/status`, [200, 401, 403]),
+    checkDockerContainer('caddy'),
   ]);
+  const caddy = { name: 'caddy', up: caddyR.ok };
   const portal = { name: 'portal', up: true };
   const services = loadProxyServices();
   const devices  = loadDevices();
@@ -3203,10 +3204,10 @@ app.get('/api/migration/checklist', auth, async (req, res) => {
 });
 
 app.post('/api/migration/validate', auth, async (req, res) => {
-  const [wg, ag, caddyUp] = await Promise.all([
+  const [wg, ag, caddyR] = await Promise.all([
     checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
-    checkService('adguard',  `${AG_URL}/control/status`, [200, 401]),
-    tcpOpen(getHostIp(), 443),
+    checkService('adguard',  `${AG_URL}/control/status`, [200, 401, 403]),
+    checkDockerContainer('caddy'),
   ]);
   const monitors = loadMonitors();
   const devices  = loadDevices();
@@ -3214,7 +3215,7 @@ app.post('/api/migration/validate', auth, async (req, res) => {
   const apps     = loadApps();
   res.json({
     services: {
-      'wg-easy': wg.up, 'adguard': ag.up, 'caddy': caddyUp, 'portal': true,
+      'wg-easy': wg.up, 'adguard': ag.up, 'caddy': caddyR.ok, 'portal': true,
     },
     data: {
       devices:  Object.keys(devices).length,
