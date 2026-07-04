@@ -155,9 +155,9 @@ print_final_summary() {
   local ssh_port="${SSH_PORT:-22}"
   local admin_url=""
 
-  # Public (Let's Encrypt) cert requires a real FQDN + ACME email — matches configure_caddy.
+  # Public (Let's Encrypt) cert requires a real FQDN + ACME email that resolves here — matches configure_caddy.
   local xray_public_tls="no"
-  if [ -n "${admin_domain:-}" ] && [ -n "${tls_email:-}" ] && ! is_ip_address "${admin_domain:-}"; then
+  if [ -n "${admin_domain:-}" ] && [ -n "${tls_email:-}" ] && ! is_ip_address "${admin_domain:-}" && [ "${TLS_DOMAIN_OK:-yes}" = "yes" ]; then
     xray_public_tls="yes"
   fi
 
@@ -662,7 +662,7 @@ configure_caddy() {
   # Whether Caddy can obtain a publicly-trusted (Let's Encrypt) cert:
   # requires a real FQDN (not a bare IP) and an ACME contact email.
   local use_public_tls="no"
-  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain" && [ "${TLS_DOMAIN_OK:-yes}" = "yes" ]; then
     use_public_tls="yes"
   fi
 
@@ -781,9 +781,10 @@ configure_firewall() {
   local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
   local tls_email="${TLS_EMAIL:-}"
 
-  # Caddy can obtain a public (Let's Encrypt) cert only with a real FQDN + ACME email.
+  # Caddy can obtain a public (Let's Encrypt) cert only with a real FQDN + ACME email
+  # that resolves to this VPS (TLS_DOMAIN_OK, checked once in main).
   local use_public_tls="no"
-  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain"; then
+  if [ -n "$admin_domain" ] && [ -n "$tls_email" ] && ! is_ip_address "$admin_domain" && [ "${TLS_DOMAIN_OK:-yes}" = "yes" ]; then
     use_public_tls="yes"
   fi
 
@@ -1052,6 +1053,27 @@ main() {
     TLS_EMAIL="$(sed -n 's/^TLS_EMAIL=//p' "$ENV_FILE" 2>/dev/null | head -n 1)"
     export TLS_EMAIL
   fi
+
+  # Protect the user: only ask Caddy for a public (Let's Encrypt) cert when the FQDN
+  # actually resolves to THIS server. If it points elsewhere or doesn't resolve, ACME is
+  # doomed (and burns Let's Encrypt rate limits) — fall back to a self-signed cert and say
+  # exactly what to fix. TLS_DOMAIN_OK gates the ACME path in configure_caddy /
+  # configure_firewall / print_final_summary below.
+  TLS_DOMAIN_OK="yes"
+  if [ -n "$admin_domain" ] && [ -n "${TLS_EMAIL:-}" ] && ! is_ip_address "$admin_domain"; then
+    local _dom_ip _our_ip
+    _dom_ip="$(getent ahostsv4 "$admin_domain" 2>/dev/null | awk 'NR==1{print $1}')"
+    _our_ip="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null || true)"
+    if [ -z "$_our_ip" ] && is_ip_address "$wg_host"; then _our_ip="$wg_host"; fi
+    if [ -z "$_dom_ip" ]; then
+      warn "⚠ '$admin_domain' does not resolve — using a self-signed certificate. Set its DNS A record and re-run bootstrap for a Let's Encrypt certificate."
+      TLS_DOMAIN_OK="no"
+    elif [ -n "$_our_ip" ] && [ "$_dom_ip" != "$_our_ip" ]; then
+      warn "⚠ '$admin_domain' resolves to $_dom_ip, not this server ($_our_ip) — using a self-signed certificate. Point its DNS A record here and re-run bootstrap for a Let's Encrypt certificate."
+      TLS_DOMAIN_OK="no"
+    fi
+  fi
+  export TLS_DOMAIN_OK
 
   if [ "$has_existing" = "no" ] || [ "$existing_action" = "new" ]; then
     set_password_hash_secret "$SECRETS_FILE" "$password_hash"

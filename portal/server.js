@@ -166,10 +166,10 @@ function readEnvValue(key) {
 // Keep this in sync with configure_caddy() in bootstrap.sh — the two generators must
 // produce the same Caddyfile. A public (Let's Encrypt) cert needs a real FQDN + email;
 // otherwise Caddy falls back to a self-signed internal cert.
-function generateMainCaddyfile(adminDomain, tlsEmail) {
+function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(adminDomain);
-  const usePublicTls = !!adminDomain && !!tlsEmail && !isIp;
+  const usePublicTls = !!adminDomain && !!tlsEmail && !isIp && domainPointsHere;
 
   let out = '{\n';
   if (usePublicTls) out += `  email ${tlsEmail}\n`;
@@ -211,6 +211,25 @@ function generateMainCaddyfile(adminDomain, tlsEmail) {
   out += '}\n\n';
   out += 'import /etc/caddy/easywg-services.caddy\n';
   return out;
+}
+
+// This VPS's public IPv4, used to check that a Server Endpoint FQDN actually points here
+// before attempting a public cert. Prefers WG_HOST when it is already an IP (no network
+// call); otherwise asks an echo service. Returns '' if it cannot be determined (callers
+// then default to allowing ACME rather than blocking on our own inability to check).
+async function getPublicIp() {
+  const wgHost = readEnvValue('WG_HOST') || process.env.WG_HOST || '';
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(wgHost)) return wgHost;
+  for (const url of ['https://api.ipify.org', 'https://ifconfig.me/ip']) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (r.ok) {
+        const ip = (await r.text()).trim();
+        if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return ip;
+      }
+    } catch { /* try next source */ }
+  }
+  return '';
 }
 
 // Best-effort: open port 80 so Caddy can complete the Let's Encrypt HTTP-01 challenge
@@ -603,9 +622,20 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
   if (!host) return res.status(400).json({ error: 'Missing host.' });
 
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':');
+  // Protect the user: a public cert is only attempted when the FQDN resolves to THIS
+  // server. If it points elsewhere, fall back to a self-signed cert (avoids doomed ACME
+  // + Let's Encrypt rate limits) and tell the user exactly what to fix.
+  let domainPointsHere = true;
+  let dnsWarn = '';
   if (!isIp) {
-    try { await dnsLib.promises.lookup(host); }
+    let resolvedIp = '';
+    try { resolvedIp = (await dnsLib.promises.lookup(host)).address; }
     catch { return res.status(422).json({ error: `Cannot resolve '${host}'. Update DNS before saving.` }); }
+    const ourIp = await getPublicIp();
+    if (ourIp && resolvedIp && resolvedIp !== ourIp) {
+      domainPointsHere = false;
+      dnsWarn = ` ⚠ ${host} resolves to ${resolvedIp}, not this server (${ourIp}) — a self-signed certificate is used. Point the DNS A record here and save again for a valid certificate.`;
+    }
   }
 
   const settings = loadSettings();
@@ -617,13 +647,13 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
   if (tlsEmail) updateHostEnvValue('TLS_EMAIL', tlsEmail);
 
   const effective = tlsEmail || readEnvValue('TLS_EMAIL');
-  const caddyContent = generateMainCaddyfile(host, effective);
+  const caddyContent = generateMainCaddyfile(host, effective, domainPointsHere);
   fs.writeFileSync(CADDY_FILE, caddyContent);
 
   // When switching to a public cert while Xray owns :443, Caddy validates via HTTP-01 on
   // port 80 — open it so issuance succeeds. Bare-IP / self-signed setups don't need it.
   const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
-  const usePublicTls = !isIp && !!effective;
+  const usePublicTls = !isIp && !!effective && domainPointsHere;
   let portMsg = '';
   if (caddyHttpsPort && usePublicTls) {
     const opened = await openHttpChallengePort();
@@ -634,7 +664,7 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
 
   await reloadCaddy();
 
-  res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${portMsg} Portal restarting…` });
+  res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${dnsWarn}${portMsg} Portal restarting…` });
   setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
 });
 
