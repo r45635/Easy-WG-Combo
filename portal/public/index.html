@@ -870,22 +870,27 @@
         <div class="security-panel" id="settings-endpoint-panel">
           <h2 class="panel-title">Server Endpoint</h2>
           <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:.75rem">
-            Public IP or hostname used for WireGuard configs and VLESS URIs.<br>
-            Changing this will restart the portal (~5 s). Run <code>./compose.sh up -d</code> on the VPS afterwards to propagate to wg-easy and Caddy.
+            Public IP or hostname for this VPS — updates WireGuard configs, VLESS URIs and the HTTPS portal address in one step.
           </p>
           <div class="endpoint-row">
             <input id="settings-endpoint-input" type="text" class="endpoint-input" placeholder="155.138.131.219 or vpn.example.com">
             <button type="button" class="btn-secondary" id="settings-endpoint-validate-btn">Check DNS</button>
           </div>
           <div id="settings-endpoint-status" class="endpoint-status"></div>
+
+          <div id="settings-endpoint-tls-row" class="endpoint-row hidden" style="margin-top:.5rem">
+            <input id="settings-endpoint-tls-input" type="email" class="endpoint-input" placeholder="admin@example.com (for Let's Encrypt — leave blank for self-signed)">
+          </div>
+          <div id="settings-endpoint-xray-note" class="endpoint-warning hidden">
+            ℹ Xray is active on port 443. Caddy will use a self-signed certificate — accept the browser warning once at the new URL.
+          </div>
           <div id="settings-endpoint-warning" class="endpoint-warning hidden">
-            ⚠ WireGuard clients already distributed will keep the old endpoint.<br>
-            Run <code>./compose.sh up -d</code> on the VPS after restart to update wg-easy and Caddy.
+            ⚠ WireGuard clients already distributed will keep the old endpoint. Run <code>./compose.sh up -d</code> on the VPS after restart to propagate to wg-easy.
           </div>
           <div class="endpoint-actions">
-            <button type="button" class="btn-primary" id="settings-endpoint-save-btn" disabled>Save &amp; Restart Portal</button>
+            <button type="button" class="btn-primary" id="settings-endpoint-save-btn" disabled>Save &amp; Apply</button>
             <span id="settings-endpoint-reconnect" class="endpoint-reconnect hidden">
-              Portal restarting… reconnecting
+              Applying… reconnecting
               <span class="endpoint-spinner"></span>
             </span>
           </div>

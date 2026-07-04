@@ -3675,19 +3675,23 @@ function loadSettingsTab() {
 }
 
 async function loadEndpointSection() {
-  const input   = document.getElementById('settings-endpoint-input');
+  const input    = document.getElementById('settings-endpoint-input');
+  const tlsInput = document.getElementById('settings-endpoint-tls-input');
   const statusEl = document.getElementById('settings-endpoint-status');
-  const saveBtn = document.getElementById('settings-endpoint-save-btn');
+  const saveBtn  = document.getElementById('settings-endpoint-save-btn');
   if (!input) return;
 
   statusEl.textContent = '';
   saveBtn.disabled = true;
 
   const data = await GET('/api/settings/server-endpoint').catch(() => null);
-  if (data?.host) {
-    input.value = data.host;
-    saveBtn.disabled = false;
-  }
+  if (!data) return;
+
+  input.value = data.host || '';
+  if (tlsInput) tlsInput.value = data.tlsEmail || '';
+  if (data.host) saveBtn.disabled = false;
+
+  updateEndpointTlsVisibility(data.host, data.xrayMode);
 }
 
 function updateModeCardHighlight() {
@@ -3761,6 +3765,13 @@ document.getElementById('settings-mode-save-btn').addEventListener('click', asyn
 
 // ── Server Endpoint settings ─────────────────────────────────────────────────
 
+function updateEndpointTlsVisibility(host, xrayMode) {
+  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test((host || '').trim()) || (host || '').includes(':');
+  const isDomain = !isIp && (host || '').includes('.');
+  document.getElementById('settings-endpoint-tls-row').classList.toggle('hidden', !isDomain || xrayMode);
+  document.getElementById('settings-endpoint-xray-note').classList.toggle('hidden', !isDomain || !xrayMode);
+}
+
 document.getElementById('settings-endpoint-validate-btn').addEventListener('click', async () => {
   const input    = document.getElementById('settings-endpoint-input');
   const statusEl = document.getElementById('settings-endpoint-status');
@@ -3775,48 +3786,54 @@ document.getElementById('settings-endpoint-validate-btn').addEventListener('clic
   saveBtn.disabled = true;
 
   const data = await GET(`/api/settings/validate-host?host=${encodeURIComponent(host)}`).catch(() => null);
-  if (!data) {
-    statusEl.textContent = 'Check failed — server error.';
-    statusEl.style.color = 'var(--red)';
-    return;
-  }
+  if (!data) { statusEl.textContent = 'Check failed — server error.'; statusEl.style.color = 'var(--red)'; return; }
+
   if (data.ok) {
-    statusEl.textContent = data.type === 'ip'
-      ? `✓ Valid IP address`
-      : `✓ Resolves to ${data.resolvedIp}`;
+    statusEl.textContent = data.type === 'ip' ? '✓ Valid IP address' : `✓ Resolves to ${data.resolvedIp}`;
     statusEl.style.color = 'var(--green)';
     warnEl.classList.remove('hidden');
     saveBtn.disabled = false;
+    updateEndpointTlsVisibility(host, state.xrayEnabled);
   } else {
     statusEl.textContent = `✗ ${data.error}`;
     statusEl.style.color = 'var(--red)';
     warnEl.classList.add('hidden');
+    document.getElementById('settings-endpoint-tls-row').classList.add('hidden');
+    document.getElementById('settings-endpoint-xray-note').classList.add('hidden');
     saveBtn.disabled = true;
   }
 });
 
 document.getElementById('settings-endpoint-save-btn').addEventListener('click', async () => {
   const input       = document.getElementById('settings-endpoint-input');
+  const tlsInput    = document.getElementById('settings-endpoint-tls-input');
   const reconnectEl = document.getElementById('settings-endpoint-reconnect');
   const saveBtn     = document.getElementById('settings-endpoint-save-btn');
   const validateBtn = document.getElementById('settings-endpoint-validate-btn');
   const host        = input.value.trim();
+  const tlsEmail    = tlsInput ? tlsInput.value.trim() : '';
   if (!host) return;
 
+  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(host);
+  const note = isIp
+    ? 'The portal and Caddy will update immediately.'
+    : (state.xrayEnabled
+        ? 'Caddy uses a self-signed cert (Xray active). Accept the browser warning once at the new URL.'
+        : (tlsEmail ? 'Caddy will request a Let\'s Encrypt certificate.' : 'Caddy will use a self-signed certificate.'));
+
   const confirmed = confirm(
-    `Save "${host}" as the server endpoint?\n\n` +
-    `The portal will restart (~5 s). WireGuard clients generated after restart will use the new endpoint.\n\n` +
-    `Run ./compose.sh up -d on the VPS afterwards to also update wg-easy and Caddy.`
+    `Apply "${host}" as the server endpoint?\n\n` +
+    `${note}\n\n` +
+    `WireGuard clients already distributed will keep the old endpoint — run ./compose.sh up -d on the VPS to propagate to wg-easy.`
   );
   if (!confirmed) return;
 
-  saveBtn.disabled  = true;
+  saveBtn.disabled     = true;
   validateBtn.disabled = true;
   reconnectEl.classList.remove('hidden');
 
-  await POST('/api/settings/server-endpoint', { host }).catch(() => null);
+  await POST('/api/settings/server-endpoint', { host, tlsEmail }).catch(() => null);
 
-  // Poll until the portal responds again after restart
   const poll = async () => {
     try {
       const r = await fetch('/api/health', { cache: 'no-store' });

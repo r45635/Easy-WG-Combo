@@ -155,6 +155,49 @@ function updateHostEnvValue(key, value) {
   fs.writeFileSync(envPath, content);
 }
 
+function readEnvValue(key) {
+  try {
+    const content = fs.readFileSync('/backup-src/.env', 'utf8');
+    const m = content.match(new RegExp(`^${key}=(.*)`, 'm'));
+    return m ? m[1].trim() : '';
+  } catch { return ''; }
+}
+
+function generateMainCaddyfile(adminDomain, tlsEmail) {
+  const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
+  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(adminDomain);
+  const useAcme = !caddyHttpsPort && !!tlsEmail && !isIp;
+
+  let out = '{\n';
+  if (useAcme) out += `  email ${tlsEmail}\n`;
+  out += '  admin localhost:2019\n';
+  out += '}\n\n';
+
+  if (caddyHttpsPort) {
+    out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
+    out += '  tls internal\n';
+  } else {
+    const binding = adminDomain || ':443';
+    out += `${binding} {\n`;
+    if (isIp || binding === ':443' || !tlsEmail) out += '  tls internal\n';
+  }
+
+  out += '  encode zstd gzip\n';
+  out += '  log {\n';
+  out += '    output file /var/log/easy-wg-portal/access.log\n';
+  out += '    format json\n';
+  out += '  }\n';
+  out += `  reverse_proxy 127.0.0.1:${PORT}\n`;
+  out += '  header {\n';
+  out += '    Strict-Transport-Security "max-age=31536000; includeSubDomains"\n';
+  out += '    X-Content-Type-Options "nosniff"\n';
+  out += '    Referrer-Policy "same-origin"\n';
+  out += '  }\n';
+  out += '}\n\n';
+  out += 'import /etc/caddy/easywg-services.caddy\n';
+  return out;
+}
+
 let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
 
 function getServerName() {
@@ -497,8 +540,13 @@ app.get('/api/settings/ui-capabilities', auth, (_req, res) => {
 
 app.get('/api/settings/server-endpoint', auth, (_req, res) => {
   const settings = loadSettings();
-  const source = settings.wgHost ? 'config' : 'env';
-  res.json({ host: VPS_HOST, source });
+  res.json({
+    host:        VPS_HOST,
+    source:      settings.wgHost ? 'config' : 'env',
+    adminDomain: readEnvValue('ADMIN_DOMAIN') || VPS_HOST,
+    tlsEmail:    readEnvValue('TLS_EMAIL') || '',
+    xrayMode:    !!(process.env.CADDY_HTTPS_PORT),
+  });
 });
 
 app.get('/api/settings/validate-host', auth, async (req, res) => {
@@ -522,24 +570,30 @@ app.get('/api/settings/validate-host', auth, async (req, res) => {
 });
 
 app.post('/api/settings/server-endpoint', auth, async (req, res) => {
-  const host = String(req.body.host || '').trim();
+  const host     = String(req.body.host     || '').trim();
+  const tlsEmail = String(req.body.tlsEmail || '').trim();
   if (!host) return res.status(400).json({ error: 'Missing host.' });
 
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':');
   if (!isIp) {
-    try {
-      await dnsLib.promises.lookup(host);
-    } catch {
-      return res.status(422).json({ error: `Cannot resolve '${host}'. Update DNS before saving.` });
-    }
+    try { await dnsLib.promises.lookup(host); }
+    catch { return res.status(422).json({ error: `Cannot resolve '${host}'. Update DNS before saving.` }); }
   }
 
   const settings = loadSettings();
   settings.wgHost = host;
   saveSettings(settings);
-  updateHostEnvValue('WG_HOST', host);
 
-  res.json({ ok: true, message: 'Server endpoint saved. Portal is restarting…' });
+  updateHostEnvValue('WG_HOST', host);
+  updateHostEnvValue('ADMIN_DOMAIN', host);
+  if (tlsEmail) updateHostEnvValue('TLS_EMAIL', tlsEmail);
+
+  const effective = tlsEmail || readEnvValue('TLS_EMAIL');
+  const caddyContent = generateMainCaddyfile(host, effective);
+  fs.writeFileSync(CADDY_FILE, caddyContent);
+  await reloadCaddy();
+
+  res.json({ ok: true, message: 'Endpoint saved, Caddy reloaded. Portal restarting…' });
   setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
 });
 
