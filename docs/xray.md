@@ -14,12 +14,13 @@ Each device gets its own VLESS UUID. Revoking a device immediately removes its V
 - You need a tunnel that survives active probing (GFW-style detection)
 - You still want the Easy-WG-Combo admin portal and DNS filtering
 
-**Trade-off:** when Xray is active, port 443 is owned by Xray. Caddy moves to port `8443`. How the admin portal's certificate is handled depends on your `.env`:
+**Trade-off:** when Xray is active, port 443 is owned by Xray. Caddy moves to port `8443`. How the admin portal's certificate is handled depends on your `.env` — and the installer picks the safe option for you:
 
-- **With a real domain** (`ADMIN_DOMAIN` = an FQDN pointing at the VPS) **and `TLS_EMAIL` set** → Caddy obtains a **valid Let's Encrypt certificate** via the HTTP-01 challenge on port 80 (443 is taken by Xray, so TLS-ALPN-01 is disabled automatically). Access the portal at `https://<your-domain>:8443` with **no browser warning**. You must use the hostname — a public cert cannot cover a bare IP, so `https://<VPS_IP>:8443` will fail with a TLS/cipher error.
-- **With a bare IP or no `TLS_EMAIL`** → Caddy falls back to a **self-signed certificate** (internal CA). Access at `https://<VPS_IP>:8443`; the browser warns on first access — add an exception once.
+- **With a real domain** (`ADMIN_DOMAIN` = an FQDN) **+ `TLS_EMAIL`, and the domain points to this VPS** → Caddy obtains a **valid Let's Encrypt certificate** via the HTTP-01 challenge on port 80 (443 is taken by Xray, so TLS-ALPN-01 is disabled automatically). bootstrap opens port 80 in UFW automatically in this case. Access the portal at `https://<your-domain>:8443` with **no browser warning**. You must use the hostname — a public cert cannot cover a bare IP, so `https://<VPS_IP>:8443` will fail with a TLS/cipher error.
+- **With a bare IP, or no `TLS_EMAIL`** → Caddy uses a **self-signed certificate** (internal CA). Access at `https://<VPS_IP>:8443`; the browser warns on first access — add an exception once. **A bare-IP install is fully supported — you never need a domain to finish the setup.**
+- **With a domain that does NOT point to this VPS** (typo, DNS not propagated, still pointing at an old server) → the installer detects the mismatch and **falls back to a self-signed certificate**, printing exactly what to fix (e.g. *"vpn.example.com resolves to 1.2.3.4, not this server (203.0.113.9)"*). This avoids doomed ACME attempts that would burn Let's Encrypt rate limits. Fix the DNS `A` record and re-run bootstrap (or re-save the endpoint in the portal) to upgrade to a valid certificate.
 
-> **Prerequisite for the valid cert:** DNS for your domain must resolve to the VPS **and** port 80 must be reachable from the internet (bootstrap opens it in UFW automatically in this mode). If issuance fails, Caddy keeps serving a self-signed cert and retries in the background.
+> The domain-points-here check runs in both bootstrap and the portal's **Server Endpoint** feature. If the VPS's own public IP can't be determined, the installer errs on the side of attempting ACME (Caddy retries in the background and serves a self-signed cert meanwhile).
 
 ---
 
@@ -213,8 +214,12 @@ Caddy will move back to port 443, the public HTTPS portal returns, and the Xray 
 - You are hitting the portal **by IP** while a public (domain) certificate is configured. Use `https://<your-domain>:8443` instead.
 
 **Certificate stays self-signed even with a domain configured:**
-- The Let's Encrypt HTTP-01 challenge needs DNS pointing at the VPS and port 80 reachable. Verify: `dig +short <your-domain>` (must return the VPS IP) and `ufw status | grep 80`.
+- Most often the installer detected that your domain does **not** point to this VPS and deliberately fell back to self-signed (look for a `⚠ … resolves to … not this server …` line in the bootstrap output or the portal's Server Endpoint response). Fix the DNS `A` record so it points here, then re-run bootstrap (or re-save the endpoint) — the installer will switch to a Let's Encrypt cert.
+- Verify manually: `dig +short <your-domain>` must return this VPS's public IP (`curl -s https://api.ipify.org`), and `ufw status | grep 80` should show port 80 open.
 - Inspect issuance: `./compose.sh logs caddy | grep -i certificate` — look for "certificate obtained" vs an error.
+
+**Per-device VLESS access lost after re-running bootstrap:**
+- This is fixed as of 2026-07. The portal now reconciles `xray/config.json` from `devices.json` (the source of truth for per-device UUIDs) on every start, so a bootstrap re-run — which regenerates `config.json` with only the global UUID — self-heals within seconds. If it doesn't, check `./compose.sh logs portal | grep -i syncxray` for errors and confirm `./xray` is mounted read-write into the portal.
 
 **Xray container exits immediately:**
 - Check `./xray/config.json` is valid JSON

@@ -65,6 +65,10 @@ The Apps module requires a writable Docker socket (`/var/run/docker.sock`). This
 
 Apps are a preview feature. Do not enable the writable socket unless you are comfortable with this risk.
 
+### Firewall management (UFW)
+
+The portal container is granted `NET_ADMIN` and a writable `/etc/ufw` mount so that the **Server Endpoint** feature can open port 80 (`ufw allow 80/tcp`) for the Let's Encrypt HTTP-01 challenge when you switch to a public certificate while Xray owns port 443. This lets the portal modify the host firewall. Given the portal already holds the Docker socket (root-equivalent), this does not raise the privilege ceiling, but it is called out here for transparency. If the `ufw` call fails, the portal falls back to a clear warning and the certificate stays self-signed until you open port 80 manually.
+
 ### Gateway / Reverse Proxy
 
 Caddy services can expose VPN-internal services or the VPS itself to the public internet over HTTPS. Before exposing a service:

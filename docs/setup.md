@@ -79,11 +79,13 @@ echo "export PASSWORD_HASH='<hash>'" > .env.secrets
 | Mode | How | Security |
 |---|---|---|
 | **SSH tunnel** *(default, safest)* | `ssh -L 19080:localhost:8080 ...` | No admin port reachable from internet |
-| **Public HTTPS** | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` | Caddy ACME cert (or self-signed if using IP / no `TLS_EMAIL`); use strong password + Fail2Ban |
+| **Public HTTPS** | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` | Caddy ACME cert (or self-signed for a bare IP, no `TLS_EMAIL`, or a domain that doesn't point here); use strong password + Fail2Ban |
 
 Public HTTPS is enabled by default in the installer. Check your `.env` to confirm.
 
-When enabled, set `ADMIN_DOMAIN` (recommended) or the installer falls back to `WG_HOST`. `TLS_EMAIL` is optional for ACME registration.
+**A domain is optional.** If you only have an IP, leave `ADMIN_DOMAIN` unset — the installer falls back to `WG_HOST` and serves a self-signed certificate on that IP. The install completes normally; you just accept the browser warning once.
+
+For a **warning-free certificate**, set `ADMIN_DOMAIN` to an FQDN that points to this VPS **and** set `TLS_EMAIL`. The installer verifies the domain actually resolves here before requesting a Let's Encrypt certificate — if it points elsewhere (typo, DNS not propagated), it automatically falls back to a self-signed cert and tells you what to fix, so a wrong domain never blocks the install.
 
 ## Fail2Ban defaults
 
