@@ -78,7 +78,7 @@ services:
       - ./wireguard:/backup-src/wireguard:ro
       - ./adguard/conf:/backup-src/adguard/conf:ro
       - ./caddy:/backup-src/caddy:ro
-      - ./.env:/backup-src/.env:ro
+      - ./.env:/backup-src/.env
       - ./docker-compose.yml:/backup-src/docker-compose.yml:ro
       - ./compose.sh:/backup-src/compose.sh:ro
       - ./backups:/backups

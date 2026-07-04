@@ -145,6 +145,16 @@ function saveSettings(data) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
 }
 
+function updateHostEnvValue(key, value) {
+  const envPath = '/backup-src/.env';
+  if (!fs.existsSync(envPath)) return;
+  let content = fs.readFileSync(envPath, 'utf8');
+  const re = new RegExp(`^${key}=.*`, 'm');
+  const line = `${key}=${value}`;
+  content = re.test(content) ? content.replace(re, line) : content + `\n${line}\n`;
+  fs.writeFileSync(envPath, content);
+}
+
 let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
 
 function getServerName() {
@@ -481,6 +491,56 @@ app.get('/api/settings/ui-capabilities', auth, (_req, res) => {
     modules.push('xray');
   }
   res.json({ interfaceMode: mode, modules, actions: caps.actions });
+});
+
+// ── Server endpoint ───────────────────────────────────────────────────────────
+
+app.get('/api/settings/server-endpoint', auth, (_req, res) => {
+  const settings = loadSettings();
+  const source = settings.wgHost ? 'config' : 'env';
+  res.json({ host: VPS_HOST, source });
+});
+
+app.get('/api/settings/validate-host', auth, async (req, res) => {
+  const host = String(req.query.host || '').trim();
+  if (!host) return res.status(400).json({ ok: false, error: 'Missing host parameter.' });
+
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':')) {
+    return res.json({ ok: true, type: 'ip' });
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const result = await dnsLib.promises.lookup(host);
+    clearTimeout(timer);
+    res.json({ ok: true, type: 'hostname', resolvedIp: result.address });
+  } catch (e) {
+    clearTimeout(timer);
+    res.json({ ok: false, error: `Cannot resolve '${host}'. Check your DNS record.` });
+  }
+});
+
+app.post('/api/settings/server-endpoint', auth, async (req, res) => {
+  const host = String(req.body.host || '').trim();
+  if (!host) return res.status(400).json({ error: 'Missing host.' });
+
+  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':');
+  if (!isIp) {
+    try {
+      await dnsLib.promises.lookup(host);
+    } catch {
+      return res.status(422).json({ error: `Cannot resolve '${host}'. Update DNS before saving.` });
+    }
+  }
+
+  const settings = loadSettings();
+  settings.wgHost = host;
+  saveSettings(settings);
+  updateHostEnvValue('WG_HOST', host);
+
+  res.json({ ok: true, message: 'Server endpoint saved. Portal is restarting…' });
+  setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
 });
 
 // ── WireGuard clients ─────────────────────────────────────────────────────────
@@ -2333,7 +2393,7 @@ const FILEDROP_MAX_MB    = parseInt(process.env.FILEDROP_MAX_MB   || '500');
 const FILEDROP_TOTAL_GB  = parseInt(process.env.FILEDROP_TOTAL_GB  || '5');
 const FILEDROP_DEFAULT_EXPIRY = 7;
 const FILEDROP_MAX_EXPIRY     = 30;
-const VPS_HOST           = process.env.WG_HOST || '';
+const VPS_HOST           = loadSettings().wgHost || process.env.WG_HOST || '';
 
 // ── Phase 3: App catalog ─────────────────────────────────────────────────────
 const APP_CATALOG = {

@@ -3671,6 +3671,23 @@ function loadSettingsTab() {
   });
   updateModeCardHighlight();
   document.getElementById('settings-mode-msg').textContent = '';
+  loadEndpointSection();
+}
+
+async function loadEndpointSection() {
+  const input   = document.getElementById('settings-endpoint-input');
+  const statusEl = document.getElementById('settings-endpoint-status');
+  const saveBtn = document.getElementById('settings-endpoint-save-btn');
+  if (!input) return;
+
+  statusEl.textContent = '';
+  saveBtn.disabled = true;
+
+  const data = await GET('/api/settings/server-endpoint').catch(() => null);
+  if (data?.host) {
+    input.value = data.host;
+    saveBtn.disabled = false;
+  }
 }
 
 function updateModeCardHighlight() {
@@ -3740,6 +3757,74 @@ document.getElementById('settings-mode-save-btn').addEventListener('click', asyn
   } else {
     await applyInterfaceMode(selected);
   }
+});
+
+// ── Server Endpoint settings ─────────────────────────────────────────────────
+
+document.getElementById('settings-endpoint-validate-btn').addEventListener('click', async () => {
+  const input    = document.getElementById('settings-endpoint-input');
+  const statusEl = document.getElementById('settings-endpoint-status');
+  const warnEl   = document.getElementById('settings-endpoint-warning');
+  const saveBtn  = document.getElementById('settings-endpoint-save-btn');
+  const host     = input.value.trim();
+
+  if (!host) { statusEl.textContent = 'Enter an IP or hostname first.'; statusEl.style.color = 'var(--red)'; return; }
+
+  statusEl.textContent = 'Checking…';
+  statusEl.style.color = 'var(--text-dim)';
+  saveBtn.disabled = true;
+
+  const data = await GET(`/api/settings/validate-host?host=${encodeURIComponent(host)}`).catch(() => null);
+  if (!data) {
+    statusEl.textContent = 'Check failed — server error.';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+  if (data.ok) {
+    statusEl.textContent = data.type === 'ip'
+      ? `✓ Valid IP address`
+      : `✓ Resolves to ${data.resolvedIp}`;
+    statusEl.style.color = 'var(--green)';
+    warnEl.classList.remove('hidden');
+    saveBtn.disabled = false;
+  } else {
+    statusEl.textContent = `✗ ${data.error}`;
+    statusEl.style.color = 'var(--red)';
+    warnEl.classList.add('hidden');
+    saveBtn.disabled = true;
+  }
+});
+
+document.getElementById('settings-endpoint-save-btn').addEventListener('click', async () => {
+  const input       = document.getElementById('settings-endpoint-input');
+  const reconnectEl = document.getElementById('settings-endpoint-reconnect');
+  const saveBtn     = document.getElementById('settings-endpoint-save-btn');
+  const validateBtn = document.getElementById('settings-endpoint-validate-btn');
+  const host        = input.value.trim();
+  if (!host) return;
+
+  const confirmed = confirm(
+    `Save "${host}" as the server endpoint?\n\n` +
+    `The portal will restart (~5 s). WireGuard clients generated after restart will use the new endpoint.\n\n` +
+    `Run ./compose.sh up -d on the VPS afterwards to also update wg-easy and Caddy.`
+  );
+  if (!confirmed) return;
+
+  saveBtn.disabled  = true;
+  validateBtn.disabled = true;
+  reconnectEl.classList.remove('hidden');
+
+  await POST('/api/settings/server-endpoint', { host }).catch(() => null);
+
+  // Poll until the portal responds again after restart
+  const poll = async () => {
+    try {
+      const r = await fetch('/api/health', { cache: 'no-store' });
+      if (r.ok) { location.reload(); return; }
+    } catch { /* still restarting */ }
+    setTimeout(poll, 1500);
+  };
+  setTimeout(poll, 2000);
 });
 
 // ── Xray VLESS+Reality ────────────────────────────────────────────────────────

@@ -573,6 +573,21 @@ is_ip_address() {
   [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$value" == *:* ]]
 }
 
+validate_wg_host_resolution() {
+  local h="$1"
+  is_ip_address "$h" && return 0
+  if getent hosts "$h" >/dev/null 2>&1; then
+    info "✓ '$h' resolves correctly."
+    return 0
+  fi
+  warn "⚠ '$h' does not resolve. Make sure the DNS record points to this VPS before continuing."
+  if has_tty; then
+    printf 'Continue anyway? [y/N] '
+    read -r ans
+    [ "${ans:-n}" = "y" ] || die "Aborted. Set the DNS record for '$h' and retry."
+  fi
+}
+
 is_placeholder_domain() {
   local d="$1"
   case "$d" in
@@ -935,6 +950,7 @@ main() {
       fi
     fi
     [ -n "$wg_host" ] || die "WG_HOST is required."
+    validate_wg_host_resolution "$wg_host"
 
     if [ -z "$admin_password" ]; then
       if has_tty; then
