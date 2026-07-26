@@ -219,7 +219,7 @@ Caddy will move back to port 443, the public HTTPS portal returns, and the Xray 
 - Inspect issuance: `./compose.sh logs caddy | grep -i certificate` — look for "certificate obtained" vs an error.
 
 **Per-device VLESS access lost after re-running bootstrap:**
-- This is fixed as of 2026-07. The portal now reconciles `xray/config.json` from `devices.json` (the source of truth for per-device UUIDs) on every start, so a bootstrap re-run — which regenerates `config.json` with only the global UUID — self-heals within seconds. If it doesn't, check `./compose.sh logs portal | grep -i syncxray` for errors and confirm `./xray` is mounted read-write into the portal.
+- This is fixed since v0.4.0. The portal now reconciles `xray/config.json` from `devices.json` (the source of truth for per-device UUIDs) on every start, so a bootstrap re-run — which regenerates `config.json` with only the global UUID — self-heals within seconds. If it doesn't, check `./compose.sh logs portal | grep -i syncxray` for errors and confirm `./xray` is mounted read-write into the portal.
 
 **Xray container exits immediately:**
 - Check `./xray/config.json` is valid JSON

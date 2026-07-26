@@ -114,13 +114,13 @@ All endpoints require authentication (session cookie or HTTP Basic auth).
   "notify": true,
   "notifyAfterFailures": 2,
   "lastStatus": "up",
-  "lastCheck": "2026-06-13T12:00:00.000Z",
-  "lastSuccess": "2026-06-13T12:00:00.000Z",
+  "lastCheck": "2026-01-01T12:00:00.000Z",
+  "lastSuccess": "2026-01-01T12:00:00.000Z",
   "lastFailure": null,
   "lastResponseMs": 42,
   "consecutiveFailures": 0,
   "failureCount": 0,
-  "nextCheckAt": "2026-06-13T12:05:00.000Z"
+  "nextCheckAt": "2026-01-01T12:05:00.000Z"
 }
 ```
 
@@ -152,8 +152,8 @@ Monitor configuration and history are stored in `/data/monitors.json` and `/data
 ```json
 {
   "mon_abc123": [
-    { "t": "2026-06-13T12:00:00.000Z", "ok": true, "ms": 42, "err": null },
-    { "t": "2026-06-13T12:05:00.000Z", "ok": false, "ms": null, "err": "ECONNREFUSED" }
+    { "t": "2026-01-01T12:00:00.000Z", "ok": true, "ms": 42, "err": null },
+    { "t": "2026-01-01T12:05:00.000Z", "ok": false, "ms": null, "err": "ECONNREFUSED" }
   ]
 }
 ```

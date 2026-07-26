@@ -194,10 +194,29 @@ run_bootstrap() {
   exec sudo --preserve-env=WG_HOST,ADMIN_PASSWORD,SSH_PORT,SERVER_NAME,ALLOW_REPLACE,BACKUP_DIR,EXISTING_CONFIG_ACTION,ADMIN_DOMAIN,TLS_EMAIL,PUBLIC_HTTPS_ENABLED,FAIL2BAN_JAIL,FAIL2BAN_BANTIME,FAIL2BAN_FINDTIME,FAIL2BAN_MAXRETRY,DNS_FALLBACK_SERVERS,DNS_TEST_HOST ./bootstrap.sh
 }
 
+check_os() {
+  # Warn (not fail) outside the tested matrix — other apt-based distros
+  # usually work, but are not covered by CI or the docs.
+  local os_id="" os_ver=""
+  if [ -r /etc/os-release ]; then
+    os_id="$(. /etc/os-release && printf '%s' "${ID:-}")"
+    os_ver="$(. /etc/os-release && printf '%s' "${VERSION_ID:-}")"
+  fi
+  case "${os_id}-${os_ver}" in
+    debian-12|debian-13|ubuntu-24.*|ubuntu-25.*|ubuntu-26.*)
+      ;;
+    *)
+      log "Warning: '${os_id:-unknown} ${os_ver:-}' is outside the tested matrix (Debian 12/13, Ubuntu 24.04+)."
+      log "Continuing anyway — apt-based distros generally work."
+      ;;
+  esac
+}
+
 main() {
   print_install_header
   confirm_proceed
   require_cmd apt-get
+  check_os
   ensure_git
   resolve_install_dir
   handle_existing_installation

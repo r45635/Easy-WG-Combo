@@ -2,7 +2,7 @@
 
 ## Recommended VPS
 
-1 vCPU / 1 GB RAM / 25 GB SSD is sufficient. Debian 12 or Ubuntu 24.04 LTS.
+1 vCPU / 1 GB RAM / 25 GB SSD is sufficient. Debian 12/13 or Ubuntu 24.04+ LTS.
 
 If you want a quick option, Vultr's $5/month plan in any region works well:
 https://www.vultr.com/?ref=8489819
@@ -146,3 +146,20 @@ Port 53 is exposed to the internet only on the VPN interface (wg0, inside the wg
 `PASSWORD_HASH` lives in `.env.secrets` (gitignored) and is injected via shell environment — docker-compose variable interpolation mangles bcrypt `$` signs when read from `env_file:` or `.env`.
 
 The `xray` container is added automatically by `compose.sh` when `XRAY_ENABLED=yes` in `.env`. Enable it by re-running `./bootstrap.sh` after setting the flag. See [Xray documentation](xray.md) for full setup instructions.
+
+## Updating an existing installation
+
+```bash
+cd ~/Easy-WG-Combo
+./easywg update
+```
+
+The command is safe by construction:
+
+1. Refuses to run if the checkout has local changes (commit, discard, or `git stash` them first — your `.env`, `.env.secrets` and data directories are gitignored and never affected).
+2. `git pull --ff-only` — never rewrites local history.
+3. `./compose.sh pull` — refreshes the version-pinned container images (images are otherwise **never** updated after install).
+4. `./compose.sh up -d --build` — rebuilds the portal and restarts only what changed.
+5. Runs a service health check.
+
+Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14 (v15 is a breaking rewrite); an update never crosses that major. See [CHANGELOG.md](../CHANGELOG.md) for what changed between versions.

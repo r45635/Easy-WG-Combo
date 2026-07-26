@@ -1,5 +1,8 @@
 # Easy-WG-Combo
 
+[![CI](https://github.com/r45635/Easy-WG-Combo/actions/workflows/ci.yml/badge.svg)](https://github.com/r45635/Easy-WG-Combo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Easy-WG-Combo turns a small VPS into a personal VPN, DNS protection, security and monitoring appliance.
 
 It combines WireGuard, AdGuard Home, a custom admin portal, HTTPS access, security checks, backups, notifications and optional advanced gateway features — without requiring users to manually assemble and maintain many separate tools.
@@ -36,38 +39,17 @@ It is not intended to replace enterprise VPN gateways, zero-trust platforms or m
 
 ## Feature Status
 
-| Feature | Status | Notes |
-|---|---|---|
-| WireGuard device management | Stable | Devices, QR codes, configs |
-| AdGuard DNS filtering | Stable | Per-device presets |
-| Mobile-responsive UI | Stable | Hamburger menu, collapsible sidebar |
-| Security Center | Beta | Fail2Ban, UFW, sessions, TLS, security score |
-| Backup / Restore | Beta | Local backup and guided restore |
-| Notifications | Beta | SMTP and webhook |
-| Device Inventory | Beta | User-friendly device management |
-| DNS Profiles | Beta | Per-device DNS profiles with timed bypass |
-| Monitoring | Beta | HTTP, TCP, DNS, Docker, TLS checks |
-| VLESS+Reality (Xray) | Beta | DPI-resistant tunnel; per-device UUIDs; QR from Devices tab |
-| Gateway / Reverse Proxy | Experimental | VPN-only and public HTTPS exposure |
-| Apps | Preview | Catalog visible; install/manage not production-ready |
-| File Drop | Preview | UI available; not recommended for sensitive use yet |
-| Migration Assistant | Preview | Checklist/helper only |
+Core features (WireGuard devices, AdGuard DNS filtering, mobile UI) are **stable**. Security Center, backups, notifications, monitoring, DNS profiles and the Xray VLESS+Reality tunnel are **beta**. Gateway is **experimental**; Apps, File Drop and Migration Assistant are **previews** and not production-ready.
 
-→ [Detailed feature status](docs/feature-status.md)
+→ [Detailed feature status](docs/feature-status.md) *(canonical per-feature table)*
 
 ---
 
 ## Interface Modes
 
-The portal has three modes so users are not exposed to unnecessary complexity. Switch from the **Settings** tab at any time.
+The portal has three modes so users are not exposed to unnecessary complexity: **User** (essentials only), **Super User** *(default — adds DNS profiles, backups, monitoring, security overview)* and **Advanced** (everything, including embedded WireGuard/AdGuard views and preview features). Switch from the **Settings** tab at any time.
 
-| Mode | Intended user | Visible features |
-|---|---|---|
-| **User** | Basic VPN user | Devices, QR codes, simple DNS protection |
-| **Super User** *(default)* | Appliance operator | Devices (incl. VLESS QR), DNS profiles, backups, monitoring, notifications, security overview |
-| **Advanced** | Full administrator | WireGuard, AdGuard, Gateway, Apps, File Drop, Migration, logs and advanced security controls |
-
-→ [Interface modes reference](docs/interface-modes.md)
+→ [Interface modes reference](docs/interface-modes.md) *(canonical mode-by-mode table)*
 
 ---
 
@@ -97,7 +79,7 @@ The portal has three modes so users are not exposed to unnecessary complexity. S
 
 ## Quick Install
 
-Requires a fresh Debian 12 or Ubuntu 24.04 VPS — 1 vCPU and 1 GB RAM is enough.
+Requires a fresh Debian 12/13 or Ubuntu 24.04+ VPS — 1 vCPU and 1 GB RAM is enough.
 
 ```bash
 export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword'
@@ -107,6 +89,17 @@ curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/mai
 The installer sets up Docker, UFW, Caddy, Fail2Ban, configures HTTPS, and starts all containers.
 
 → [Full setup guide](docs/setup.md) — sizing, options, manual install, environment variables
+
+### Updating
+
+```bash
+cd ~/Easy-WG-Combo
+./easywg update
+```
+
+This pulls the latest code (refusing if you have local edits — commit or stash them first), refreshes the pinned container images, rebuilds the portal and runs a health check. Version history is in [CHANGELOG.md](CHANGELOG.md).
+
+> **Note:** WireGuard is deliberately pinned to wg-easy **v14** — v15 is a breaking rewrite with an incompatible data model. `easywg update` will never cross that major version.
 
 ---
 
@@ -252,6 +245,9 @@ Run `./easywg help` for the full command list.
 | [Feature status](docs/feature-status.md) | Detailed status for all features |
 | [Xray VLESS+Reality](docs/xray.md) | DPI-resistant tunnel — setup, per-device QR, client apps |
 | [Experimental features](docs/experimental-features.md) | Gateway, Apps, File Drop, Migration — what works and what doesn't |
+| [Apps preview](docs/apps-preview.md) | Optional self-hosted app catalog — setup and limitations |
+| [File Drop preview](docs/filedrop-preview.md) | File sharing — setup, tokens, limitations |
+| [Migration preview](docs/migration-preview.md) | Migration checklist/helper — current scope |
 | [Security model](docs/security-model.md) | Threat model, exposure modes, sensitive operations |
 | [Gateway](docs/gateway.md) | Reverse proxy / Caddy services |
 | [Monitoring](docs/monitoring.md) | Uptime check types, CLI, auto-seeded defaults |
