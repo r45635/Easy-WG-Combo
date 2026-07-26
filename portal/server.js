@@ -10,7 +10,7 @@ const http       = require('http');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
-const { randomUUID } = require('crypto');
+const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -383,13 +383,26 @@ async function fail2banStatus() {
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+// Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
+// SSH-tunnel access stays plain HTTP and must still receive the cookie.
+app.set('trust proxy', 1);
 app.use(session({
   name:              'portal.sid',
-  secret:            process.env.SESSION_SECRET || PORTAL_PASS + '_sess',
+  // Random per-boot secret when SESSION_SECRET is unset: sessions do not
+  // survive a restart (fine for a single-admin portal) and the secret can
+  // no longer be derived from a default admin password.
+  secret:            process.env.SESSION_SECRET || randomBytes(32).toString('hex'),
   resave:            false,
   saveUninitialized: false,
-  cookie:            { maxAge: 24 * 60 * 60 * 1000 },
+  cookie:            { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: 'auto' },
 }));
+
+// Constant-time password comparison (hash both sides to equalize length).
+function passwordsMatch(a, b) {
+  const ha = createHash('sha256').update(String(a ?? '')).digest();
+  const hb = createHash('sha256').update(String(b ?? '')).digest();
+  return timingSafeEqual(ha, hb);
+}
 
 const auth = (req, res, next) => {
   // Accept HTTP Basic auth for CLI / scripted access
@@ -397,7 +410,7 @@ const auth = (req, res, next) => {
   if (authHeader.startsWith('Basic ')) {
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
     const password = decoded.slice(decoded.indexOf(':') + 1);
-    if (password === currentPortalPass) return next();
+    if (passwordsMatch(password, currentPortalPass)) return next();
   }
   if (!req.session.ok) return res.status(401).json({ error: 'Unauthorized' });
   const meta = sessionRegistry.get(req.sessionID);
@@ -516,7 +529,7 @@ app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
-  if (req.body.password === currentPortalPass) {
+  if (passwordsMatch(req.body.password, currentPortalPass)) {
     req.session.ok = true;
     sessionRegistry.set(req.sessionID, {
       ip:       clientIp(req),
@@ -1121,7 +1134,7 @@ app.get('/api/fail2ban/jaillog', auth, (req, res) => {
 
 app.post('/api/auth/password', auth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || currentPassword !== currentPortalPass)
+  if (!currentPassword || !passwordsMatch(currentPassword, currentPortalPass))
     return res.status(403).json({ error: 'Current password is incorrect.' });
   if (!newPassword || newPassword.length < 8)
     return res.status(400).json({ error: 'New password must be at least 8 characters.' });
@@ -1214,11 +1227,14 @@ app.get('/api/geoip/:ip', auth, async (req, res) => {
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 3000);
+    // HTTPS provider (ip-api free tier is HTTP-only); response mapped to the
+    // { status, country, countryCode } shape the frontend expects.
     const r = await fetch(
-      `http://ip-api.com/json/${encodeURIComponent(req.params.ip)}?fields=status,country,countryCode`,
+      `https://ipwho.is/${encodeURIComponent(req.params.ip)}?fields=success,country,country_code`,
       { signal: ctrl.signal },
     );
-    res.json(await r.json());
+    const d = await r.json();
+    res.json({ status: d.success ? 'success' : 'fail', country: d.country, countryCode: d.country_code });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1782,7 +1798,7 @@ async function sendEmailNotif(subject, body) {
   const cfg = loadNotifConfig();
   const ec = cfg.channels?.email || {};
   if (!ec.enabled || !ec.smtp_host || !ec.to) throw new Error('Email not configured');
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: ec.smtp_host,
     port: ec.smtp_port || 587,
     secure: (ec.smtp_port || 587) === 465,
