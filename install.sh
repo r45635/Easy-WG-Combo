@@ -3,7 +3,9 @@ set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/r45635/Easy-WG-Combo.git}"
 APP_DIR="${APP_DIR:-$HOME/Easy-WG-Combo}"
-INSTALL_VERSION="1.1.0"
+# install.sh runs standalone (curl | bash) before the repo exists, so it cannot
+# read the VERSION file — keep this literal in sync with VERSION on release.
+INSTALL_VERSION="0.4.0"
 
 log() {
   printf '%s\n' "$*"
@@ -206,6 +208,9 @@ main() {
 
   if [ -d "$APP_DIR/.git" ]; then
     log "Updating existing checkout in $APP_DIR..."
+    if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
+      die "Local changes present in $APP_DIR — commit, discard, or stash them first (git -C $APP_DIR status). Or use: $APP_DIR/easywg update"
+    fi
     git -C "$APP_DIR" pull --ff-only origin main
   else
     log "Cloning repository into $APP_DIR..."

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="3.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+VERSION="$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "dev")"
 
 export EASYWG_DIR="$SCRIPT_DIR"
 
@@ -18,6 +18,7 @@ Commands:
   health                    Full system health report
   services                  Show service status only
   doctor                    Check installation health (containers, API, scripts, security)
+  update                    Update to the latest version (git pull + image pull + rebuild)
 
   backup                    Create a configuration backup
   backup --encrypt          Create an encrypted backup (requires age)
@@ -102,6 +103,21 @@ case "${1:-}" in
     ;;
   doctor)
     bash "$SCRIPTS_DIR/doctor.sh" "$@"
+    ;;
+  update)
+    echo "Easy-WG-Combo v$VERSION — checking for updates..."
+    git -C "$SCRIPT_DIR" fetch origin
+    if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain)" ]; then
+      echo "Error: local changes present in $SCRIPT_DIR — refusing to update." >&2
+      echo "Review them with:  git -C $SCRIPT_DIR status" >&2
+      echo "Then commit, discard, or stash:  git -C $SCRIPT_DIR stash" >&2
+      exit 1
+    fi
+    git -C "$SCRIPT_DIR" pull --ff-only origin main
+    "$SCRIPT_DIR/compose.sh" pull
+    "$SCRIPT_DIR/compose.sh" up -d --build
+    bash "$SCRIPTS_DIR/health.sh" --services-only || true
+    echo "Update complete — now at v$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo dev) ($(git -C "$SCRIPT_DIR" rev-parse --short HEAD))"
     ;;
   status|health)
     shift

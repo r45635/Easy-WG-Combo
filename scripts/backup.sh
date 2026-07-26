@@ -34,7 +34,7 @@ trap 'rm -rf "$STAGE"' EXIT
 HOSTNAME_VAL=$(hostname)
 OS_VAL=$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -s)
 DC_VERSION=$(docker compose version --short 2>/dev/null || docker-compose version --short 2>/dev/null || echo "unknown")
-EWGC_VERSION=$(grep -m1 '"version"' "$PROJECT_DIR/portal/package.json" 2>/dev/null | awk -F'"' '{print $4}' || echo "unknown")
+EWGC_VERSION="$(cat "$PROJECT_DIR/VERSION" 2>/dev/null || echo "unknown")+$(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo "nogit")"
 
 HAS_WG=$([ -d "$PROJECT_DIR/wireguard" ] && echo "true" || echo "false")
 HAS_AG=$([ -d "$PROJECT_DIR/adguard" ] && echo "true" || echo "false")

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="1.1.0"
 BOOTSTRAP_REPO_URL="https://github.com/r45635/Easy-WG-Combo"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BOOTSTRAP_VERSION="$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "dev")"
 ENV_FILE="$SCRIPT_DIR/.env"
 SECRETS_FILE="$SCRIPT_DIR/.env.secrets"
 PORTAL_SETTINGS_FILE="$SCRIPT_DIR/portal/data/portal-config.json"
