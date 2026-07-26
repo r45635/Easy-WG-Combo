@@ -1,7 +1,11 @@
 services:
 
   wg-easy:
-    image: ghcr.io/wg-easy/wg-easy:14
+    # PINNED to v14: v15 is a breaking rewrite (new data model, incompatible
+    # API). Do NOT bump the major — Dependabot is configured to ignore it.
+    # The digest keeps installs reproducible; Dependabot refreshes it on 14.x
+    # patch releases.
+    image: ghcr.io/wg-easy/wg-easy:14@sha256:5f26407fd2ede54df76d63304ef184576a6c1bb73f934a58a11abdd852fab549
     container_name: wg-easy
     restart: unless-stopped
     environment:
@@ -31,7 +35,7 @@ services:
       - net.ipv4.ip_forward=1
 
   adguard:
-    image: adguard/adguardhome:latest
+    image: adguard/adguardhome:v0.107.77
     container_name: adguard
     restart: unless-stopped
     network_mode: host
@@ -97,7 +101,7 @@ services:
       - adguard
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     container_name: caddy
     restart: unless-stopped
     network_mode: host

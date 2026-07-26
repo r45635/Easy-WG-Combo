@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Portal npm dependencies — weekly, minor+patch grouped into one PR
+  - package-ecosystem: "npm"
+    directory: "/portal"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Portal base image (node)
+  - package-ecosystem: "docker"
+    directory: "/portal"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  # Stack images in docker-compose.yml + docker-compose.xray.yml
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    ignore:
+      # wg-easy v15 is a breaking rewrite (new data model / API).
+      # The v14 pin is deliberate — see docker-compose.yml.
+      - dependency-name: "ghcr.io/wg-easy/wg-easy"
+        update-types: ["version-update:semver-major"]
+
+  # CI actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

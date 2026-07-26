@@ -882,7 +882,11 @@ configure_xray() {
   public_key="${XRAY_PUBLIC_KEY:-${_env_pub:-}}"
   if [ -z "$private_key" ] || [ -z "$public_key" ]; then
     log "Generating Xray X25519 key pair (pulling image if needed)..."
-    keypair="$(docker run --rm ghcr.io/xtls/xray-core:latest x25519 2>/dev/null)"
+    # Use the exact image pinned in docker-compose.xray.yml so the parsed
+    # x25519 output format cannot drift from the deployed binary.
+    xray_image="$(awk '/image: *ghcr.io\/xtls\/xray-core/ {print $2; exit}' "$SCRIPT_DIR/docker-compose.xray.yml")"
+    [ -n "$xray_image" ] || die "Could not read xray image from docker-compose.xray.yml"
+    keypair="$(docker run --rm "$xray_image" x25519 2>/dev/null)"
     private_key="$(printf '%s' "$keypair" | grep -i 'private' | awk '{print $NF}')"
     public_key="$(printf '%s' "$keypair" | grep -i 'public' | awk '{print $NF}')"
     [ -n "$private_key" ] || die "Failed to generate Xray private key."

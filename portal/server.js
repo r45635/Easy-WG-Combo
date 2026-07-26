@@ -2521,6 +2521,7 @@ const FILEDROP_MAX_EXPIRY     = 30;
 const VPS_HOST           = loadSettings().wgHost || process.env.WG_HOST || '';
 
 // ── Phase 3: App catalog ─────────────────────────────────────────────────────
+// Image tags below are pinned (Dependabot cannot see them) — review quarterly.
 const APP_CATALOG = {
   'uptime-kuma': {
     id: 'uptime-kuma', name: 'Uptime Kuma', category: 'monitoring',
@@ -2535,7 +2536,7 @@ const APP_CATALOG = {
   'ntfy': {
     id: 'ntfy', name: 'ntfy', category: 'notifications',
     description: 'Simple self-hosted push notification service for any platform.',
-    image: 'binwiederhier/ntfy:latest',
+    image: 'binwiederhier/ntfy:v2',
     internalPort: 8080, minRamMb: 128, defaultExposure: 'vpn_only',
     namedVolumes: [
       { name: 'easywg-ntfy-cache', target: '/var/cache/ntfy' },
@@ -2548,7 +2549,7 @@ const APP_CATALOG = {
   'filebrowser': {
     id: 'filebrowser', name: 'FileBrowser', category: 'files',
     description: 'Web-based file manager with user management and sharing.',
-    image: 'filebrowser/filebrowser:latest',
+    image: 'filebrowser/filebrowser:v2',
     internalPort: 8081, minRamMb: 64, defaultExposure: 'vpn_only',
     namedVolumes: [
       { name: 'easywg-filebrowser-db',  target: '/database' },
@@ -2561,7 +2562,7 @@ const APP_CATALOG = {
   'stirling-pdf': {
     id: 'stirling-pdf', name: 'Stirling PDF', category: 'productivity',
     description: 'Powerful web-based PDF manipulation tool. All processing is local.',
-    image: 'frooodle/s-pdf:latest',
+    image: 'frooodle/s-pdf:2.14.2',
     internalPort: 8082, minRamMb: 256, defaultExposure: 'vpn_only',
     namedVolumes: [
       { name: 'easywg-stirling-configs', target: '/configs' },
@@ -2574,7 +2575,7 @@ const APP_CATALOG = {
   'vaultwarden': {
     id: 'vaultwarden', name: 'Vaultwarden', category: 'security',
     description: 'Lightweight Bitwarden-compatible password manager server.',
-    image: 'vaultwarden/server:latest',
+    image: 'vaultwarden/server:1.37.0',
     internalPort: 8083, minRamMb: 256, defaultExposure: 'vpn_only',
     namedVolumes: [{ name: 'easywg-vaultwarden-data', target: '/data' }],
     env: ['ROCKET_PORT=8083', 'SIGNUPS_ALLOWED=false'],
