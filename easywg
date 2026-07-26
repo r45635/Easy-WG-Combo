@@ -107,7 +107,9 @@ case "${1:-}" in
   update)
     echo "Easy-WG-Combo v$VERSION — checking for updates..."
     git -C "$SCRIPT_DIR" fetch origin
-    if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain)" ]; then
+    # untracked-files=no: runtime files (caddy/Caddyfile, xray/, backups/)
+    # are untracked by design and must not block updates
+    if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain --untracked-files=no)" ]; then
       echo "Error: local changes present in $SCRIPT_DIR — refusing to update." >&2
       echo "Review them with:  git -C $SCRIPT_DIR status" >&2
       echo "Then commit, discard, or stash:  git -C $SCRIPT_DIR stash" >&2

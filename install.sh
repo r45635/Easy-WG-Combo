@@ -227,7 +227,7 @@ main() {
 
   if [ -d "$APP_DIR/.git" ]; then
     log "Updating existing checkout in $APP_DIR..."
-    if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
+    if [ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]; then
       die "Local changes present in $APP_DIR — commit, discard, or stash them first (git -C $APP_DIR status). Or use: $APP_DIR/easywg update"
     fi
     git -C "$APP_DIR" pull --ff-only origin main
