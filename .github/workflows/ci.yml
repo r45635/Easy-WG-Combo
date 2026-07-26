@@ -17,7 +17,7 @@ jobs:
   shell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Lint shell scripts
         run: shellcheck --severity=warning bootstrap.sh install.sh compose.sh easywg scripts/*.sh
@@ -25,7 +25,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Validate base compose config
         run: |
@@ -38,7 +38,7 @@ jobs:
   portal:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
