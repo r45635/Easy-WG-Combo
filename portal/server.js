@@ -382,6 +382,9 @@ async function fail2banStatus() {
 // ── Express setup ────────────────────────────────────────────────────────────
 
 app.use(express.json());
+// Express 5 / body-parser 2 leave req.body undefined when no JSON body was
+// parsed (Express 4 gave {}); handlers destructure req.body unguarded.
+app.use((req, _res, next) => { req.body ??= {}; next(); });
 app.use(express.static(path.join(__dirname, 'public')));
 // Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
 // SSH-tunnel access stays plain HTTP and must still receive the cookie.
