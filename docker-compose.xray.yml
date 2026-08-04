@@ -6,7 +6,7 @@ services:
   xray:
     # Version-pinned: bootstrap.sh reads this line for key generation, so the
     # x25519 CLI output format stays frozen with the image.
-    image: ghcr.io/xtls/xray-core:26.7.11
+    image: ghcr.io/xtls/xray-core:26.7.28
     container_name: xray
     restart: unless-stopped
     network_mode: host
