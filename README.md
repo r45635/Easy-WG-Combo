@@ -122,7 +122,7 @@ The portal can be exposed over HTTPS through Caddy by setting `PUBLIC_HTTPS_ENAB
 
 This is convenient but increases the attack surface. If you enable it: use a strong password, keep Fail2Ban enabled, and consider restricting by IP.
 
-> The current installer enables public HTTPS by default. Check your `.env` to confirm your chosen mode.
+> The installer defaults to **local-only** (admin via SSH tunnel / VPN). Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` (or answer the install prompt) to expose the portal. The portal is a root-equivalent control plane — only expose it deliberately.
 
 → [Security model](docs/security-model.md)
 
@@ -202,6 +202,7 @@ All features are available from the terminal:
 ```bash
 ./easywg status                    # System health summary
 ./easywg doctor                    # Check installation health
+./easywg passwd                    # Rotate the admin password everywhere
 ./easywg backup                    # Create a backup
 ./easywg restore <file>            # Restore from backup
 
@@ -224,8 +225,10 @@ Run `./easywg help` for the full command list.
 
 ## Security Notes
 
-- The portal is a privileged local admin component. Treat access to it accordingly.
-- Public HTTPS mode exposes the admin interface. Use a strong password and keep Fail2Ban enabled.
+- The portal is a **root-equivalent** local admin component (it controls Docker, the firewall and certificates). Treat access to it accordingly — compromise of the portal is compromise of the host.
+- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, use a strong password (≥16), keep Fail2Ban enabled, and prefer restricting by IP.
+- Rotate the admin password with `./easywg passwd` — it updates the portal, the wg-easy hash and `.env` together (the in-portal password change only affects the portal login).
+- See [SECURITY.md](SECURITY.md) for the accepted-risk model.
 - The Docker socket, even read-only, is sensitive. The Apps module requires a writable socket.
 - Gateway can expose services publicly. Review each service before enabling public access.
 - File Drop public links are accessible without VPN. Use passwords and expiry.

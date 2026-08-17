@@ -59,6 +59,14 @@ fi
 if docker inspect adguard --format '{{.State.Running}}' 2>/dev/null | grep -q true || \
    docker inspect adguardhome --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
   ok "AdGuard Home container is running"
+  # The portal proxies AdGuard using ADGUARD_PASSWORD from .env. AdGuard's own
+  # credential is set in its web wizard; if they diverge the proxy returns 401.
+  ag_http=$(curl -s -o /dev/null -w '%{http_code}' -u "admin:${PORTAL_PASS}" "${PORTAL_URL}/adguard/control/status" 2>/dev/null || echo "000")
+  case "$ag_http" in
+    401) fail "AdGuard proxy auth failed (401) — the AdGuard wizard password must match ADGUARD_PASSWORD/ADMIN_PASSWORD in .env" ;;
+    000) warn "Could not probe AdGuard through the portal (portal down?)" ;;
+    *)   ok "AdGuard is reachable through the portal (HTTP ${ag_http})" ;;
+  esac
 else
   fail "AdGuard Home container is not running — start with: ./compose.sh up -d"
 fi

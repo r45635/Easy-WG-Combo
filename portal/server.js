@@ -11,17 +11,26 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
+const rateLimit = require('express-rate-limit');
+const netGuards = require('./lib/net-guards');
+const archiveGuards = require('./lib/archive-guards');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
 const HOST = process.env.PORTAL_HOST || '127.0.0.1';
 
+// State/config roots. Overridable so tests can point them at a temp dir; the
+// defaults are the container bind-mount paths and unchanged in production.
+const DATA_DIR      = process.env.PORTAL_DATA_DIR     || '/data';
+const CADDY_DIR     = process.env.PORTAL_CADDY_DIR    || '/app-caddy';
+const FILEDROP_ROOT = process.env.PORTAL_FILEDROP_DIR || '/filedrop';
+
 const WG_URL       = process.env.WG_EASY_URL   || 'http://127.0.0.1:51821';
 const AG_URL       = process.env.ADGUARD_URL   || 'http://127.0.0.1:3000';
-const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
+const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD || '';
 const AG_USER      = process.env.ADGUARD_USER      || 'admin';
-const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
-const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
+const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || '';
+const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || '';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
 const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
@@ -32,8 +41,8 @@ const BACKUP_KEEP      = parseInt(process.env.BACKUP_KEEP || '10', 10);
 const DOCKER_SOCK      = '/var/run/docker.sock';
 const SSH_CONFIG_PATH  = '/etc/ssh/sshd_config';
 const UFW_CONF_PATH    = '/etc/ufw/ufw.conf';
-const NOTIF_FILE       = '/data/notifications.json';
-const NOTIF_HIST_FILE  = '/data/notifications-history.json';
+const NOTIF_FILE       = path.join(DATA_DIR, 'notifications.json');
+const NOTIF_HIST_FILE  = path.join(DATA_DIR, 'notifications-history.json');
 const ALERT_DISK_THRESHOLD  = parseInt(process.env.ALERT_DISK_THRESHOLD  || '85',  10);
 const ALERT_CERT_EXPIRY_DAYS = parseInt(process.env.ALERT_CERT_EXPIRY_DAYS || '14', 10);
 const runCmd = promisify(execFile);
@@ -49,11 +58,11 @@ const XRAY_CONFIG_PATH = '/xray-config/config.json';
 
 // ── Phase 2: constants ─────────────────────────────────────────────────────────
 
-const DEVICES_FILE        = '/data/devices.json';
-const DNS_PROFILES_FILE   = '/data/dns-profiles.json';
-const PROXY_SERVICES_FILE = '/data/proxy-services.json';
-const CADDY_SERVICES_FILE = '/app-caddy/easywg-services.caddy';
-const CADDY_FILE          = '/app-caddy/Caddyfile';
+const DEVICES_FILE        = path.join(DATA_DIR, 'devices.json');
+const DNS_PROFILES_FILE   = path.join(DATA_DIR, 'dns-profiles.json');
+const PROXY_SERVICES_FILE = path.join(DATA_DIR, 'proxy-services.json');
+const CADDY_SERVICES_FILE = path.join(CADDY_DIR, 'easywg-services.caddy');
+const CADDY_FILE          = path.join(CADDY_DIR, 'Caddyfile');
 const VPN_DNS_IP          = process.env.WG_DEFAULT_DNS || '10.8.0.1';
 const VPN_SUBNET          = (() => { const p = VPN_DNS_IP.split('.'); p[3] = '0'; return p.join('.') + '/24'; })();
 
@@ -84,8 +93,8 @@ function dnsToPreset(dns) {
   return DNS_PRESETS.find(p => p.value === dns?.trim()) || { id: 'custom', label: dns || '—' };
 }
 
-const DATA_FILE = '/data/client-dns.json';
-const SETTINGS_FILE = '/data/portal-config.json';
+const DATA_FILE = path.join(DATA_DIR, 'client-dns.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'portal-config.json');
 
 const VALID_INTERFACE_MODES = ['user', 'super_user', 'advanced'];
 const DEFAULT_INTERFACE_MODE = 'super_user';
@@ -99,7 +108,7 @@ const UI_CAPABILITIES = {
       createBackup: false, guidedRestore: false, restoreBackup: false,
       configureNotifications: false, viewSecurityScore: false,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
-      rawLogs: false, advancedSecurity: false,
+      rawLogs: false, advancedSecurity: false, manageMonitors: false,
     },
   },
   super_user: {
@@ -111,7 +120,7 @@ const UI_CAPABILITIES = {
       restoreBackup: true, configureNotifications: true,
       viewSecurityScore: true, viewMonitoring: true,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
-      rawLogs: false, advancedSecurity: false,
+      rawLogs: false, advancedSecurity: false, manageMonitors: true,
     },
   },
   advanced: {
@@ -142,7 +151,8 @@ function loadSettings() {
 }
 
 function saveSettings(data) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(SETTINGS_FILE, 0o600); } catch { /* self-heal pre-existing 0644 files */ }
 }
 
 function updateHostEnvValue(key, value) {
@@ -168,20 +178,26 @@ function readEnvValue(key) {
 // otherwise Caddy falls back to a self-signed internal cert.
 function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
+  const publicHttps = String(process.env.PUBLIC_HTTPS_ENABLED || 'no').toLowerCase() === 'yes';
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(adminDomain);
   const usePublicTls = !!adminDomain && !!tlsEmail && !isIp && domainPointsHere;
 
   let out = '{\n';
-  if (usePublicTls) out += `  email ${tlsEmail}\n`;
+  if (publicHttps && usePublicTls) out += `  email ${tlsEmail}\n`;
   out += '  admin localhost:2019\n';
   out += '}\n\n';
 
   if (caddyHttpsPort) {
-    // Xray mode: portal is public on caddyHttpsPort (Xray owns :443).
-    out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
-    if (usePublicTls) {
+    // Xray mode: 443 is held by Xray, so the portal is served on caddyHttpsPort.
+    if (!publicHttps) {
+      // Local-only: bind to loopback (SSH-tunnel access), self-signed. Must stay
+      // in phase with bootstrap.sh configure_caddy — do not re-publish here.
+      out += `127.0.0.1:${caddyHttpsPort} {\n`;
+      out += '  tls internal\n';
+    } else if (usePublicTls) {
       // Real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is impossible —
       // force HTTP-01 (served by Caddy on :80). Requires port 80 open in UFW.
+      out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
       out += '  tls {\n';
       out += '    issuer acme {\n';
       out += `      email ${tlsEmail}\n`;
@@ -189,6 +205,7 @@ function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
       out += '    }\n';
       out += '  }\n';
     } else {
+      out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
       out += '  tls internal\n';
     }
   } else {
@@ -207,6 +224,11 @@ function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   out += '    Strict-Transport-Security "max-age=31536000; includeSubDomains"\n';
   out += '    X-Content-Type-Options "nosniff"\n';
   out += '    Referrer-Policy "same-origin"\n';
+  out += '    X-Frame-Options "SAMEORIGIN"\n';
+  out += '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n';
+  // Report-only first (one release) so violations surface before enforcing.
+  // Keep in phase with configure_caddy() in bootstrap.sh.
+  out += "    Content-Security-Policy-Report-Only \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'\"\n";
   out += '  }\n';
   out += '}\n\n';
   out += 'import /etc/caddy/easywg-services.caddy\n';
@@ -247,6 +269,19 @@ function openHttpChallengePort() {
 
 let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
 
+// Fail closed: never serve with a missing or well-known default credential.
+// Empty ADMIN_PASSWORD used to fall back to 'changeme', so a bare
+// `docker compose up` (or an empty .env) booted a publicly reachable admin
+// portal with a known password. Refuse to start instead.
+if (!currentPortalPass || currentPortalPass === 'changeme') {
+  console.error(
+    'FATAL: no admin password set. The portal will not start.\n' +
+    '       Set ADMIN_PASSWORD in .env (min 16 chars recommended) and use\n' +
+    '       ./compose.sh, or run ./install.sh / ./bootstrap.sh which set it for you.'
+  );
+  process.exit(1);
+}
+
 function getServerName() {
   return loadSettings().serverName || sanitizeServerName(DEFAULT_SERVER_NAME);
 }
@@ -276,6 +311,25 @@ function requiresAction(action) {
     res.status(403).json({ error: `Action '${action}' not allowed in current interface mode.` });
   };
 }
+
+// Interface-mode ordering for privilege-raise checks (user < super_user < advanced).
+function modeRank(mode) { return VALID_INTERFACE_MODES.indexOf(mode); }
+
+// ── Login rate limiting (app-level, defense-in-depth alongside Fail2Ban) ──────
+const LOGIN_MAX_FAILS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const loginFailures = new Map(); // ip → { count, first }
+function loginRateLimited(ip) {
+  const rec = loginFailures.get(ip);
+  return !!rec && (Date.now() - rec.first < LOGIN_WINDOW_MS) && rec.count >= LOGIN_MAX_FAILS;
+}
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  const rec = loginFailures.get(ip);
+  if (!rec || now - rec.first >= LOGIN_WINDOW_MS) loginFailures.set(ip, { count: 1, first: now });
+  else rec.count += 1;
+}
+function clearLoginFailures(ip) { loginFailures.delete(ip); }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
@@ -357,21 +411,23 @@ function isValidIp(value) {
 }
 
 function isValidIpOrCidr(value) {
-  const raw = String(value || '').trim();
+  if (typeof value !== 'string' || /[\s{}]/.test(value)) return false;
+  const raw = value.trim();
   const ipv4 = /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)(\/([0-9]|[12]\d|3[0-2]))?$/;
-  const ipv6 = /^[0-9a-fA-F:]+(?:\/\d+)?$/;
+  // Bounded prefix; hex groups only (still permissive on grouping, but free of
+  // the control/brace characters that could break out into the Caddyfile).
+  const ipv6 = /^[0-9a-fA-F:]{2,39}(?:\/(?:12[0-8]|1[01]\d|\d{1,2}))?$/;
   return ipv4.test(raw) || ipv6.test(raw);
 }
 
 const sessionRegistry = new Map(); // sessionId → {ip, ua, loginAt, lastSeen}
 
+// Delegates to the trust-proxy-aware helper. The old hand-rolled version
+// trusted client-supplied X-Real-IP / X-Forwarded-For before the socket, which
+// let any request spoof its source address. With trust proxy = 'loopback',
+// XFF is only honored from a loopback peer (Caddy / SSH tunnel).
 function clientIp(req) {
-  return (
-    req.headers['x-real-ip'] ||
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.socket.remoteAddress ||
-    'unknown'
-  ).replace(/^::ffff:/, '');
+  return netGuards.trustedClientIp(req) || 'unknown';
 }
 
 async function fail2banStatus() {
@@ -388,7 +444,10 @@ app.use((req, _res, next) => { req.body ??= {}; next(); });
 app.use(express.static(path.join(__dirname, 'public')));
 // Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
 // SSH-tunnel access stays plain HTTP and must still receive the cookie.
-app.set('trust proxy', 1);
+// 'loopback' (not 1): trust X-Forwarded-* only when the socket peer is
+// loopback — i.e. Caddy (reverse-proxies from 127.0.0.1) or an SSH tunnel.
+// A remote client can no longer forge XFF to spoof its source IP.
+app.set('trust proxy', 'loopback');
 app.use(session({
   name:              'portal.sid',
   // Random per-boot secret when SESSION_SECRET is unset: sessions do not
@@ -399,6 +458,31 @@ app.use(session({
   saveUninitialized: false,
   cookie:            { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: 'auto' },
 }));
+
+// CSRF defense-in-depth: reject state-changing API requests whose Origin is a
+// different host. Same-origin browser requests carry a matching Origin; CLI /
+// Basic-auth requests carry none and pass. sameSite=lax is the primary control.
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (!req.path.startsWith('/api/')) return next();
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  let originHost;
+  try { originHost = new URL(origin).host; } catch { return res.status(403).json({ error: 'Bad Origin header' }); }
+  if (originHost !== req.headers.host) return res.status(403).json({ error: 'Cross-origin request rejected' });
+  next();
+});
+
+// Coarse per-IP request limiting (defense-in-depth). The portal is single-admin,
+// but this bounds brute-force/abuse across every handler and, importantly, the
+// unauthenticated /files/ download path. The failure-counting login limiter
+// (below) is the stricter, credential-specific layer on top.
+const rlOpts = { windowMs: 60_000, standardHeaders: 'draft-7', legacyHeaders: false,
+  message: { error: 'Too many requests. Slow down.' } };
+app.use('/files/', rateLimit({ ...rlOpts, limit: 120 }));
+// Global (covers /api plus the /wireguard, /control, /adguard proxy mounts).
+// Placed after express.static so asset serving is not counted.
+app.use(rateLimit({ ...rlOpts, limit: 600 }));
 
 // Constant-time password comparison (hash both sides to equalize length).
 function passwordsMatch(a, b) {
@@ -411,9 +495,13 @@ const auth = (req, res, next) => {
   // Accept HTTP Basic auth for CLI / scripted access
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Basic ')) {
+    const ip = clientIp(req);
+    if (loginRateLimited(ip)) return res.status(429).json({ error: 'Too many failed attempts. Try again later.' });
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
     const password = decoded.slice(decoded.indexOf(':') + 1);
-    if (passwordsMatch(password, currentPortalPass)) return next();
+    if (passwordsMatch(password, currentPortalPass)) { clearLoginFailures(ip); return next(); }
+    recordLoginFailure(ip);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   if (!req.session.ok) return res.status(401).json({ error: 'Unauthorized' });
   const meta = sessionRegistry.get(req.sessionID);
@@ -532,16 +620,26 @@ app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
+  const ip = clientIp(req);
+  if (loginRateLimited(ip)) {
+    return res.status(429).json({ error: 'Too many failed attempts. Try again later.' });
+  }
   if (passwordsMatch(req.body.password, currentPortalPass)) {
-    req.session.ok = true;
-    sessionRegistry.set(req.sessionID, {
-      ip:       clientIp(req),
-      ua:       (req.headers['user-agent'] || '').slice(0, 120),
-      loginAt:  Date.now(),
-      lastSeen: Date.now(),
+    clearLoginFailures(ip);
+    // Regenerate the session ID on privilege change to prevent session fixation.
+    req.session.regenerate((err) => {
+      if (err) return res.status(500).json({ error: 'Session error' });
+      req.session.ok = true;
+      sessionRegistry.set(req.sessionID, {
+        ip,
+        ua:       (req.headers['user-agent'] || '').slice(0, 120),
+        loginAt:  Date.now(),
+        lastSeen: Date.now(),
+      });
+      res.json({ success: true });
     });
-    res.json({ success: true });
   } else {
+    recordLoginFailure(ip);
     res.status(401).json({ error: 'Wrong password' });
   }
 });
@@ -584,6 +682,14 @@ app.post('/api/settings/interface-mode', auth, (req, res) => {
   const mode = String(req.body.interfaceMode || '').trim();
   if (!VALID_INTERFACE_MODES.includes(mode)) {
     return res.status(400).json({ error: `Invalid interface mode. Must be one of: ${VALID_INTERFACE_MODES.join(', ')}.` });
+  }
+  // Raising privilege (e.g. user -> advanced) requires the admin password, so a
+  // hijacked lower-mode session cannot unlock advanced actions on its own.
+  // Downgrades are free.
+  if (modeRank(mode) > modeRank(getInterfaceMode())) {
+    if (!passwordsMatch(req.body.confirmPassword || '', currentPortalPass)) {
+      return res.status(401).json({ error: 'Password confirmation required to raise the interface mode.' });
+    }
   }
   setInterfaceMode(mode);
   res.json({ success: true, interfaceMode: mode });
@@ -632,7 +738,7 @@ app.get('/api/settings/validate-host', auth, async (req, res) => {
   }
 });
 
-app.post('/api/settings/server-endpoint', auth, async (req, res) => {
+app.post('/api/settings/server-endpoint', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const host     = String(req.body.host     || '').trim();
   const tlsEmail = String(req.body.tlsEmail || '').trim();
   if (!host) return res.status(400).json({ error: 'Missing host.' });
@@ -664,6 +770,8 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
 
   const effective = tlsEmail || readEnvValue('TLS_EMAIL');
   const caddyContent = generateMainCaddyfile(host, effective, domainPointsHere);
+  // Snapshot for rollback: a bad host/email must not leave a broken Caddyfile live.
+  const prevCaddy = fs.existsSync(CADDY_FILE) ? fs.readFileSync(CADDY_FILE, 'utf8') : null;
   fs.writeFileSync(CADDY_FILE, caddyContent);
 
   // When switching to a public cert while Xray owns :443, Caddy validates via HTTP-01 on
@@ -678,7 +786,11 @@ app.post('/api/settings/server-endpoint', auth, async (req, res) => {
       : ' ⚠ Could not open port 80 automatically — run “ufw allow 80/tcp” on the host, or the certificate will stay self-signed.';
   }
 
-  await reloadCaddy();
+  const reload = await reloadCaddy();
+  if (!reload.ok) {
+    if (prevCaddy !== null) { fs.writeFileSync(CADDY_FILE, prevCaddy); await reloadCaddy(); }
+    return res.status(500).json({ error: `Caddy reload failed: ${reload.error || 'unknown error'}. Reverted to the previous configuration.` });
+  }
 
   res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${dnsWarn}${portMsg} Portal restarting…` });
   setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
@@ -967,7 +1079,7 @@ app.get('/api/fail2ban/status', auth, async (_req, res) => {
   }
 });
 
-app.post('/api/fail2ban/unban', auth, async (req, res) => {
+app.post('/api/fail2ban/unban', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIp(ip)) {
     return res.status(400).json({ error: 'Invalid IP address.' });
@@ -984,7 +1096,7 @@ app.post('/api/fail2ban/unban', auth, async (req, res) => {
 
 // ── Fail2Ban extended ────────────────────────────────────────────────────────
 
-app.post('/api/fail2ban/ban', auth, async (req, res) => {
+app.post('/api/fail2ban/ban', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIp(ip)) return res.status(400).json({ error: 'Invalid IP address.' });
   try {
@@ -1021,7 +1133,7 @@ app.get('/api/fail2ban/config', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/fail2ban/logs', auth, (req, res) => {
+app.get('/api/fail2ban/logs', auth, requiresAction('rawLogs'), (req, res) => {
   const n      = Math.min(parseInt(req.query.n || '200', 10), 500);
   const filter = req.query.status || '';
   try {
@@ -1069,7 +1181,7 @@ app.get('/api/fail2ban/ignoreip', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
+app.post('/api/fail2ban/ignoreip', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
   try {
@@ -1081,7 +1193,7 @@ app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
+app.delete('/api/fail2ban/ignoreip', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
   try {
@@ -1095,7 +1207,7 @@ app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
 
 // ── Fail2Ban live config edit ─────────────────────────────────────────────────
 
-app.post('/api/fail2ban/set-config', auth, async (req, res) => {
+app.post('/api/fail2ban/set-config', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const { bantime, findtime, maxretry } = req.body;
   const cmds = [];
   if (bantime  !== undefined) cmds.push(runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'bantime',  String(bantime)],  { timeout: 4000 }));
@@ -1120,7 +1232,7 @@ app.post('/api/fail2ban/set-config', auth, async (req, res) => {
 
 // ── Fail2Ban jail log ─────────────────────────────────────────────────────────
 
-app.get('/api/fail2ban/jaillog', auth, (req, res) => {
+app.get('/api/fail2ban/jaillog', auth, requiresAction('rawLogs'), (req, res) => {
   const n = Math.min(parseInt(req.query.n || '100', 10), 500);
   try {
     if (!fs.existsSync(FAIL2BAN_LOG))
@@ -1145,7 +1257,19 @@ app.post('/api/auth/password', auth, (req, res) => {
   settings.adminPassword = newPassword;
   saveSettings(settings);
   currentPortalPass = newPassword;
-  res.json({ success: true });
+  // Revoke every OTHER session so a stolen cookie can't outlive the rotation.
+  for (const id of [...sessionRegistry.keys()]) {
+    if (id === req.sessionID) continue;
+    sessionRegistry.delete(id);
+    req.sessionStore.destroy(id, () => {});
+  }
+  // This only changes the portal login. wg-easy (PASSWORD_HASH), AdGuard and the
+  // CLI scripts read their credential from .env — they are NOT rotated here.
+  // `./easywg passwd` rotates all of them together.
+  res.json({
+    success: true,
+    warning: 'Only the portal login was changed. wg-easy, AdGuard and the CLI still use the previous password. Run "./easywg passwd" on the server to rotate everything.',
+  });
 });
 
 // ── System service status ─────────────────────────────────────────────────────
@@ -1526,7 +1650,7 @@ app.get('/api/security', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/security/rescan', auth, async (_req, res) => {
+app.post('/api/security/rescan', auth, requiresAction('advancedSecurity'), async (_req, res) => {
   try {
     securityCache = await computeSecurityScore();
     securityCacheAt = Date.now();
@@ -1610,7 +1734,7 @@ async function createBackupArchive(encrypt = false) {
     }
 
     // Portal data
-    const dataSrc = '/data';
+    const dataSrc = DATA_DIR;
     if (fs.existsSync(dataSrc)) copyDir(dataSrc, path.join(stage, 'portal', 'data'));
 
     await runCmd('tar', ['-czf', archivePath, '-C', stage, '.'], { timeout: 60000 });
@@ -1644,7 +1768,7 @@ app.get('/api/backup', auth, (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/backup/create', auth, async (req, res) => {
+app.post('/api/backup/create', auth, requiresAction('createBackup'), async (req, res) => {
   const encrypt = req.body.encrypt === true;
   try {
     const filename = await createBackupArchive(encrypt);
@@ -1666,7 +1790,7 @@ app.get('/api/backup/download/:filename', auth, (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-app.post('/api/backup/restore', auth, async (req, res) => {
+app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (req, res) => {
   const { filename, dryRun, confirmed } = req.body;
   try {
     assertSafeBackupFilename(filename);
@@ -1710,10 +1834,20 @@ app.post('/api/backup/restore', auth, async (req, res) => {
     preRestoreFile = await createBackupArchive(false);
   } catch { /* non-fatal */ }
 
+  // Treat the archive as untrusted: validate every entry (no absolute paths,
+  // no '..' traversal, no symlink/hardlink/device members) before extracting.
+  try {
+    const { stdout: vlisting } = await runCmd('tar', ['-tvzf', filePath], { timeout: 15000 });
+    const archErr = archiveGuards.validateTarListing(vlisting);
+    if (archErr) return res.status(422).json({ error: `Unsafe backup archive: ${archErr}` });
+  } catch { return res.status(422).json({ error: 'Could not read the backup archive.' }); }
+
   // Restore
   const stage = fs.mkdtempSync('/tmp/ewg-restore-');
   try {
-    await runCmd('tar', ['-xzf', filePath, '-C', stage], { timeout: 60000 });
+    // --no-same-owner/--no-overwrite-dir: don't let the archive set ownership or
+    // replace existing directory metadata during extraction.
+    await runCmd('tar', ['--no-same-owner', '--no-overwrite-dir', '-xzf', filePath, '-C', stage], { timeout: 60000 });
 
     const restoreDir = (src, dst) => {
       if (!fs.existsSync(src)) return;
@@ -1731,7 +1865,7 @@ app.post('/api/backup/restore', auth, async (req, res) => {
       if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(BACKUP_SRC_DIR, f));
     }
     const portalData = path.join(stage, 'portal', 'data');
-    if (fs.existsSync(portalData)) restoreDir(portalData, '/data');
+    if (fs.existsSync(portalData)) restoreDir(portalData, DATA_DIR);
 
     sendNotification('restore_success', { filename }).catch(() => {});
     res.json({ success: true, manifest, preRestoreFile });
@@ -1743,7 +1877,7 @@ app.post('/api/backup/restore', auth, async (req, res) => {
   }
 });
 
-app.delete('/api/backup/:filename', auth, (req, res) => {
+app.delete('/api/backup/:filename', auth, requiresAction('restoreBackup'), (req, res) => {
   try {
     assertSafeBackupFilename(req.params.filename);
     const filePath = path.join(BACKUP_DIR, req.params.filename);
@@ -1784,7 +1918,8 @@ function loadNotifConfig() {
 }
 
 function saveNotifConfig(cfg) {
-  fs.writeFileSync(NOTIF_FILE, JSON.stringify(cfg, null, 2));
+  fs.writeFileSync(NOTIF_FILE, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(NOTIF_FILE, 0o600); } catch { /* self-heal pre-existing 0644 files */ }
 }
 
 function maskSecrets(cfg) {
@@ -1887,7 +2022,7 @@ app.get('/api/notifications/config', auth, (_req, res) => {
   res.json(maskSecrets(loadNotifConfig()));
 });
 
-app.post('/api/notifications/config', auth, (req, res) => {
+app.post('/api/notifications/config', auth, requiresAction('configureNotifications'), (req, res) => {
   const existing = loadNotifConfig();
   const incoming = req.body;
 
@@ -2055,9 +2190,18 @@ function isValidDomain(str) {
   if (typeof str !== 'string' || str.length > 253) return false;
   return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(str);
 }
+// Returns the normalized href for a valid http(s) target, else null. The WHATWG
+// URL parser silently strips ASCII whitespace, so a raw string like
+// "http://x\nrespond" parses clean but, stored verbatim, injects Caddyfile
+// directives. Reject control/brace characters up front and return u.href so
+// callers persist the normalized value, not the raw input.
+function normalizeTargetUrl(str) {
+  if (typeof str !== 'string' || /[\s{}]/.test(str)) return null;
+  try { const u = new URL(str); return ['http:', 'https:'].includes(u.protocol) ? u.href : null; }
+  catch { return null; }
+}
 function isValidTargetUrl(str) {
-  try { const u = new URL(str); return ['http:', 'https:'].includes(u.protocol); }
-  catch { return false; }
+  return normalizeTargetUrl(str) !== null;
 }
 function isValidCustomAllowedIps(ips) {
   return Array.isArray(ips) && ips.length > 0 && ips.every(ip => isValidIpOrCidr(ip));
@@ -2068,20 +2212,30 @@ function isValidCustomAllowedIps(ips) {
 function generateCaddyServices(services) {
   const enabled = Object.values(services).filter(s => s.enabled !== false);
   if (!enabled.length) return '# No easywg-managed proxy services\n';
+  // Belt-and-braces: never emit a control/brace character from a stored field
+  // into the Caddyfile. Validation on write should already prevent this; this
+  // makes generation fail loudly rather than produce an injected config.
+  const safe = (v) => {
+    const s = String(v ?? '');
+    if (/[\r\n{}]/.test(s)) throw new Error(`Unsafe character in proxy service field: ${JSON.stringify(s)}`);
+    return s;
+  };
   return enabled.map(svc => {
-    const lines = [`# easywg-managed: ${svc.id}`];
-    const site = svc.exposure === 'vpn_only' ? `http://${svc.domain}` : svc.domain;
+    const domain = safe(svc.domain);
+    const target = safe(svc.target);
+    const lines = [`# easywg-managed: ${safe(svc.id)}`];
+    const site = svc.exposure === 'vpn_only' ? `http://${domain}` : domain;
     lines.push(`${site} {`);
     if (svc.exposure === 'vpn_only') lines.push(`  bind ${VPN_DNS_IP}`);
     if (svc.basicAuth && svc.basicAuthUser && svc.basicAuthPasswordHash) {
-      lines.push('  basicauth {', `    ${svc.basicAuthUser} ${svc.basicAuthPasswordHash}`, '  }');
+      lines.push('  basicauth {', `    ${safe(svc.basicAuthUser)} ${safe(svc.basicAuthPasswordHash)}`, '  }');
     }
     if (svc.ipAllowlist?.length) {
-      lines.push('  @allowed {', ...svc.ipAllowlist.map(ip => `    remote_ip ${ip}`), '  }');
-      lines.push('  handle @allowed {', `    reverse_proxy ${svc.target}`, '  }');
+      lines.push('  @allowed {', ...svc.ipAllowlist.map(ip => `    remote_ip ${safe(ip)}`), '  }');
+      lines.push('  handle @allowed {', `    reverse_proxy ${target}`, '  }');
       lines.push('  respond 403');
     } else {
-      lines.push(`  reverse_proxy ${svc.target}`);
+      lines.push(`  reverse_proxy ${target}`);
     }
     lines.push('  header {', '    X-Content-Type-Options "nosniff"', '    Referrer-Policy "same-origin"', '  }');
     lines.push('}');
@@ -2431,7 +2585,8 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
   const { name, domain, target, exposure = 'vpn_only', ipAllowlist = [], notes = '', confirmed = false } = req.body;
   if (!name || !domain || !target) return res.status(400).json({ error: 'name, domain, and target are required' });
   if (!isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
-  if (!isValidTargetUrl(target)) return res.status(400).json({ error: 'target must be a valid http:// or https:// URL' });
+  const normTarget = normalizeTargetUrl(target);
+  if (!normTarget) return res.status(400).json({ error: 'target must be a valid http:// or https:// URL' });
   if (!['vpn_only', 'public'].includes(exposure)) return res.status(400).json({ error: 'exposure must be vpn_only or public' });
   if (exposure === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed: true' });
   if (ipAllowlist.length && !ipAllowlist.every(ip => isValidIpOrCidr(ip))) return res.status(400).json({ error: 'Invalid IP in ipAllowlist' });
@@ -2441,7 +2596,7 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
       return res.status(409).json({ error: 'Domain already registered' });
     const id = `svc_${Date.now()}`;
     const service = {
-      id, name, domain, target, exposure, tls: exposure !== 'vpn_only',
+      id, name, domain, target: normTarget, exposure, tls: exposure !== 'vpn_only',
       basicAuth: false, basicAuthUser: '', basicAuthPasswordHash: '',
       ipAllowlist, enabled: true, notes, createdAt: new Date().toISOString(),
     };
@@ -2456,11 +2611,16 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.patch('/api/proxy/services/:id', auth, async (req, res) => {
+app.patch('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
     if (!svc) return res.status(404).json({ error: 'Service not found' });
+    if (req.body.ipAllowlist !== undefined) {
+      if (!Array.isArray(req.body.ipAllowlist) || !req.body.ipAllowlist.every(ip => isValidIpOrCidr(ip))) {
+        return res.status(400).json({ error: 'Invalid IP in ipAllowlist' });
+      }
+    }
     for (const key of ['name', 'notes', 'ipAllowlist']) {
       if (req.body[key] !== undefined) svc[key] = req.body[key];
     }
@@ -2471,7 +2631,7 @@ app.patch('/api/proxy/services/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/proxy/services/:id', auth, async (req, res) => {
+app.delete('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2487,7 +2647,7 @@ app.delete('/api/proxy/services/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/proxy/services/:id/enable', auth, async (req, res) => {
+app.post('/api/proxy/services/:id/enable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2500,7 +2660,7 @@ app.post('/api/proxy/services/:id/enable', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/proxy/services/:id/disable', auth, async (req, res) => {
+app.post('/api/proxy/services/:id/disable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2528,11 +2688,11 @@ const httpsLib = require('https');
 const dnsLib   = require('dns');
 
 // ── Phase 3: constants ────────────────────────────────────────────────────────
-const MONITORS_FILE      = '/data/monitors.json';
-const MONITOR_HIST_FILE  = '/data/monitor-history.json';
-const APPS_FILE          = '/data/apps.json';
-const FILEDROP_META_FILE = '/data/filedrop-shares.json';
-const FILEDROP_DIR       = '/filedrop/storage';
+const MONITORS_FILE      = path.join(DATA_DIR, 'monitors.json');
+const MONITOR_HIST_FILE  = path.join(DATA_DIR, 'monitor-history.json');
+const APPS_FILE          = path.join(DATA_DIR, 'apps.json');
+const FILEDROP_META_FILE = path.join(DATA_DIR, 'filedrop-shares.json');
+const FILEDROP_DIR       = path.join(FILEDROP_ROOT, 'storage');
 const FILEDROP_MAX_MB    = parseInt(process.env.FILEDROP_MAX_MB   || '500');
 const FILEDROP_TOTAL_GB  = parseInt(process.env.FILEDROP_TOTAL_GB  || '5');
 const FILEDROP_DEFAULT_EXPIRY = 7;
@@ -2811,6 +2971,9 @@ function seedDefaultMonitors() {
   for (const d of defaults) {
     monitors[d.id] = {
       id: d.id, name: d.name, type: d.type, target: d.target,
+      // Built-in monitors legitimately probe local services; they bypass the
+      // private-range guard and their type/target cannot be changed via PATCH.
+      builtin: true,
       expectedStatus: d.expectedStatus || null, resolver: d.resolver || null,
       intervalSeconds: 300, timeoutSeconds: 5, retries: 2,
       enabled: true, notify: true, notifyAfterFailures: 2,
@@ -2826,18 +2989,29 @@ function seedDefaultMonitors() {
 function generateShareToken() {
   return crypto.randomBytes(24).toString('hex');
 }
+const FILEDROP_PBKDF2_ITER = 600000; // OWASP 2023 floor for PBKDF2-SHA256
 function hashFilePassword(pass) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
-  return `${salt}:${hash}`;
+  const hash = crypto.pbkdf2Sync(pass, salt, FILEDROP_PBKDF2_ITER, 32, 'sha256').toString('hex');
+  return `${salt}:${FILEDROP_PBKDF2_ITER}:${hash}`;
 }
+// Async so the (unauthenticated) download path yields the event loop instead of
+// blocking it for the full KDF cost on every attempt. Verifies both the new
+// `salt:iterations:hash` format and the legacy `salt:hash` (100k) format.
 function verifyFilePassword(pass, stored) {
-  const [salt, hash] = (stored || '').split(':');
-  if (!salt || !hash) return false;
-  try {
-    const attempt = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(attempt, 'hex'));
-  } catch { return false; }
+  return new Promise((resolve) => {
+    const parts = String(stored || '').split(':');
+    let salt, iterations, hash;
+    if (parts.length === 3) { [salt, iterations, hash] = parts; iterations = parseInt(iterations, 10); }
+    else if (parts.length === 2) { [salt, hash] = parts; iterations = 100000; }
+    else return resolve(false);
+    if (!salt || !hash || !Number.isInteger(iterations)) return resolve(false);
+    crypto.pbkdf2(pass, salt, iterations, 32, 'sha256', (err, dk) => {
+      if (err) return resolve(false);
+      try { resolve(crypto.timingSafeEqual(Buffer.from(hash, 'hex'), dk)); }
+      catch { resolve(false); }
+    });
+  });
 }
 function getFiledropUsageMb() {
   try {
@@ -2884,21 +3058,12 @@ const MONITOR_VALID_TYPES = ['http', 'https', 'tcp', 'dns', 'docker', 'tls'];
 const MONITOR_SAFE_CONTAINER_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 const MONITOR_SAFE_DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-app.post('/api/monitors', auth, (req, res) => {
+app.post('/api/monitors', auth, requiresAction('manageMonitors'), (req, res) => {
   const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
   if (!name || !type || !target) return res.status(400).json({ error: 'name, type, target required' });
-  if (!MONITOR_VALID_TYPES.includes(type))
-    return res.status(400).json({ error: `type must be one of: ${MONITOR_VALID_TYPES.join(', ')}` });
-  if ((type === 'http' || type === 'https') && !/^https?:\/\/.+/.test(target))
-    return res.status(400).json({ error: 'HTTP/HTTPS monitor target must be a valid URL starting with http:// or https://' });
-  if (type === 'tcp' || type === 'tls') {
-    const p = parseInt(req.body.port || 443);
-    if (!p || p < 1 || p > 65535) return res.status(400).json({ error: 'port must be between 1 and 65535' });
-  }
-  if (type === 'docker' && !MONITOR_SAFE_CONTAINER_RE.test(target))
-    return res.status(400).json({ error: 'docker target must be a valid container name (alphanumeric, dash, dot, underscore)' });
-  if (type === 'dns' && !MONITOR_SAFE_DOMAIN_RE.test(target))
-    return res.status(400).json({ error: 'dns target must be a valid domain name' });
+  // Centralized validation (type, target shape, SSRF private-range block, bounds).
+  const vErr = netGuards.validateMonitor(req.body, { isBuiltin: false });
+  if (vErr) return res.status(400).json({ error: vErr });
   const monitors = loadMonitors();
   const id = `mon_${Date.now()}`;
   monitors[id] = {
@@ -2916,17 +3081,26 @@ app.post('/api/monitors', auth, (req, res) => {
   res.json({ ok: true, monitor: monitors[id] });
 });
 
-app.patch('/api/monitors/:id', auth, (req, res) => {
+app.patch('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  // Built-in monitors may not have their type/target rewritten (they probe local services).
+  if (m.builtin && (req.body.type !== undefined || req.body.target !== undefined || req.body.resolver !== undefined)) {
+    return res.status(400).json({ error: 'Built-in monitor type/target cannot be changed.' });
+  }
   const fields = ['name','type','target','expectedStatus','resolver','intervalSeconds','timeoutSeconds','retries','notify','notifyAfterFailures','tags','notes'];
+  // Validate the MERGED result so PATCH cannot bypass the checks POST enforces.
+  const candidate = { ...m };
+  for (const f of fields) { if (req.body[f] !== undefined) candidate[f] = req.body[f]; }
+  const vErr = netGuards.validateMonitor(candidate, { isBuiltin: !!m.builtin });
+  if (vErr) return res.status(400).json({ error: vErr });
   for (const f of fields) { if (req.body[f] !== undefined) m[f] = req.body[f]; }
   saveMonitors(monitors);
   res.json({ ok: true, monitor: m });
 });
 
-app.delete('/api/monitors/:id', auth, (req, res) => {
+app.delete('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   if (!monitors[req.params.id]) return res.status(404).json({ error: 'Monitor not found' });
   delete monitors[req.params.id];
@@ -2937,7 +3111,7 @@ app.delete('/api/monitors/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/enable', auth, (req, res) => {
+app.post('/api/monitors/:id/enable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -2948,7 +3122,7 @@ app.post('/api/monitors/:id/enable', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/disable', auth, (req, res) => {
+app.post('/api/monitors/:id/disable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -2958,7 +3132,7 @@ app.post('/api/monitors/:id/disable', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/check', auth, async (req, res) => {
+app.post('/api/monitors/:id/check', auth, requiresAction('manageMonitors'), async (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -3000,6 +3174,9 @@ app.post('/api/apps/:id/install', auth, requiresAction('appsLifecycle'), async (
   const { exposure, domain, confirmed } = req.body;
   const mode = exposure === 'public' ? 'public' : 'vpn_only';
   if (mode === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed:true' });
+  // domain is written into the generated Caddyfile — validate it (this path
+  // previously bypassed validation entirely).
+  if (domain && !isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
 
   const containerName = `easywg-${catalogEntry.id}`;
   try {
@@ -3080,7 +3257,8 @@ app.post('/api/apps/:id/start', auth, requiresAction('appsLifecycle'), async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/stop', auth, async (req, res) => {
+app.post('/api/apps/:id/stop', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/stop`, null);
     if (r.status === 204 || r.status === 304) return res.json({ ok: true });
@@ -3088,7 +3266,8 @@ app.post('/api/apps/:id/stop', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/restart', auth, async (req, res) => {
+app.post('/api/apps/:id/restart', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/restart`, null);
     if (r.status === 204) return res.json({ ok: true });
@@ -3096,7 +3275,8 @@ app.post('/api/apps/:id/restart', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/apps/:id/logs', auth, async (req, res) => {
+app.get('/api/apps/:id/logs', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const tail = parseInt(req.query.tail || '200');
     const data = await new Promise((resolve, reject) => {
@@ -3127,7 +3307,7 @@ app.get('/api/apps/:id/logs', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/update', auth, async (req, res) => {
+app.post('/api/apps/:id/update', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const cName = encodeURIComponent('easywg-' + req.params.id);
     const catalogEntry = APP_CATALOG[req.params.id];
@@ -3291,7 +3471,7 @@ app.get('/api/filedrop/status', auth, (req, res) => {
 });
 
 // Public download endpoint (no auth — token is the secret)
-function serveFiledrop(req, res) {
+async function serveFiledrop(req, res) {
   const { token } = req.params;
   const shares = loadFiledropShares();
   const share = shares[token];
@@ -3302,11 +3482,18 @@ function serveFiledrop(req, res) {
   if (share.maxDownloads && share.downloads >= share.maxDownloads) {
     return res.status(410).json({ error: 'Download limit reached' });
   }
-  // Password check
+  // VPN-only shares: enforce source membership in the VPN subnet (or loopback =
+  // SSH-tunnel admin) server-side. The token alone must not let a public client
+  // download. Legacy shares without a `mode` are treated as public.
+  if (share.mode === 'vpn_only' && !netGuards.isVpnOrLocalClient(req, VPN_SUBNET)) {
+    return res.status(403).json({ error: 'This file is only available over the VPN.' });
+  }
+  // Password check — POST body only. Query strings land in access logs, browser
+  // history, referrers and were echoed into the Security → Logs panel.
   if (share.passwordProtected) {
-    const pw = (req.method === 'POST' ? req.body?.password : null) || req.query.pw || '';
+    const pw = (req.method === 'POST' ? req.body?.password : null) || '';
     if (!pw) return res.status(401).json({ error: 'Password required', passwordRequired: true });
-    if (!verifyFilePassword(pw, share.passwordHash)) return res.status(401).json({ error: 'Wrong password' });
+    if (!(await verifyFilePassword(pw, share.passwordHash))) return res.status(401).json({ error: 'Wrong password' });
   }
   const filePath = path.join(FILEDROP_DIR, share.storedName);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
@@ -3316,8 +3503,12 @@ function serveFiledrop(req, res) {
   saveFiledropShares(shares);
   sendNotification('filedrop_downloaded', { name: share.originalName }).catch(() => {});
 
-  res.setHeader('Content-Disposition', `attachment; filename="${share.originalName.replace(/"/g, '')}"`);
-  res.setHeader('Content-Type', share.mimeType || 'application/octet-stream');
+  // RFC 5987 encoding (not just quote-stripping) + force a non-renderable type on
+  // untrusted uploads so the browser downloads rather than sniffs/executes them.
+  const asciiName = share.originalName.replace(/[^\w.\- ]/g, '_');
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(share.originalName)}`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   fs.createReadStream(filePath).pipe(res);
 }
@@ -3428,7 +3619,7 @@ app.post('/api/migration/validate', auth, async (req, res) => {
       services: Object.keys(services).length,
       apps:     Object.keys(apps).length,
     },
-    score: [wg.up, ag.up, caddyUp].filter(Boolean).length,
+    score: [wg.up, ag.up, caddyR.ok].filter(Boolean).length,
     maxScore: 3,
   });
 });
@@ -3519,7 +3710,7 @@ app.get('/api/xray/client-config', auth, async (req, res) => {
   }
 });
 
-app.post('/api/xray/restart', auth, async (_req, res) => {
+app.post('/api/xray/restart', auth, requiresAction('advancedSecurity'), async (_req, res) => {
   if (!XRAY_ENABLED) return res.status(404).json({ error: 'Xray not enabled' });
   try {
     await new Promise((resolve, reject) => {
@@ -3536,21 +3727,31 @@ app.post('/api/xray/restart', auth, async (_req, res) => {
   }
 });
 
-// ── Phase 3: Monitor scheduler ────────────────────────────────────────────────
-setInterval(() => {
-  const monitors = loadMonitors();
-  for (const m of Object.values(monitors)) {
-    if (!m.enabled) continue;
-    if (m.nextCheckAt && Date.now() < new Date(m.nextCheckAt).getTime()) continue;
-    runMonitorCheck(m);
-  }
-}, 60_000);
+// ── Start (skipped when the module is require()'d, e.g. by the test suite) ────
+if (require.main === module) {
+  // Monitor scheduler
+  setInterval(() => {
+    const monitors = loadMonitors();
+    for (const m of Object.values(monitors)) {
+      if (!m.enabled) continue;
+      if (m.nextCheckAt && Date.now() < new Date(m.nextCheckAt).getTime()) continue;
+      runMonitorCheck(m);
+    }
+  }, 60_000);
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+  app.listen(PORT, HOST, () => {
+    console.log(`Portal listening on ${HOST}:${PORT}`);
+    // Re-derive xray/config.json from devices.json on boot so per-device UUIDs survive a
+    // bootstrap.sh re-run (configure_xray regenerates config.json with only the global UUID).
+    if (XRAY_ENABLED) syncXrayClients().catch(() => {});
+  });
+}
 
-app.listen(PORT, HOST, () => {
-  console.log(`Portal listening on ${HOST}:${PORT}`);
-  // Re-derive xray/config.json from devices.json on boot so per-device UUIDs survive a
-  // bootstrap.sh re-run (configure_xray regenerates config.json with only the global UUID).
-  if (XRAY_ENABLED) syncXrayClients().catch(() => {});
-});
+// Exposed for unit tests (pure generators/validators).
+app._internals = {
+  generateMainCaddyfile, generateCaddyServices, normalizeTargetUrl,
+  isValidTargetUrl, isValidDomain, isValidIpOrCidr,
+  hashFilePassword, verifyFilePassword, FILEDROP_PBKDF2_ITER,
+};
+
+module.exports = app;

@@ -42,7 +42,7 @@ This is convenient for remote access without an SSH client, but it increases the
 - Consider restricting by IP in Caddy if your IP is stable
 - Use a real domain with ACME certificates rather than `WG_HOST` fallback
 
-> The installer currently enables public HTTPS by default. Set `PUBLIC_HTTPS_ENABLED=no` in `.env` to use local-only mode.
+> The installer defaults to local-only (`PUBLIC_HTTPS_ENABLED=no`); the admin portal is reachable only via SSH tunnel / VPN. Set `PUBLIC_HTTPS_ENABLED=yes` (or answer the install prompt) to expose it on public HTTPS.
 
 ### Public HTTPS with Xray enabled
 
@@ -53,7 +53,7 @@ When `XRAY_ENABLED=yes`, Xray takes over port 443. Caddy moves to `CADDY_HTTPS_P
 - The login page is still protected by Fail2Ban via Caddy access logs
 - Port 443 is fully owned by the Xray VLESS+Reality service — traffic on that port is not admin traffic
 
-This is effectively a hardened configuration: the admin interface is not on a well-known port, and traffic analysis cannot distinguish it from standard HTTPS. The same rules apply: use a strong password and keep Fail2Ban active.
+This reduces exposure (the admin interface is not on a well-known port, and traffic analysis cannot easily distinguish it from standard HTTPS) but is **not** a security boundary on its own — it is obscurity, not hardening. When exposed publicly, still use a strong password, keep Fail2Ban active, and prefer restricting access by IP. Note the portal opens `:8443` only when `PUBLIC_HTTPS_ENABLED=yes`; with it off, the portal binds to loopback and Xray still serves VLESS on `:443`.
 
 ---
 

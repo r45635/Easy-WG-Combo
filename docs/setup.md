@@ -79,7 +79,7 @@ echo "export PASSWORD_HASH='<hash>'" > .env.secrets
 | Mode | How | Security |
 |---|---|---|
 | **SSH tunnel** *(default, safest)* | `ssh -L 19080:localhost:8080 ...` | No admin port reachable from internet |
-| **Public HTTPS** | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` | Caddy ACME cert (or self-signed for a bare IP, no `TLS_EMAIL`, or a domain that doesn't point here); use strong password + Fail2Ban |
+| **Public HTTPS** *(opt-in)* | Set `PUBLIC_HTTPS_ENABLED=yes` in `.env`, or answer the install prompt (default is **no** = local-only) | Caddy ACME cert (or self-signed for a bare IP, no `TLS_EMAIL`, or a domain that doesn't point here); use strong password + Fail2Ban |
 
 Public HTTPS is enabled by default in the installer. Check your `.env` to confirm.
 
@@ -163,3 +163,5 @@ The command is safe by construction:
 5. Runs a service health check.
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14 (v15 is a breaking rewrite); an update never crosses that major. See [CHANGELOG.md](../CHANGELOG.md) for what changed between versions.
+
+To rotate the admin password, run `./easywg passwd` on the server — it updates the portal login, the wg-easy password hash and `.env` together. (Changing the password inside the portal UI only affects the portal login; wg-easy, AdGuard and the CLI keep the old one.)

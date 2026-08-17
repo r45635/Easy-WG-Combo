@@ -56,9 +56,14 @@ services:
       - SERVER_NAME=${SERVER_NAME:-vpn-server}
       - FAIL2BAN_JAIL=${FAIL2BAN_JAIL:-easy-wg-portal}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - WG_EASY_PASSWORD=${ADMIN_PASSWORD}
+      # Service creds default to ADMIN_PASSWORD but can be pinned independently.
+      - WG_EASY_PASSWORD=${WG_EASY_PASSWORD:-${ADMIN_PASSWORD}}
       - ADGUARD_USER=admin
-      - ADGUARD_PASSWORD=${ADMIN_PASSWORD}
+      - ADGUARD_PASSWORD=${ADGUARD_PASSWORD:-${ADMIN_PASSWORD}}
+      # Fixed session secret so logins survive a restart; empty = random per boot.
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      # So a UI Caddyfile rewrite (Server Endpoint) honors the exposure choice.
+      - PUBLIC_HTTPS_ENABLED=${PUBLIC_HTTPS_ENABLED:-no}
       - ACCESS_LOG_PATH=/var/log/easy-wg-portal/access.log
       - FAIL2BAN_LOG=/var/log/fail2ban.log
       - BACKUP_DIR=/backups
