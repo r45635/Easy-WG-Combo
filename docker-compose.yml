@@ -62,6 +62,8 @@ services:
       - ADGUARD_PASSWORD=${ADGUARD_PASSWORD:-${ADMIN_PASSWORD}}
       # Fixed session secret so logins survive a restart; empty = random per boot.
       - SESSION_SECRET=${SESSION_SECRET:-}
+      # So a UI Caddyfile rewrite (Server Endpoint) honors the exposure choice.
+      - PUBLIC_HTTPS_ENABLED=${PUBLIC_HTTPS_ENABLED:-no}
       - ACCESS_LOG_PATH=/var/log/easy-wg-portal/access.log
       - FAIL2BAN_LOG=/var/log/fail2ban.log
       - BACKUP_DIR=/backups

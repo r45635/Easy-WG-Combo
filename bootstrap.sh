@@ -645,7 +645,8 @@ resolve_admin_domain() {
 # regenerates the same Caddyfile when the admin changes the Server Endpoint from the UI.
 configure_caddy() {
   local admin_domain="$1"
-  local caddy_https_port="${2:-}"   # when set, Caddy binds to localhost:$caddy_https_port (Xray mode)
+  local caddy_https_port="${2:-}"   # when set, Caddy serves the portal on this port (Xray mode)
+  local public_https="${3:-yes}"    # no => bind the portal site to loopback only
   local portal_port="${PORTAL_PORT:-8080}"
   local tls_email="${TLS_EMAIL:-}"
   local caddy_dir="$SCRIPT_DIR/caddy"
@@ -675,12 +676,16 @@ configure_caddy() {
     printf '}\n\n'
 
     if [ -n "$caddy_https_port" ]; then
-      # Xray mode: Caddy serves the portal publicly on $caddy_https_port (443 is held by Xray).
-      # Use explicit admin_domain so the cert is issued for the correct hostname/IP.
-      printf '%s:%s {\n' "${admin_domain:-:}" "$caddy_https_port"
-      if [ "$use_public_tls" = "yes" ]; then
-        # Real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is impossible —
-        # force the HTTP-01 challenge (served by Caddy on :80).
+      # Xray mode: 443 is held by Xray, so the portal is served on $caddy_https_port.
+      if ! is_truthy "$public_https"; then
+        # Local-only: bind the portal to loopback (reachable via SSH tunnel only),
+        # self-signed cert. UFW keeps the port closed (see configure_firewall).
+        printf '127.0.0.1:%s {\n' "$caddy_https_port"
+        printf '  tls internal\n'
+      elif [ "$use_public_tls" = "yes" ]; then
+        # Public + real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is
+        # impossible — force the HTTP-01 challenge (served by Caddy on :80).
+        printf '%s:%s {\n' "${admin_domain:-:}" "$caddy_https_port"
         printf '  tls {\n'
         printf '    issuer acme {\n'
         printf '      email %s\n' "$tls_email"
@@ -688,7 +693,8 @@ configure_caddy() {
         printf '    }\n'
         printf '  }\n'
       else
-        # Bare IP or no email: fall back to a self-signed cert (browser warning).
+        # Public + bare IP or no email: self-signed cert (browser warning).
+        printf '%s:%s {\n' "${admin_domain:-:}" "$caddy_https_port"
         printf '  tls internal\n'
       fi
     else
@@ -778,7 +784,7 @@ configure_firewall() {
   local caddy_https_port="${3:-8443}"
   local admin_domain="${4:-}"
   local ssh_port="${SSH_PORT:-22}"
-  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
+  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-no}"
   local tls_email="${TLS_EMAIL:-}"
 
   # Caddy can obtain a public (Let's Encrypt) cert only with a real FQDN + ACME email
@@ -792,14 +798,21 @@ configure_firewall() {
   run_root ufw allow "${ssh_port}/tcp"
   run_root ufw allow "${wg_port}/udp"
   if is_truthy "$xray_enabled"; then
-    # Xray on 443; portal on caddy_https_port
+    # Xray always needs :443 for VLESS+Reality.
     run_root ufw allow 443/tcp
-    run_root ufw allow "${caddy_https_port}/tcp"
-    if [ "$use_public_tls" = "yes" ]; then
-      # Xray owns :443, so Caddy validates its cert via HTTP-01 on :80 — keep it open.
-      run_root ufw allow 80/tcp
+    if is_truthy "$public_https_enabled"; then
+      # Portal exposed publicly on caddy_https_port.
+      run_root ufw allow "${caddy_https_port}/tcp"
+      if [ "$use_public_tls" = "yes" ]; then
+        # Xray owns :443, so Caddy validates its cert via HTTP-01 on :80 — keep it open.
+        run_root ufw allow 80/tcp
+      else
+        # Self-signed cert (bare IP or no email): port 80 is not needed.
+        run_root ufw delete allow 80/tcp 2>/dev/null || true
+      fi
     else
-      # Self-signed cert (bare IP or no email): port 80 is not needed.
+      # Local-only admin: portal is bound to loopback, so keep both ports closed.
+      run_root ufw delete allow "${caddy_https_port}/tcp" 2>/dev/null || true
       run_root ufw delete allow 80/tcp 2>/dev/null || true
     fi
   elif is_truthy "$public_https_enabled"; then
@@ -989,7 +1002,21 @@ main() {
   local server_name
   local wg_port
   local admin_domain
-  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-yes}"
+  # Resolve exposure: explicit env var wins; else the value already in .env;
+  # else default to local-only (No). The admin portal is a root-equivalent
+  # control plane — don't expose it to the Internet unless the operator opts in.
+  local public_https_enabled="${PUBLIC_HTTPS_ENABLED:-}"
+  if [ -z "$public_https_enabled" ]; then
+    public_https_enabled="$(sed -n 's/^PUBLIC_HTTPS_ENABLED=//p' "$ENV_FILE" 2>/dev/null | head -n 1)"
+  fi
+  if [ "$has_existing" = "no" ] && [ -z "${PUBLIC_HTTPS_ENABLED:-}" ] && has_tty; then
+    local _phe_ans
+    read_prompt "Expose the admin portal on public HTTPS? Otherwise it stays reachable only via SSH tunnel / VPN [y/N]: " _phe_ans
+    case "$_phe_ans" in [yY]*) public_https_enabled="yes" ;; *) public_https_enabled="no" ;; esac
+  fi
+  [ -n "$public_https_enabled" ] || public_https_enabled="no"
+  set_env_value "$ENV_FILE" "PUBLIC_HTTPS_ENABLED" "$public_https_enabled"
+  export PUBLIC_HTTPS_ENABLED="$public_https_enabled"
   local action_label="fresh"
 
   wg_port="$(resolve_wg_port)"
@@ -1125,8 +1152,12 @@ main() {
     log "Configuring Xray VLESS+Reality..."
     configure_xray
     set_env_value "$ENV_FILE" "CADDY_HTTPS_PORT" "$caddy_https_port"
-    log "Configuring Caddy on public port ${caddy_https_port}..."
-    configure_caddy "$admin_domain" "$caddy_https_port"
+    if is_truthy "$public_https_enabled"; then
+      log "Configuring Caddy on public port ${caddy_https_port}..."
+    else
+      log "Configuring Caddy on loopback port ${caddy_https_port} (local-only admin)..."
+    fi
+    configure_caddy "$admin_domain" "$caddy_https_port" "$public_https_enabled"
     log "Configuring Fail2Ban protection..."
     configure_fail2ban
   else

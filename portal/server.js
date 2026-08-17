@@ -175,20 +175,26 @@ function readEnvValue(key) {
 // otherwise Caddy falls back to a self-signed internal cert.
 function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   const caddyHttpsPort = process.env.CADDY_HTTPS_PORT || '';
+  const publicHttps = String(process.env.PUBLIC_HTTPS_ENABLED || 'no').toLowerCase() === 'yes';
   const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(adminDomain);
   const usePublicTls = !!adminDomain && !!tlsEmail && !isIp && domainPointsHere;
 
   let out = '{\n';
-  if (usePublicTls) out += `  email ${tlsEmail}\n`;
+  if (publicHttps && usePublicTls) out += `  email ${tlsEmail}\n`;
   out += '  admin localhost:2019\n';
   out += '}\n\n';
 
   if (caddyHttpsPort) {
-    // Xray mode: portal is public on caddyHttpsPort (Xray owns :443).
-    out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
-    if (usePublicTls) {
+    // Xray mode: 443 is held by Xray, so the portal is served on caddyHttpsPort.
+    if (!publicHttps) {
+      // Local-only: bind to loopback (SSH-tunnel access), self-signed. Must stay
+      // in phase with bootstrap.sh configure_caddy — do not re-publish here.
+      out += `127.0.0.1:${caddyHttpsPort} {\n`;
+      out += '  tls internal\n';
+    } else if (usePublicTls) {
       // Real Let's Encrypt cert. Xray owns :443 so TLS-ALPN-01 is impossible —
       // force HTTP-01 (served by Caddy on :80). Requires port 80 open in UFW.
+      out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
       out += '  tls {\n';
       out += '    issuer acme {\n';
       out += `      email ${tlsEmail}\n`;
@@ -196,6 +202,7 @@ function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
       out += '    }\n';
       out += '  }\n';
     } else {
+      out += `${adminDomain || ':'}:${caddyHttpsPort} {\n`;
       out += '  tls internal\n';
     }
   } else {
