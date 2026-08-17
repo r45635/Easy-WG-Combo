@@ -348,6 +348,7 @@ const I18N = {
     'nav.settings': 'Settings',
     'settings.interfaceMode': 'Interface Mode',
     'settings.interfaceMode.desc': 'Choose how much of the portal is visible. You can change this at any time.',
+    'settings.mode.confirmPrompt': 'Enter the admin password to unlock a higher interface mode:',
     'settings.mode.user': 'User',
     'settings.mode.user.desc': 'Simple mode for creating VPN devices and using DNS protection.',
     'settings.mode.super_user': 'Super User',
@@ -717,6 +718,7 @@ const I18N = {
     'nav.settings': 'Paramètres',
     'settings.interfaceMode': 'Mode d\'interface',
     'settings.interfaceMode.desc': 'Choisissez la quantité du portail visible. Vous pouvez changer cela à tout moment.',
+    'settings.mode.confirmPrompt': 'Saisissez le mot de passe admin pour débloquer un mode d\'interface supérieur :',
     'settings.mode.user': 'Utilisateur',
     'settings.mode.user.desc': 'Mode simple pour créer des appareils VPN et utiliser la protection DNS.',
     'settings.mode.super_user': 'Super Utilisateur',
@@ -1086,6 +1088,7 @@ const I18N = {
     'nav.settings': '设置',
     'settings.interfaceMode': '界面模式',
     'settings.interfaceMode.desc': '选择门户显示的内容。您可以随时更改。',
+    'settings.mode.confirmPrompt': '输入管理员密码以解锁更高的界面模式：',
     'settings.mode.user': '用户',
     'settings.mode.user.desc': '简单模式，用于创建VPN设备和使用DNS保护。',
     'settings.mode.super_user': '超级用户',
@@ -3733,7 +3736,16 @@ function openAdvancedConfirm(onConfirmed) {
 async function applyInterfaceMode(mode) {
   const msgEl = document.getElementById('settings-mode-msg');
   msgEl.textContent = '';
-  const data = await POST('/api/settings/interface-mode', { interfaceMode: mode });
+  const RANK = { user: 0, super_user: 1, advanced: 2 };
+  const body = { interfaceMode: mode };
+  // Raising the mode unlocks privileged actions — the server requires the admin
+  // password, so ask for it here rather than letting the request 401.
+  if ((RANK[mode] ?? 0) > (RANK[state.interfaceMode] ?? 0)) {
+    const pw = window.prompt(t('settings.mode.confirmPrompt'));
+    if (pw === null) return;
+    body.confirmPassword = pw;
+  }
+  const data = await POST('/api/settings/interface-mode', body);
   if (!data?.success) {
     msgEl.textContent = data?.error || t('common.error');
     msgEl.style.color = 'var(--red)';

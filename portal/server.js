@@ -106,7 +106,7 @@ const UI_CAPABILITIES = {
       createBackup: false, guidedRestore: false, restoreBackup: false,
       configureNotifications: false, viewSecurityScore: false,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
-      rawLogs: false, advancedSecurity: false,
+      rawLogs: false, advancedSecurity: false, manageMonitors: false,
     },
   },
   super_user: {
@@ -118,7 +118,7 @@ const UI_CAPABILITIES = {
       restoreBackup: true, configureNotifications: true,
       viewSecurityScore: true, viewMonitoring: true,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
-      rawLogs: false, advancedSecurity: false,
+      rawLogs: false, advancedSecurity: false, manageMonitors: true,
     },
   },
   advanced: {
@@ -304,6 +304,25 @@ function requiresAction(action) {
   };
 }
 
+// Interface-mode ordering for privilege-raise checks (user < super_user < advanced).
+function modeRank(mode) { return VALID_INTERFACE_MODES.indexOf(mode); }
+
+// ── Login rate limiting (app-level, defense-in-depth alongside Fail2Ban) ──────
+const LOGIN_MAX_FAILS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const loginFailures = new Map(); // ip → { count, first }
+function loginRateLimited(ip) {
+  const rec = loginFailures.get(ip);
+  return !!rec && (Date.now() - rec.first < LOGIN_WINDOW_MS) && rec.count >= LOGIN_MAX_FAILS;
+}
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  const rec = loginFailures.get(ip);
+  if (!rec || now - rec.first >= LOGIN_WINDOW_MS) loginFailures.set(ip, { count: 1, first: now });
+  else rec.count += 1;
+}
+function clearLoginFailures(ip) { loginFailures.delete(ip); }
+
 // ── Persistence ─────────────────────────────────────────────────────────────
 
 function loadStore() {
@@ -429,6 +448,20 @@ app.use(session({
   cookie:            { maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'lax', secure: 'auto' },
 }));
 
+// CSRF defense-in-depth: reject state-changing API requests whose Origin is a
+// different host. Same-origin browser requests carry a matching Origin; CLI /
+// Basic-auth requests carry none and pass. sameSite=lax is the primary control.
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (!req.path.startsWith('/api/')) return next();
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  let originHost;
+  try { originHost = new URL(origin).host; } catch { return res.status(403).json({ error: 'Bad Origin header' }); }
+  if (originHost !== req.headers.host) return res.status(403).json({ error: 'Cross-origin request rejected' });
+  next();
+});
+
 // Constant-time password comparison (hash both sides to equalize length).
 function passwordsMatch(a, b) {
   const ha = createHash('sha256').update(String(a ?? '')).digest();
@@ -440,9 +473,13 @@ const auth = (req, res, next) => {
   // Accept HTTP Basic auth for CLI / scripted access
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Basic ')) {
+    const ip = clientIp(req);
+    if (loginRateLimited(ip)) return res.status(429).json({ error: 'Too many failed attempts. Try again later.' });
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
     const password = decoded.slice(decoded.indexOf(':') + 1);
-    if (passwordsMatch(password, currentPortalPass)) return next();
+    if (passwordsMatch(password, currentPortalPass)) { clearLoginFailures(ip); return next(); }
+    recordLoginFailure(ip);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   if (!req.session.ok) return res.status(401).json({ error: 'Unauthorized' });
   const meta = sessionRegistry.get(req.sessionID);
@@ -561,16 +598,26 @@ app.use('/adguard',  auth, proxyTo('/adguard',  AG_URL, { agAuth: true }));
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
+  const ip = clientIp(req);
+  if (loginRateLimited(ip)) {
+    return res.status(429).json({ error: 'Too many failed attempts. Try again later.' });
+  }
   if (passwordsMatch(req.body.password, currentPortalPass)) {
-    req.session.ok = true;
-    sessionRegistry.set(req.sessionID, {
-      ip:       clientIp(req),
-      ua:       (req.headers['user-agent'] || '').slice(0, 120),
-      loginAt:  Date.now(),
-      lastSeen: Date.now(),
+    clearLoginFailures(ip);
+    // Regenerate the session ID on privilege change to prevent session fixation.
+    req.session.regenerate((err) => {
+      if (err) return res.status(500).json({ error: 'Session error' });
+      req.session.ok = true;
+      sessionRegistry.set(req.sessionID, {
+        ip,
+        ua:       (req.headers['user-agent'] || '').slice(0, 120),
+        loginAt:  Date.now(),
+        lastSeen: Date.now(),
+      });
+      res.json({ success: true });
     });
-    res.json({ success: true });
   } else {
+    recordLoginFailure(ip);
     res.status(401).json({ error: 'Wrong password' });
   }
 });
@@ -613,6 +660,14 @@ app.post('/api/settings/interface-mode', auth, (req, res) => {
   const mode = String(req.body.interfaceMode || '').trim();
   if (!VALID_INTERFACE_MODES.includes(mode)) {
     return res.status(400).json({ error: `Invalid interface mode. Must be one of: ${VALID_INTERFACE_MODES.join(', ')}.` });
+  }
+  // Raising privilege (e.g. user -> advanced) requires the admin password, so a
+  // hijacked lower-mode session cannot unlock advanced actions on its own.
+  // Downgrades are free.
+  if (modeRank(mode) > modeRank(getInterfaceMode())) {
+    if (!passwordsMatch(req.body.confirmPassword || '', currentPortalPass)) {
+      return res.status(401).json({ error: 'Password confirmation required to raise the interface mode.' });
+    }
   }
   setInterfaceMode(mode);
   res.json({ success: true, interfaceMode: mode });
@@ -661,7 +716,7 @@ app.get('/api/settings/validate-host', auth, async (req, res) => {
   }
 });
 
-app.post('/api/settings/server-endpoint', auth, async (req, res) => {
+app.post('/api/settings/server-endpoint', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const host     = String(req.body.host     || '').trim();
   const tlsEmail = String(req.body.tlsEmail || '').trim();
   if (!host) return res.status(400).json({ error: 'Missing host.' });
@@ -996,7 +1051,7 @@ app.get('/api/fail2ban/status', auth, async (_req, res) => {
   }
 });
 
-app.post('/api/fail2ban/unban', auth, async (req, res) => {
+app.post('/api/fail2ban/unban', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIp(ip)) {
     return res.status(400).json({ error: 'Invalid IP address.' });
@@ -1013,7 +1068,7 @@ app.post('/api/fail2ban/unban', auth, async (req, res) => {
 
 // ── Fail2Ban extended ────────────────────────────────────────────────────────
 
-app.post('/api/fail2ban/ban', auth, async (req, res) => {
+app.post('/api/fail2ban/ban', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIp(ip)) return res.status(400).json({ error: 'Invalid IP address.' });
   try {
@@ -1050,7 +1105,7 @@ app.get('/api/fail2ban/config', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/fail2ban/logs', auth, (req, res) => {
+app.get('/api/fail2ban/logs', auth, requiresAction('rawLogs'), (req, res) => {
   const n      = Math.min(parseInt(req.query.n || '200', 10), 500);
   const filter = req.query.status || '';
   try {
@@ -1098,7 +1153,7 @@ app.get('/api/fail2ban/ignoreip', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
+app.post('/api/fail2ban/ignoreip', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
   try {
@@ -1110,7 +1165,7 @@ app.post('/api/fail2ban/ignoreip', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
+app.delete('/api/fail2ban/ignoreip', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const ip = String(req.body.ip || '').trim();
   if (!isValidIpOrCidr(ip)) return res.status(400).json({ error: 'Invalid IP or CIDR notation.' });
   try {
@@ -1124,7 +1179,7 @@ app.delete('/api/fail2ban/ignoreip', auth, async (req, res) => {
 
 // ── Fail2Ban live config edit ─────────────────────────────────────────────────
 
-app.post('/api/fail2ban/set-config', auth, async (req, res) => {
+app.post('/api/fail2ban/set-config', auth, requiresAction('advancedSecurity'), async (req, res) => {
   const { bantime, findtime, maxretry } = req.body;
   const cmds = [];
   if (bantime  !== undefined) cmds.push(runCmd('fail2ban-client', ['set', FAIL2BAN_JAIL, 'bantime',  String(bantime)],  { timeout: 4000 }));
@@ -1149,7 +1204,7 @@ app.post('/api/fail2ban/set-config', auth, async (req, res) => {
 
 // ── Fail2Ban jail log ─────────────────────────────────────────────────────────
 
-app.get('/api/fail2ban/jaillog', auth, (req, res) => {
+app.get('/api/fail2ban/jaillog', auth, requiresAction('rawLogs'), (req, res) => {
   const n = Math.min(parseInt(req.query.n || '100', 10), 500);
   try {
     if (!fs.existsSync(FAIL2BAN_LOG))
@@ -1174,6 +1229,12 @@ app.post('/api/auth/password', auth, (req, res) => {
   settings.adminPassword = newPassword;
   saveSettings(settings);
   currentPortalPass = newPassword;
+  // Revoke every OTHER session so a stolen cookie can't outlive the rotation.
+  for (const id of [...sessionRegistry.keys()]) {
+    if (id === req.sessionID) continue;
+    sessionRegistry.delete(id);
+    req.sessionStore.destroy(id, () => {});
+  }
   // This only changes the portal login. wg-easy (PASSWORD_HASH), AdGuard and the
   // CLI scripts read their credential from .env — they are NOT rotated here.
   // `./easywg passwd` rotates all of them together.
@@ -1561,7 +1622,7 @@ app.get('/api/security', auth, async (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/security/rescan', auth, async (_req, res) => {
+app.post('/api/security/rescan', auth, requiresAction('advancedSecurity'), async (_req, res) => {
   try {
     securityCache = await computeSecurityScore();
     securityCacheAt = Date.now();
@@ -1679,7 +1740,7 @@ app.get('/api/backup', auth, (_req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/backup/create', auth, async (req, res) => {
+app.post('/api/backup/create', auth, requiresAction('createBackup'), async (req, res) => {
   const encrypt = req.body.encrypt === true;
   try {
     const filename = await createBackupArchive(encrypt);
@@ -1701,7 +1762,7 @@ app.get('/api/backup/download/:filename', auth, (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-app.post('/api/backup/restore', auth, async (req, res) => {
+app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (req, res) => {
   const { filename, dryRun, confirmed } = req.body;
   try {
     assertSafeBackupFilename(filename);
@@ -1778,7 +1839,7 @@ app.post('/api/backup/restore', auth, async (req, res) => {
   }
 });
 
-app.delete('/api/backup/:filename', auth, (req, res) => {
+app.delete('/api/backup/:filename', auth, requiresAction('restoreBackup'), (req, res) => {
   try {
     assertSafeBackupFilename(req.params.filename);
     const filePath = path.join(BACKUP_DIR, req.params.filename);
@@ -1922,7 +1983,7 @@ app.get('/api/notifications/config', auth, (_req, res) => {
   res.json(maskSecrets(loadNotifConfig()));
 });
 
-app.post('/api/notifications/config', auth, (req, res) => {
+app.post('/api/notifications/config', auth, requiresAction('configureNotifications'), (req, res) => {
   const existing = loadNotifConfig();
   const incoming = req.body;
 
@@ -2491,7 +2552,7 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.patch('/api/proxy/services/:id', auth, async (req, res) => {
+app.patch('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2506,7 +2567,7 @@ app.patch('/api/proxy/services/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/proxy/services/:id', auth, async (req, res) => {
+app.delete('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2522,7 +2583,7 @@ app.delete('/api/proxy/services/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/proxy/services/:id/enable', auth, async (req, res) => {
+app.post('/api/proxy/services/:id/enable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2535,7 +2596,7 @@ app.post('/api/proxy/services/:id/enable', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/proxy/services/:id/disable', auth, async (req, res) => {
+app.post('/api/proxy/services/:id/disable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
     const svc      = services[req.params.id];
@@ -2919,7 +2980,7 @@ const MONITOR_VALID_TYPES = ['http', 'https', 'tcp', 'dns', 'docker', 'tls'];
 const MONITOR_SAFE_CONTAINER_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
 const MONITOR_SAFE_DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-app.post('/api/monitors', auth, (req, res) => {
+app.post('/api/monitors', auth, requiresAction('manageMonitors'), (req, res) => {
   const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
   if (!name || !type || !target) return res.status(400).json({ error: 'name, type, target required' });
   if (!MONITOR_VALID_TYPES.includes(type))
@@ -2951,7 +3012,7 @@ app.post('/api/monitors', auth, (req, res) => {
   res.json({ ok: true, monitor: monitors[id] });
 });
 
-app.patch('/api/monitors/:id', auth, (req, res) => {
+app.patch('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -2961,7 +3022,7 @@ app.patch('/api/monitors/:id', auth, (req, res) => {
   res.json({ ok: true, monitor: m });
 });
 
-app.delete('/api/monitors/:id', auth, (req, res) => {
+app.delete('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   if (!monitors[req.params.id]) return res.status(404).json({ error: 'Monitor not found' });
   delete monitors[req.params.id];
@@ -2972,7 +3033,7 @@ app.delete('/api/monitors/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/enable', auth, (req, res) => {
+app.post('/api/monitors/:id/enable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -2983,7 +3044,7 @@ app.post('/api/monitors/:id/enable', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/disable', auth, (req, res) => {
+app.post('/api/monitors/:id/disable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -2993,7 +3054,7 @@ app.post('/api/monitors/:id/disable', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/monitors/:id/check', auth, async (req, res) => {
+app.post('/api/monitors/:id/check', auth, requiresAction('manageMonitors'), async (req, res) => {
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
@@ -3115,7 +3176,7 @@ app.post('/api/apps/:id/start', auth, requiresAction('appsLifecycle'), async (re
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/stop', auth, async (req, res) => {
+app.post('/api/apps/:id/stop', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/stop`, null);
     if (r.status === 204 || r.status === 304) return res.json({ ok: true });
@@ -3123,7 +3184,7 @@ app.post('/api/apps/:id/stop', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/restart', auth, async (req, res) => {
+app.post('/api/apps/:id/restart', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/restart`, null);
     if (r.status === 204) return res.json({ ok: true });
@@ -3131,7 +3192,7 @@ app.post('/api/apps/:id/restart', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/apps/:id/logs', auth, async (req, res) => {
+app.get('/api/apps/:id/logs', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const tail = parseInt(req.query.tail || '200');
     const data = await new Promise((resolve, reject) => {
@@ -3162,7 +3223,7 @@ app.get('/api/apps/:id/logs', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/apps/:id/update', auth, async (req, res) => {
+app.post('/api/apps/:id/update', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const cName = encodeURIComponent('easywg-' + req.params.id);
     const catalogEntry = APP_CATALOG[req.params.id];
@@ -3561,7 +3622,7 @@ app.get('/api/xray/client-config', auth, async (req, res) => {
   }
 });
 
-app.post('/api/xray/restart', auth, async (_req, res) => {
+app.post('/api/xray/restart', auth, requiresAction('advancedSecurity'), async (_req, res) => {
   if (!XRAY_ENABLED) return res.status(404).json({ error: 'Xray not enabled' });
   try {
     await new Promise((resolve, reject) => {

@@ -89,19 +89,36 @@ The selected mode is saved to `/data/portal-config.json` and persists across res
 
 ---
 
+## What the modes are — and are not
+
+Interface modes are **guardrails, not access control**. Easy-WG-Combo has a single
+admin credential; anyone who holds it can raise the mode and unlock every action.
+What the modes give you is:
+
+- a **blast-radius limiter** for a hijacked or shoulder-surfed session, and
+- an **accident guard** against invoking dangerous operations by mistake.
+
+They are **not** multi-user permissions. Do not treat "User mode" as a way to hand
+someone limited access — they still have the full admin password.
+
 ## Backend enforcement
 
-The mode is enforced server-side. Calling restricted API endpoints from outside the portal returns `403 Forbidden` if the current mode does not allow the action.
+Restricted actions are enforced **server-side**: calling a restricted API endpoint
+returns `403 Forbidden` when the current mode does not allow it (not merely hidden
+in the UI). **Raising** the interface mode (e.g. User → Advanced) requires
+re-entering the admin password, so a hijacked lower-mode session cannot escalate
+itself; downgrades are free.
 
 Enforced actions:
 
 | Action | User | Super User | Advanced |
 |---|---|---|---|
 | Create / delete devices | ✓ | ✓ | ✓ |
-| Assign DNS profile | — | ✓ | ✓ |
-| Create / restore backup | — | ✓ | ✓ |
+| Create / restore / delete backup | — | ✓ | ✓ |
 | Configure notifications | — | ✓ | ✓ |
-| Get VLESS QR (per device) | — | ✓ | ✓ |
+| Manage monitors (create/edit/run) | — | ✓ | ✓ |
+| Raw security logs | — | — | ✓ |
+| Advanced security / firewall | — | — | ✓ |
 | Public gateway services | — | — | ✓ |
 | App lifecycle | — | — | ✓ |
 | File Drop public link | — | — | ✓ |
