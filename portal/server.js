@@ -3246,6 +3246,7 @@ app.post('/api/apps/:id/start', auth, requiresAction('appsLifecycle'), async (re
 });
 
 app.post('/api/apps/:id/stop', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/stop`, null);
     if (r.status === 204 || r.status === 304) return res.json({ ok: true });
@@ -3254,6 +3255,7 @@ app.post('/api/apps/:id/stop', auth, requiresAction('appsLifecycle'), async (req
 });
 
 app.post('/api/apps/:id/restart', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const r = await dockerPost(`/containers/${encodeURIComponent('easywg-' + req.params.id)}/restart`, null);
     if (r.status === 204) return res.json({ ok: true });
@@ -3262,6 +3264,7 @@ app.post('/api/apps/:id/restart', auth, requiresAction('appsLifecycle'), async (
 });
 
 app.get('/api/apps/:id/logs', auth, requiresAction('appsLifecycle'), async (req, res) => {
+  if (!APP_CATALOG[req.params.id]) return res.status(404).json({ error: 'App not in catalog' });
   try {
     const tail = parseInt(req.query.tail || '200');
     const data = await new Promise((resolve, reject) => {

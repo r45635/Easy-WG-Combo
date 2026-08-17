@@ -32,12 +32,13 @@ File Drop is security-sensitive. The following audit items must be completed bef
 | No path traversal on download endpoint | Code uses token-only lookup — not audited |
 | Password hashing (PBKDF2, not plaintext) | Code present — not tested on live |
 | No plaintext password storage | Code present — not audited |
-| Expiration enforcement | Code present — untested |
-| Max download count enforcement | Code present — untested |
+| Expiration enforcement | Enforced (returns 410) |
+| Max download count enforcement | Enforced (returns 410) |
 | Cleanup job | API endpoint present — untested |
-| No public links by default | VPN-only default — not validated |
-| Public mode requires explicit confirmation | Code present — not validated |
-| `X-Robots-Tag: noindex, nofollow` on public links | Code present — not validated |
+| `vpn_only` shares blocked from public sources | **Enforced server-side** (source IP must be in the VPN subnet or loopback) |
+| Password-protected shares | POST body only (never the query string); PBKDF2-SHA256 600k |
+| Public mode requires explicit confirmation | Enforced (`confirmed: true` required) |
+| Untrusted download hardening | `Content-Type: application/octet-stream`, `X-Content-Type-Options: nosniff`, `X-Robots-Tag: noindex, nofollow` |
 
 ---
 
