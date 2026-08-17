@@ -100,3 +100,17 @@ test('legacy share without mode is treated as public (public source → 200)', a
   const res = await dl('tok_legacy', { xff: '203.0.113.9' });
   assert.strictEqual(res.status, 200);
 });
+
+const cryptoLib = require('crypto');
+test('password KDF: new 600k hash verifies, legacy 100k hash still verifies', async () => {
+  const I = h.app._internals;
+  assert.strictEqual(I.FILEDROP_PBKDF2_ITER, 600000);
+  const fresh = I.hashFilePassword('hunter2');
+  assert.strictEqual(fresh.split(':').length, 3);
+  assert.strictEqual(await I.verifyFilePassword('hunter2', fresh), true);
+  assert.strictEqual(await I.verifyFilePassword('wrong', fresh), false);
+  // legacy salt:hash (100k) format
+  const salt = 'aa'.repeat(16);
+  const legacy = `${salt}:${cryptoLib.pbkdf2Sync('old', salt, 100000, 32, 'sha256').toString('hex')}`;
+  assert.strictEqual(await I.verifyFilePassword('old', legacy), true);
+});

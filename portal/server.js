@@ -2972,18 +2972,29 @@ function seedDefaultMonitors() {
 function generateShareToken() {
   return crypto.randomBytes(24).toString('hex');
 }
+const FILEDROP_PBKDF2_ITER = 600000; // OWASP 2023 floor for PBKDF2-SHA256
 function hashFilePassword(pass) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
-  return `${salt}:${hash}`;
+  const hash = crypto.pbkdf2Sync(pass, salt, FILEDROP_PBKDF2_ITER, 32, 'sha256').toString('hex');
+  return `${salt}:${FILEDROP_PBKDF2_ITER}:${hash}`;
 }
+// Async so the (unauthenticated) download path yields the event loop instead of
+// blocking it for the full KDF cost on every attempt. Verifies both the new
+// `salt:iterations:hash` format and the legacy `salt:hash` (100k) format.
 function verifyFilePassword(pass, stored) {
-  const [salt, hash] = (stored || '').split(':');
-  if (!salt || !hash) return false;
-  try {
-    const attempt = crypto.pbkdf2Sync(pass, salt, 100000, 32, 'sha256').toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(attempt, 'hex'));
-  } catch { return false; }
+  return new Promise((resolve) => {
+    const parts = String(stored || '').split(':');
+    let salt, iterations, hash;
+    if (parts.length === 3) { [salt, iterations, hash] = parts; iterations = parseInt(iterations, 10); }
+    else if (parts.length === 2) { [salt, hash] = parts; iterations = 100000; }
+    else return resolve(false);
+    if (!salt || !hash || !Number.isInteger(iterations)) return resolve(false);
+    crypto.pbkdf2(pass, salt, iterations, 32, 'sha256', (err, dk) => {
+      if (err) return resolve(false);
+      try { resolve(crypto.timingSafeEqual(Buffer.from(hash, 'hex'), dk)); }
+      catch { resolve(false); }
+    });
+  });
 }
 function getFiledropUsageMb() {
   try {
@@ -3440,7 +3451,7 @@ app.get('/api/filedrop/status', auth, (req, res) => {
 });
 
 // Public download endpoint (no auth — token is the secret)
-function serveFiledrop(req, res) {
+async function serveFiledrop(req, res) {
   const { token } = req.params;
   const shares = loadFiledropShares();
   const share = shares[token];
@@ -3462,7 +3473,7 @@ function serveFiledrop(req, res) {
   if (share.passwordProtected) {
     const pw = (req.method === 'POST' ? req.body?.password : null) || '';
     if (!pw) return res.status(401).json({ error: 'Password required', passwordRequired: true });
-    if (!verifyFilePassword(pw, share.passwordHash)) return res.status(401).json({ error: 'Wrong password' });
+    if (!(await verifyFilePassword(pw, share.passwordHash))) return res.status(401).json({ error: 'Wrong password' });
   }
   const filePath = path.join(FILEDROP_DIR, share.storedName);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
@@ -3472,8 +3483,12 @@ function serveFiledrop(req, res) {
   saveFiledropShares(shares);
   sendNotification('filedrop_downloaded', { name: share.originalName }).catch(() => {});
 
-  res.setHeader('Content-Disposition', `attachment; filename="${share.originalName.replace(/"/g, '')}"`);
-  res.setHeader('Content-Type', share.mimeType || 'application/octet-stream');
+  // RFC 5987 encoding (not just quote-stripping) + force a non-renderable type on
+  // untrusted uploads so the browser downloads rather than sniffs/executes them.
+  const asciiName = share.originalName.replace(/[^\w.\- ]/g, '_');
+  res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(share.originalName)}`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   fs.createReadStream(filePath).pipe(res);
 }
@@ -3716,6 +3731,7 @@ if (require.main === module) {
 app._internals = {
   generateMainCaddyfile, generateCaddyServices, normalizeTargetUrl,
   isValidTargetUrl, isValidDomain, isValidIpOrCidr,
+  hashFilePassword, verifyFilePassword, FILEDROP_PBKDF2_ITER,
 };
 
 module.exports = app;
