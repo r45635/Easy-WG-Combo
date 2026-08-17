@@ -223,6 +223,11 @@ function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   out += '    Strict-Transport-Security "max-age=31536000; includeSubDomains"\n';
   out += '    X-Content-Type-Options "nosniff"\n';
   out += '    Referrer-Policy "same-origin"\n';
+  out += '    X-Frame-Options "SAMEORIGIN"\n';
+  out += '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n';
+  // Report-only first (one release) so violations surface before enforcing.
+  // Keep in phase with configure_caddy() in bootstrap.sh.
+  out += "    Content-Security-Policy-Report-Only \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'\"\n";
   out += '  }\n';
   out += '}\n\n';
   out += 'import /etc/caddy/easywg-services.caddy\n';

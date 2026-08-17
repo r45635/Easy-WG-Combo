@@ -717,6 +717,11 @@ configure_caddy() {
     printf '    Strict-Transport-Security "max-age=31536000; includeSubDomains"\n'
     printf '    X-Content-Type-Options "nosniff"\n'
     printf '    Referrer-Policy "same-origin"\n'
+    printf '    X-Frame-Options "SAMEORIGIN"\n'
+    printf '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n'
+    # Report-only first (one release) so violations surface before enforcing.
+    # Keep in phase with generateMainCaddyfile() in portal/server.js.
+    printf '    Content-Security-Policy-Report-Only "default-src '\''self'\''; script-src '\''self'\''; style-src '\''self'\'' '\''unsafe-inline'\''; img-src '\''self'\'' data:; frame-src '\''self'\''; frame-ancestors '\''self'\''; object-src '\''none'\''; base-uri '\''none'\''"\n'
     printf '  }\n'
     printf '}\n\n'
     printf 'import /etc/caddy/easywg-services.caddy\n'
