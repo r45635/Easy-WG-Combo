@@ -122,7 +122,7 @@ The portal can be exposed over HTTPS through Caddy by setting `PUBLIC_HTTPS_ENAB
 
 This is convenient but increases the attack surface. If you enable it: use a strong password, keep Fail2Ban enabled, and consider restricting by IP.
 
-> The current installer enables public HTTPS by default. Check your `.env` to confirm your chosen mode.
+> The installer defaults to **local-only** (admin via SSH tunnel / VPN). Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` (or answer the install prompt) to expose the portal. The portal is a root-equivalent control plane — only expose it deliberately.
 
 → [Security model](docs/security-model.md)
 
