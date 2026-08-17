@@ -480,7 +480,9 @@ app.use((req, res, next) => {
 const rlOpts = { windowMs: 60_000, standardHeaders: 'draft-7', legacyHeaders: false,
   message: { error: 'Too many requests. Slow down.' } };
 app.use('/files/', rateLimit({ ...rlOpts, limit: 120 }));
-app.use('/api/',   rateLimit({ ...rlOpts, limit: 600 }));
+// Global (covers /api plus the /wireguard, /control, /adguard proxy mounts).
+// Placed after express.static so asset serving is not counted.
+app.use(rateLimit({ ...rlOpts, limit: 600 }));
 
 // Constant-time password comparison (hash both sides to equalize length).
 function passwordsMatch(a, b) {
