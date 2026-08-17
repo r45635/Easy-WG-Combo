@@ -2760,8 +2760,10 @@ document.getElementById('password-form').addEventListener('submit', async e => {
     msgEl.style.color = 'var(--red)';
     return;
   }
-  msgEl.textContent = t('security.password.success');
-  msgEl.style.color = 'var(--green)';
+  msgEl.textContent = data.warning
+    ? t('security.password.success') + ' ' + data.warning
+    : t('security.password.success');
+  msgEl.style.color = data.warning ? 'var(--yellow, #d9a441)' : 'var(--green)';
   document.getElementById('pw-current').value = '';
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-confirm').value = '';

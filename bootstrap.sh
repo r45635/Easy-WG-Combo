@@ -1030,6 +1030,12 @@ main() {
     set_env_value "$ENV_FILE" "WG_HOST" "$wg_host"
     set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$admin_password"
     set_env_value "$ENV_FILE" "WG_PORT" "$wg_port"
+    # Persistent session secret so portal logins survive restarts.
+    if [ -z "$(sed -n 's/^SESSION_SECRET=//p' "$ENV_FILE" 2>/dev/null | head -n 1)" ]; then
+      local _sess_secret
+      _sess_secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+      set_env_value "$ENV_FILE" "SESSION_SECRET" "$_sess_secret"
+    fi
   else
     action_label="keep"
     if [ -z "$wg_host" ]; then

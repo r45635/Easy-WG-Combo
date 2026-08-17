@@ -1167,7 +1167,13 @@ app.post('/api/auth/password', auth, (req, res) => {
   settings.adminPassword = newPassword;
   saveSettings(settings);
   currentPortalPass = newPassword;
-  res.json({ success: true });
+  // This only changes the portal login. wg-easy (PASSWORD_HASH), AdGuard and the
+  // CLI scripts read their credential from .env — they are NOT rotated here.
+  // `./easywg passwd` rotates all of them together.
+  res.json({
+    success: true,
+    warning: 'Only the portal login was changed. wg-easy, AdGuard and the CLI still use the previous password. Run "./easywg passwd" on the server to rotate everything.',
+  });
 });
 
 // ── System service status ─────────────────────────────────────────────────────

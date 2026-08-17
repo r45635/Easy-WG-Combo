@@ -19,6 +19,7 @@ Commands:
   services                  Show service status only
   doctor                    Check installation health (containers, API, scripts, security)
   update                    Update to the latest version (git pull + image pull + rebuild)
+  passwd                    Rotate the admin password everywhere (.env, wg-easy hash, portal)
 
   backup                    Create a configuration backup
   backup --encrypt          Create an encrypted backup (requires age)
@@ -120,6 +121,48 @@ case "${1:-}" in
     "$SCRIPT_DIR/compose.sh" up -d --build
     bash "$SCRIPTS_DIR/health.sh" --services-only || true
     echo "Update complete — now at v$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo dev) ($(git -C "$SCRIPT_DIR" rev-parse --short HEAD))"
+    ;;
+  passwd)
+    # Canonical admin-password rotation. The UI password change only rewrites
+    # portal-config.json, which orphans wg-easy's PASSWORD_HASH, the AdGuard
+    # credential and the CLI scripts that read ADMIN_PASSWORD from .env. This
+    # keeps all of them in sync.
+    ENV_FILE="$SCRIPT_DIR/.env"
+    SECRETS_FILE="$SCRIPT_DIR/.env.secrets"
+    [ -f "$ENV_FILE" ] || { echo "Error: $ENV_FILE not found — is this an installed instance?" >&2; exit 1; }
+
+    printf 'New admin password (min 12 chars): '
+    read -rs new_pw; printf '\n'
+    printf 'Confirm new password: '
+    read -rs confirm_pw; printf '\n'
+    [ "$new_pw" = "$confirm_pw" ] || { echo "Error: passwords do not match." >&2; exit 1; }
+    [ "${#new_pw}" -ge 12 ] || { echo "Error: password must be at least 12 characters (16+ recommended)." >&2; exit 1; }
+    [ "${#new_pw}" -ge 16 ] || echo "Warning: 16+ characters is recommended for a public admin portal."
+
+    # 1) .env — grep-out + append avoids any sed metacharacter issues with the password.
+    tmp="$(mktemp)"; grep -vE '^ADMIN_PASSWORD=' "$ENV_FILE" > "$tmp" || true
+    printf 'ADMIN_PASSWORD=%s\n' "$new_pw" >> "$tmp"; mv "$tmp" "$ENV_FILE"
+
+    # 2) wg-easy PASSWORD_HASH in .env.secrets, using the image pinned in compose.
+    wg_img="$(awk '/image: *ghcr.io\/wg-easy\/wg-easy/{print $2; exit}' "$SCRIPT_DIR/docker-compose.yml")"
+    echo "Regenerating wg-easy password hash..."
+    new_hash="$(docker run --rm "$wg_img" wgpw "$new_pw" | sed -n "s/^PASSWORD_HASH='\(.*\)'\$/\1/p")"
+    [ -n "$new_hash" ] || { echo "Error: failed to generate PASSWORD_HASH." >&2; exit 1; }
+    touch "$SECRETS_FILE"
+    tmp="$(mktemp)"; grep -vE '^(export[[:space:]]+)?PASSWORD_HASH=' "$SECRETS_FILE" > "$tmp" || true
+    printf "export PASSWORD_HASH='%s'\n" "$new_hash" >> "$tmp"; mv "$tmp" "$SECRETS_FILE"
+
+    # 3) Apply to running containers, then drop the portal-config.json override so
+    #    the new ADMIN_PASSWORD env is authoritative, then restart the portal.
+    "$SCRIPT_DIR/compose.sh" up -d
+    if docker ps --format '{{.Names}}' | grep -qx portal; then
+      docker exec portal node -e 'const fs=require("fs");const f="/data/portal-config.json";try{const c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.adminPassword;fs.writeFileSync(f,JSON.stringify(c,null,2));}catch(e){}' || true
+      "$SCRIPT_DIR/compose.sh" restart portal
+    fi
+
+    echo "Admin password rotated for the portal and wg-easy."
+    echo "NOTE: AdGuard Home uses a credential set in its own web wizard — update it there"
+    echo "      to match if you rely on the portal's AdGuard proxy."
     ;;
   status|health)
     shift
