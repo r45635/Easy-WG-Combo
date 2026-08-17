@@ -55,6 +55,86 @@ function isVpnOrLocalClient(req, vpnSubnet) {
   return isLoopback(ip) || ipInCidr(ip, vpnSubnet);
 }
 
+// ── SSRF guards for the monitoring module ────────────────────────────────────
+
+const BLOCKED_V4_CIDRS = [
+  '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
+  '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16',
+];
+
+// True for loopback / private / link-local (incl. cloud metadata 169.254.169.254)
+// / CGNAT literal IPs. Hostnames (non-literals) return false — those are checked
+// at connect time by the probe functions.
+function isReservedIp(value) {
+  const n = normalizeIp(value).replace(/^\[|\]$/g, '');
+  if (ipv4ToInt(n) !== null) return BLOCKED_V4_CIDRS.some(c => ipInCidr(n, c));
+  if (n.includes(':')) {
+    const low = n.toLowerCase();
+    return low === '::1' || low === '::' || low.startsWith('fe8') || low.startsWith('fe9') ||
+           low.startsWith('fea') || low.startsWith('feb') || low.startsWith('fc') || low.startsWith('fd');
+  }
+  return false; // hostname — resolved and re-checked at connect time
+}
+
+function isLiteralIp(host) {
+  const h = normalizeIp(host).replace(/^\[|\]$/g, '');
+  return ipv4ToInt(h) !== null || h.includes(':');
+}
+
+function splitHostPort(target) {
+  const t = String(target || '');
+  if (t.startsWith('[')) { const i = t.indexOf(']'); return { host: t.slice(1, i), port: t.slice(i + 2) }; }
+  const idx = t.lastIndexOf(':');
+  if (idx === -1) return { host: t, port: '' };
+  return { host: t.slice(0, idx), port: t.slice(idx + 1) };
+}
+
+const MONITOR_TYPES  = ['http', 'https', 'tcp', 'dns', 'docker', 'tls'];
+const MON_DOMAIN_RE  = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const MON_CONTAINER_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
+
+// Validate a (possibly PATCH-merged) monitor definition. Returns an error string,
+// or null when valid. Built-in/seeded monitors may target local services.
+function validateMonitor(m, opts = {}) {
+  const isBuiltin = !!opts.isBuiltin;
+  const type = m.type;
+  if (!MONITOR_TYPES.includes(type)) return `type must be one of: ${MONITOR_TYPES.join(', ')}`;
+  const target = String(m.target || '');
+  if (!target) return 'target is required';
+
+  if (type === 'http' || type === 'https') {
+    let u;
+    try { u = new URL(target); } catch { return 'target must be a valid URL'; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return 'target must be http:// or https://';
+    if (!isBuiltin && isLiteralIp(u.hostname) && isReservedIp(u.hostname)) return 'target is a private/reserved address';
+  } else if (type === 'tcp' || type === 'tls') {
+    const { host, port } = splitHostPort(target);
+    const p = parseInt(port || m.port || (type === 'tls' ? 443 : 0), 10);
+    if (!p || p < 1 || p > 65535) return 'port must be between 1 and 65535';
+    if (!host) return 'target host is required';
+    if (!isBuiltin && isLiteralIp(host) && isReservedIp(host)) return 'target is a private/reserved address';
+  } else if (type === 'dns') {
+    if (!MON_DOMAIN_RE.test(target)) return 'dns target must be a valid domain name';
+    if (m.resolver) {
+      if (!isLiteralIp(m.resolver)) return 'resolver must be an IP address';
+      if (!isBuiltin && isReservedIp(m.resolver)) return 'resolver must be a public IP';
+    }
+  } else if (type === 'docker') {
+    if (!MON_CONTAINER_RE.test(target)) return 'docker target must be a valid container name';
+  }
+
+  if (m.intervalSeconds !== undefined) {
+    const iv = Number(m.intervalSeconds);
+    if (!Number.isInteger(iv) || iv < 30 || iv > 86400) return 'intervalSeconds must be between 30 and 86400';
+  }
+  if (m.timeoutSeconds !== undefined) {
+    const to = Number(m.timeoutSeconds);
+    if (!Number.isInteger(to) || to < 1 || to > 60) return 'timeoutSeconds must be between 1 and 60';
+  }
+  return null;
+}
+
 module.exports = {
   normalizeIp, trustedClientIp, isLoopback, ipv4ToInt, ipInCidr, isVpnOrLocalClient,
+  isReservedIp, isLiteralIp, splitHostPort, validateMonitor,
 };

@@ -2907,6 +2907,9 @@ function seedDefaultMonitors() {
   for (const d of defaults) {
     monitors[d.id] = {
       id: d.id, name: d.name, type: d.type, target: d.target,
+      // Built-in monitors legitimately probe local services; they bypass the
+      // private-range guard and their type/target cannot be changed via PATCH.
+      builtin: true,
       expectedStatus: d.expectedStatus || null, resolver: d.resolver || null,
       intervalSeconds: 300, timeoutSeconds: 5, retries: 2,
       enabled: true, notify: true, notifyAfterFailures: 2,
@@ -2983,18 +2986,9 @@ const MONITOR_SAFE_DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[
 app.post('/api/monitors', auth, requiresAction('manageMonitors'), (req, res) => {
   const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
   if (!name || !type || !target) return res.status(400).json({ error: 'name, type, target required' });
-  if (!MONITOR_VALID_TYPES.includes(type))
-    return res.status(400).json({ error: `type must be one of: ${MONITOR_VALID_TYPES.join(', ')}` });
-  if ((type === 'http' || type === 'https') && !/^https?:\/\/.+/.test(target))
-    return res.status(400).json({ error: 'HTTP/HTTPS monitor target must be a valid URL starting with http:// or https://' });
-  if (type === 'tcp' || type === 'tls') {
-    const p = parseInt(req.body.port || 443);
-    if (!p || p < 1 || p > 65535) return res.status(400).json({ error: 'port must be between 1 and 65535' });
-  }
-  if (type === 'docker' && !MONITOR_SAFE_CONTAINER_RE.test(target))
-    return res.status(400).json({ error: 'docker target must be a valid container name (alphanumeric, dash, dot, underscore)' });
-  if (type === 'dns' && !MONITOR_SAFE_DOMAIN_RE.test(target))
-    return res.status(400).json({ error: 'dns target must be a valid domain name' });
+  // Centralized validation (type, target shape, SSRF private-range block, bounds).
+  const vErr = netGuards.validateMonitor(req.body, { isBuiltin: false });
+  if (vErr) return res.status(400).json({ error: vErr });
   const monitors = loadMonitors();
   const id = `mon_${Date.now()}`;
   monitors[id] = {
@@ -3016,7 +3010,16 @@ app.patch('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res
   const monitors = loadMonitors();
   const m = monitors[req.params.id];
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
+  // Built-in monitors may not have their type/target rewritten (they probe local services).
+  if (m.builtin && (req.body.type !== undefined || req.body.target !== undefined || req.body.resolver !== undefined)) {
+    return res.status(400).json({ error: 'Built-in monitor type/target cannot be changed.' });
+  }
   const fields = ['name','type','target','expectedStatus','resolver','intervalSeconds','timeoutSeconds','retries','notify','notifyAfterFailures','tags','notes'];
+  // Validate the MERGED result so PATCH cannot bypass the checks POST enforces.
+  const candidate = { ...m };
+  for (const f of fields) { if (req.body[f] !== undefined) candidate[f] = req.body[f]; }
+  const vErr = netGuards.validateMonitor(candidate, { isBuiltin: !!m.builtin });
+  if (vErr) return res.status(400).json({ error: vErr });
   for (const f of fields) { if (req.body[f] !== undefined) m[f] = req.body[f]; }
   saveMonitors(monitors);
   res.json({ ok: true, monitor: m });

@@ -41,3 +41,20 @@ test('isVpnOrLocalClient', () => {
   assert.ok(g.isVpnOrLocalClient({ ip: '127.0.0.1' }, vpn));
   assert.ok(!g.isVpnOrLocalClient({ ip: '203.0.113.9' }, vpn));
 });
+
+test('isReservedIp blocks loopback/private/link-local/CGNAT', () => {
+  ['127.0.0.1', '10.0.0.5', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '::1', 'fe80::1', 'fd00::1']
+    .forEach(ip => assert.ok(g.isReservedIp(ip), `${ip} should be reserved`));
+  ['8.8.8.8', '1.1.1.1', '203.0.113.9'].forEach(ip => assert.ok(!g.isReservedIp(ip), `${ip} should be public`));
+});
+
+test('validateMonitor: SSRF, bounds, builtin bypass', () => {
+  assert.match(g.validateMonitor({ type: 'http', target: 'http://127.0.0.1:2019' }), /private|reserved/);
+  assert.match(g.validateMonitor({ type: 'tcp', target: '10.0.0.5:22' }), /private|reserved/);
+  assert.strictEqual(g.validateMonitor({ type: 'http', target: 'http://example.com' }), null);
+  assert.match(g.validateMonitor({ type: 'http', target: 'http://example.com', intervalSeconds: 5 }), /interval/);
+  assert.match(g.validateMonitor({ type: 'zzz', target: 'x' }), /type must/);
+  // built-in local probes are allowed
+  assert.strictEqual(g.validateMonitor({ type: 'http', target: 'http://127.0.0.1:8080' }, { isBuiltin: true }), null);
+  assert.strictEqual(g.validateMonitor({ type: 'dns', target: 'example.com', resolver: '127.0.0.1' }, { isBuiltin: true }), null);
+});
