@@ -4,11 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 DRY_RUN=false
+USE_ARCHIVE_COMPOSE=false
 ARCHIVE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=true; shift ;;
+    --use-archive-compose) USE_ARCHIVE_COMPOSE=true; shift ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
     *) ARCHIVE="$1"; shift ;;
   esac
@@ -47,6 +49,15 @@ fi
 log "Validating archive…"
 if ! tar -tzf "$WORK_ARCHIVE" &>/dev/null; then
   fail "Archive is invalid or corrupted."
+fi
+# Treat the archive as untrusted: reject absolute paths, '..' traversal, and
+# symlink/hardlink/device members before extracting.
+LISTING="$(tar -tvzf "$WORK_ARCHIVE" 2>/dev/null)"
+if printf '%s\n' "$LISTING" | awk '{print substr($1,1,1)}' | grep -qE '[lhbcps]'; then
+  fail "Unsafe backup archive: contains a symlink/hardlink/device entry."
+fi
+if printf '%s\n' "$LISTING" | awk '{print $6}' | grep -qE '^/|(^|/)\.\.(/|$)'; then
+  fail "Unsafe backup archive: absolute path or '..' traversal."
 fi
 
 MANIFEST_RAW=$(tar -xzOf "$WORK_ARCHIVE" manifest.json 2>/dev/null || true)
@@ -93,7 +104,7 @@ log "Extracting archive…"
 RESTORE_STAGE=$(mktemp -d)
 trap 'rm -rf "$RESTORE_STAGE"' EXIT
 
-tar -xzf "$WORK_ARCHIVE" -C "$RESTORE_STAGE"
+tar --no-same-owner --no-overwrite-dir -xzf "$WORK_ARCHIVE" -C "$RESTORE_STAGE"
 
 restore_if_exists() {
   local src="$RESTORE_STAGE/$1" dst="$PROJECT_DIR/$1"
@@ -111,7 +122,14 @@ restore_if_exists "caddy"
 restore_if_exists "portal/data"
 restore_if_exists ".env"
 restore_if_exists ".env.secrets"
-restore_if_exists "docker-compose.yml"
+# docker-compose.yml from an archive is executed by 'compose.sh up' below, i.e.
+# code execution. Keep the repo's version unless the operator explicitly opts in.
+if [ "$USE_ARCHIVE_COMPOSE" = true ]; then
+  warn "Restoring docker-compose.yml from the archive (--use-archive-compose)."
+  restore_if_exists "docker-compose.yml"
+else
+  [ -e "$RESTORE_STAGE/docker-compose.yml" ] && log "Keeping the repo docker-compose.yml (use --use-archive-compose to override)."
+fi
 
 # ── Restart services ──────────────────────────────────────────────────────────
 log "Starting services…"

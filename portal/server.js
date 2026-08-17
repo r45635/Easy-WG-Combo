@@ -12,6 +12,7 @@ const { promisify } = require('util');
 const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
 const netGuards = require('./lib/net-guards');
+const archiveGuards = require('./lib/archive-guards');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -1815,10 +1816,20 @@ app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (re
     preRestoreFile = await createBackupArchive(false);
   } catch { /* non-fatal */ }
 
+  // Treat the archive as untrusted: validate every entry (no absolute paths,
+  // no '..' traversal, no symlink/hardlink/device members) before extracting.
+  try {
+    const { stdout: vlisting } = await runCmd('tar', ['-tvzf', filePath], { timeout: 15000 });
+    const archErr = archiveGuards.validateTarListing(vlisting);
+    if (archErr) return res.status(422).json({ error: `Unsafe backup archive: ${archErr}` });
+  } catch { return res.status(422).json({ error: 'Could not read the backup archive.' }); }
+
   // Restore
   const stage = fs.mkdtempSync('/tmp/ewg-restore-');
   try {
-    await runCmd('tar', ['-xzf', filePath, '-C', stage], { timeout: 60000 });
+    // --no-same-owner/--no-overwrite-dir: don't let the archive set ownership or
+    // replace existing directory metadata during extraction.
+    await runCmd('tar', ['--no-same-owner', '--no-overwrite-dir', '-xzf', filePath, '-C', stage], { timeout: 60000 });
 
     const restoreDir = (src, dst) => {
       if (!fs.existsSync(src)) return;
