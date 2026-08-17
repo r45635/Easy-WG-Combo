@@ -161,9 +161,20 @@ print_final_summary() {
     xray_public_tls="yes"
   fi
 
-  if is_truthy "$xray_enabled"; then
+  # Local-only mode binds the portal to loopback and keeps the firewall closed,
+  # so the summary must NOT present a public wg_host URL — show the SSH tunnel.
+  local local_only="no"; is_truthy "$public_https_enabled" || local_only="yes"
+  local local_scheme local_port
+  if [ "$local_only" = "yes" ]; then
+    if is_truthy "$xray_enabled"; then
+      local_scheme="https"; local_port="$caddy_https_port"   # Caddy portal on 127.0.0.1:caddy_https_port
+    else
+      local_scheme="http";  local_port="${PORTAL_PORT:-8080}" # portal direct on 127.0.0.1:PORTAL_PORT
+    fi
+    admin_url="${local_scheme}://localhost:${local_port}"
+  elif is_truthy "$xray_enabled"; then
     admin_url="https://${admin_domain:-$wg_host}:${caddy_https_port}"
-  elif is_truthy "$public_https_enabled"; then
+  else
     if is_ip_address "${admin_domain:-}"; then
       admin_url="https://${admin_domain}"
     elif [ -n "${tls_email:-}" ] && [ -n "${admin_domain:-}" ]; then
@@ -171,8 +182,6 @@ print_final_summary() {
     else
       admin_url="https://${wg_host}"
     fi
-  else
-    admin_url="http://${wg_host}:${PORTAL_PORT:-8080}"
   fi
 
   log ""
@@ -180,13 +189,22 @@ print_final_summary() {
   log "Mode: ${action_label}"
   log "Server name: ${server_name}"
   log "WireGuard endpoint: ${wg_host}:${wg_port}/udp"
-  log "Admin URL: ${admin_url}"
+  if [ "$local_only" = "yes" ]; then
+    log "Admin portal: local-only (not exposed to the Internet)"
+    log "  → Run on your machine:  ssh -L ${local_port}:localhost:${local_port} ${SSH_USER:-root}@${wg_host}"
+    log "  → Then open: ${admin_url}"
+    [ "$local_scheme" = "https" ] && log "     (self-signed cert — accept the browser warning)"
+  else
+    log "Admin URL: ${admin_url}"
+  fi
   log "Admin password: ${admin_password}"
   log "SSH port: ${ssh_port}/tcp"
   if is_truthy "$xray_enabled"; then
     log "Xray VLESS+Reality: enabled on port 443"
     log "  → Client URI: ./easywg xray client-uri"
-    if [ "$xray_public_tls" = "yes" ]; then
+    if [ "$local_only" = "yes" ]; then
+      log "  → Admin portal is local-only (see the SSH tunnel above)."
+    elif [ "$xray_public_tls" = "yes" ]; then
       log "  → Admin portal: https://${admin_domain}:${caddy_https_port} (valid Let's Encrypt cert)"
       log "     ⚠ Use the hostname, NOT the IP — a public cert cannot cover https://${wg_host}:${caddy_https_port}"
       log "     ⚠ The cert is issued via HTTP-01 on port 80: DNS for ${admin_domain} must point here and port 80 must be reachable."
@@ -1055,6 +1073,8 @@ main() {
       printf '\n'
     fi
     [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
+    # Shared policy: min 12 chars (16+ recommended). Matches the portal + easywg passwd.
+    [ "${#admin_password}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
 
     local password_hash
     log "Generating WireGuard password hash..."
@@ -1088,6 +1108,7 @@ main() {
         read_secret_prompt "ADMIN_PASSWORD missing from .env — set it now: " _kept_pw
         printf '\n'
         [ -n "$_kept_pw" ] || die "ADMIN_PASSWORD is required."
+        [ "${#_kept_pw}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
         set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$_kept_pw"
       else
         die "ADMIN_PASSWORD is missing from .env. Set it and re-run."

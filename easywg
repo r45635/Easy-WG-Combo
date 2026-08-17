@@ -139,6 +139,18 @@ case "${1:-}" in
     [ "${#new_pw}" -ge 12 ] || { echo "Error: password must be at least 12 characters (16+ recommended)." >&2; exit 1; }
     [ "${#new_pw}" -ge 16 ] || echo "Warning: 16+ characters is recommended for a public admin portal."
 
+    # 0) Pin ADGUARD_PASSWORD to its current effective value BEFORE rotating, so the
+    #    portal's AdGuard proxy keeps working. AdGuard's own credential is set in its
+    #    web wizard and is independent of ADMIN_PASSWORD — rotating the admin password
+    #    must not silently break the AdGuard integration.
+    if ! grep -q '^ADGUARD_PASSWORD=' "$ENV_FILE"; then
+      cur_admin="$(sed -n 's/^ADMIN_PASSWORD=//p' "$ENV_FILE" | head -n 1)"
+      if [ -n "$cur_admin" ]; then
+        printf 'ADGUARD_PASSWORD=%s\n' "$cur_admin" >> "$ENV_FILE"
+        echo "Pinned ADGUARD_PASSWORD to the current value (AdGuard is managed separately)."
+      fi
+    fi
+
     # 1) .env — grep-out + append avoids any sed metacharacter issues with the password.
     tmp="$(mktemp)"; grep -vE '^ADMIN_PASSWORD=' "$ENV_FILE" > "$tmp" || true
     printf 'ADMIN_PASSWORD=%s\n' "$new_pw" >> "$tmp"; mv "$tmp" "$ENV_FILE"
@@ -161,8 +173,9 @@ case "${1:-}" in
     fi
 
     echo "Admin password rotated for the portal and wg-easy."
-    echo "NOTE: AdGuard Home uses a credential set in its own web wizard — update it there"
-    echo "      to match if you rely on the portal's AdGuard proxy."
+    echo "NOTE: AdGuard Home keeps its own independent credential (ADGUARD_PASSWORD in .env,"
+    echo "      pinned above). It is unaffected by this rotation. To change AdGuard's own"
+    echo "      login, update it in the AdGuard web wizard and set ADGUARD_PASSWORD to match."
     ;;
   status|health)
     shift

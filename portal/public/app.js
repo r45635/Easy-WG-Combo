@@ -172,11 +172,11 @@ const I18N = {
     // password
     'security.password.title': 'Change password',
     'security.password.current': 'Current password',
-    'security.password.new': 'New password (min 8 chars)',
+    'security.password.new': 'New password (min 12 chars)',
     'security.password.confirm': 'Confirm new password',
     'security.password.save': 'Change password',
     'security.password.mismatch': 'Passwords do not match.',
-    'security.password.tooShort': 'Minimum 8 characters.',
+    'security.password.tooShort': 'Minimum 12 characters (16+ recommended).',
     'security.password.success': 'Password changed successfully.',
     'security.password.wrongCurrent': 'Current password is incorrect.',
     // nav
@@ -550,11 +550,11 @@ const I18N = {
     // mot de passe
     'security.password.title': 'Changer le mot de passe',
     'security.password.current': 'Mot de passe actuel',
-    'security.password.new': 'Nouveau mot de passe (min 8 car.)',
+    'security.password.new': 'Nouveau mot de passe (min 12 car.)',
     'security.password.confirm': 'Confirmer le nouveau mot de passe',
     'security.password.save': 'Changer le mot de passe',
     'security.password.mismatch': 'Les mots de passe ne correspondent pas.',
-    'security.password.tooShort': 'Minimum 8 caractères.',
+    'security.password.tooShort': 'Minimum 12 caractères (16+ recommandé).',
     'security.password.success': 'Mot de passe changé avec succès.',
     'security.password.wrongCurrent': 'Mot de passe actuel incorrect.',
     'nav.backups': 'Sauvegardes',
@@ -920,11 +920,11 @@ const I18N = {
     // password
     'security.password.title': '修改密码',
     'security.password.current': '当前密码',
-    'security.password.new': '新密码（至少 8 位）',
+    'security.password.new': '新密码（至少 12 位）',
     'security.password.confirm': '确认新密码',
     'security.password.save': '修改密码',
     'security.password.mismatch': '两次密码不一致。',
-    'security.password.tooShort': '至少需要 8 个字符。',
+    'security.password.tooShort': '至少需要 12 个字符（推荐 16+）。',
     'security.password.success': '密码修改成功。',
     'security.password.wrongCurrent': '当前密码不正确。',
     'nav.backups': '备份',
@@ -2740,7 +2740,7 @@ document.getElementById('password-form').addEventListener('submit', async e => {
   const msgEl    = document.getElementById('pw-msg');
   msgEl.className = '';
 
-  if (newPw.length < 8) {
+  if (newPw.length < 12) {
     msgEl.textContent = t('security.password.tooShort');
     msgEl.style.color = 'var(--red)';
     return;

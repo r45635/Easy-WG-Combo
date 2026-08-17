@@ -164,4 +164,4 @@ The command is safe by construction:
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14 (v15 is a breaking rewrite); an update never crosses that major. See [CHANGELOG.md](../CHANGELOG.md) for what changed between versions.
 
-To rotate the admin password, run `./easywg passwd` on the server — it updates the portal login, the wg-easy password hash and `.env` together. (Changing the password inside the portal UI only affects the portal login; wg-easy, AdGuard and the CLI keep the old one.)
+To rotate the admin password, run `./easywg passwd` on the server — it updates the portal login, the wg-easy password hash and `.env` together, and pins `ADGUARD_PASSWORD` so the AdGuard proxy keeps working (AdGuard keeps its own independent credential, set in its web wizard). Passwords must be at least **12 characters** (16+ recommended), enforced consistently by the installer, the portal and `easywg passwd`. Changing the password inside the portal UI only affects the portal login.

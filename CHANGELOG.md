@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ## [Unreleased] — security hardening
 
 ### Security
+- **Monitoring SSRF — connect-time DNS guard.** Monitor targets are now resolved through a guarded DNS lookup: a hostname that resolves (or rebinds) to a private/reserved/link-local address — including cloud metadata `169.254.169.254`, loopback, RFC1918, CGNAT and IPv6 ULA/link-local — is refused at connect time, not merely when given as a literal IP. The socket connects to the exact address that was validated. Built-in local probes are unaffected.
+- **`POST /api/fail2ban/unban-all`** now requires Advanced mode (it lifts every ban), matching its ban/unban/ignoreip/set-config siblings.
+- **Unified password policy:** minimum **12 characters** (16+ recommended), enforced consistently by the installer, the portal UI/API and `easywg passwd`.
+- **`easywg passwd` no longer breaks the AdGuard proxy:** it pins `ADGUARD_PASSWORD` before rotating `ADMIN_PASSWORD`, so the portal keeps talking to AdGuard (whose own credential is independent).
+- **Local-only deployment summary** now prints the correct SSH-tunnel command and `localhost` URL instead of an unreachable public `WG_HOST` URL (all Xray/public/local-only combinations).
 - **File Drop `vpn_only` shares are now enforced server-side.** Previously the share mode was cosmetic and any client with the token could download over the public Internet; downloads now require a VPN-subnet (or loopback/SSH-tunnel) source. See the advisory in [SECURITY.md](SECURITY.md).
 - **File Drop passwords are POST-only** — the `?pw=` query form (which leaked into access logs and the Security → Logs panel) is removed.
 - **File Drop password hashing** raised to PBKDF2-SHA256 600k iterations, computed asynchronously (the unauthenticated download path no longer blocks the event loop); legacy hashes still verify. Downloads are served as `application/octet-stream` with `X-Content-Type-Options: nosniff` and an RFC 5987 `Content-Disposition`.

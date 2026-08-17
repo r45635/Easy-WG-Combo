@@ -73,7 +73,7 @@ jobs:
       - name: Build portal image
         run: docker build -t easywg-portal-ci ./portal
 
-      - name: Smoke test image boots
+      - name: Smoke test image boots (with a password)
         run: |
           # ADMIN_PASSWORD is required — the portal refuses to start without it.
           docker run -d --name portal-ci -e ADMIN_PASSWORD=ci-smoke-test-pw easywg-portal-ci
@@ -81,6 +81,19 @@ jobs:
           docker logs portal-ci
           docker inspect -f '{{.State.Running}}' portal-ci | grep -q true
 
+      - name: Smoke test fail-closed (no password)
+        run: |
+          # Security-critical: the portal MUST refuse to start with no ADMIN_PASSWORD.
+          docker run -d --name portal-ci-nopw easywg-portal-ci || true
+          sleep 5
+          if docker inspect -f '{{.State.Running}}' portal-ci-nopw | grep -q true; then
+            echo "::error::portal started without ADMIN_PASSWORD — should fail closed"; exit 1
+          fi
+          docker logs portal-ci-nopw 2>&1 | grep -qi "no admin password" \
+            || { echo "::error::expected the fail-closed message"; exit 1; }
+
+      # Report-only (exit-code 0): surfaces image CVEs without gating merges —
+      # Dependabot owns image bumps. Intentionally not blocking.
       - name: Trivy image scan (report only)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
