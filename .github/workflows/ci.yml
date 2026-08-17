@@ -82,7 +82,7 @@ jobs:
           docker inspect -f '{{.State.Running}}' portal-ci | grep -q true
 
       - name: Trivy image scan (report only)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: easywg-portal-ci
           severity: HIGH,CRITICAL
