@@ -56,6 +56,10 @@ jobs:
           node --check server.js
           node --check public/app.js
 
+      - name: Unit tests
+        working-directory: portal
+        run: npm test
+
       # Non-blocking: a newly disclosed transitive CVE must not red main on its
       # own schedule. Dependabot opens the fix PR; the weekly cron surfaces it.
       - name: npm audit (report only)
@@ -67,7 +71,8 @@ jobs:
 
       - name: Smoke test image boots
         run: |
-          docker run -d --name portal-ci easywg-portal-ci
+          # ADMIN_PASSWORD is required — the portal refuses to start without it.
+          docker run -d --name portal-ci -e ADMIN_PASSWORD=ci-smoke-test-pw easywg-portal-ci
           sleep 5
           docker logs portal-ci
           docker inspect -f '{{.State.Running}}' portal-ci | grep -q true

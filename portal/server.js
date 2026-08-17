@@ -16,6 +16,12 @@ const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
 const HOST = process.env.PORTAL_HOST || '127.0.0.1';
 
+// State/config roots. Overridable so tests can point them at a temp dir; the
+// defaults are the container bind-mount paths and unchanged in production.
+const DATA_DIR      = process.env.PORTAL_DATA_DIR     || '/data';
+const CADDY_DIR     = process.env.PORTAL_CADDY_DIR    || '/app-caddy';
+const FILEDROP_ROOT = process.env.PORTAL_FILEDROP_DIR || '/filedrop';
+
 const WG_URL       = process.env.WG_EASY_URL   || 'http://127.0.0.1:51821';
 const AG_URL       = process.env.ADGUARD_URL   || 'http://127.0.0.1:3000';
 const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
@@ -32,8 +38,8 @@ const BACKUP_KEEP      = parseInt(process.env.BACKUP_KEEP || '10', 10);
 const DOCKER_SOCK      = '/var/run/docker.sock';
 const SSH_CONFIG_PATH  = '/etc/ssh/sshd_config';
 const UFW_CONF_PATH    = '/etc/ufw/ufw.conf';
-const NOTIF_FILE       = '/data/notifications.json';
-const NOTIF_HIST_FILE  = '/data/notifications-history.json';
+const NOTIF_FILE       = path.join(DATA_DIR, 'notifications.json');
+const NOTIF_HIST_FILE  = path.join(DATA_DIR, 'notifications-history.json');
 const ALERT_DISK_THRESHOLD  = parseInt(process.env.ALERT_DISK_THRESHOLD  || '85',  10);
 const ALERT_CERT_EXPIRY_DAYS = parseInt(process.env.ALERT_CERT_EXPIRY_DAYS || '14', 10);
 const runCmd = promisify(execFile);
@@ -49,11 +55,11 @@ const XRAY_CONFIG_PATH = '/xray-config/config.json';
 
 // ── Phase 2: constants ─────────────────────────────────────────────────────────
 
-const DEVICES_FILE        = '/data/devices.json';
-const DNS_PROFILES_FILE   = '/data/dns-profiles.json';
-const PROXY_SERVICES_FILE = '/data/proxy-services.json';
-const CADDY_SERVICES_FILE = '/app-caddy/easywg-services.caddy';
-const CADDY_FILE          = '/app-caddy/Caddyfile';
+const DEVICES_FILE        = path.join(DATA_DIR, 'devices.json');
+const DNS_PROFILES_FILE   = path.join(DATA_DIR, 'dns-profiles.json');
+const PROXY_SERVICES_FILE = path.join(DATA_DIR, 'proxy-services.json');
+const CADDY_SERVICES_FILE = path.join(CADDY_DIR, 'easywg-services.caddy');
+const CADDY_FILE          = path.join(CADDY_DIR, 'Caddyfile');
 const VPN_DNS_IP          = process.env.WG_DEFAULT_DNS || '10.8.0.1';
 const VPN_SUBNET          = (() => { const p = VPN_DNS_IP.split('.'); p[3] = '0'; return p.join('.') + '/24'; })();
 
@@ -84,8 +90,8 @@ function dnsToPreset(dns) {
   return DNS_PRESETS.find(p => p.value === dns?.trim()) || { id: 'custom', label: dns || '—' };
 }
 
-const DATA_FILE = '/data/client-dns.json';
-const SETTINGS_FILE = '/data/portal-config.json';
+const DATA_FILE = path.join(DATA_DIR, 'client-dns.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'portal-config.json');
 
 const VALID_INTERFACE_MODES = ['user', 'super_user', 'advanced'];
 const DEFAULT_INTERFACE_MODE = 'super_user';
@@ -1610,7 +1616,7 @@ async function createBackupArchive(encrypt = false) {
     }
 
     // Portal data
-    const dataSrc = '/data';
+    const dataSrc = DATA_DIR;
     if (fs.existsSync(dataSrc)) copyDir(dataSrc, path.join(stage, 'portal', 'data'));
 
     await runCmd('tar', ['-czf', archivePath, '-C', stage, '.'], { timeout: 60000 });
@@ -1731,7 +1737,7 @@ app.post('/api/backup/restore', auth, async (req, res) => {
       if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(BACKUP_SRC_DIR, f));
     }
     const portalData = path.join(stage, 'portal', 'data');
-    if (fs.existsSync(portalData)) restoreDir(portalData, '/data');
+    if (fs.existsSync(portalData)) restoreDir(portalData, DATA_DIR);
 
     sendNotification('restore_success', { filename }).catch(() => {});
     res.json({ success: true, manifest, preRestoreFile });
@@ -2528,11 +2534,11 @@ const httpsLib = require('https');
 const dnsLib   = require('dns');
 
 // ── Phase 3: constants ────────────────────────────────────────────────────────
-const MONITORS_FILE      = '/data/monitors.json';
-const MONITOR_HIST_FILE  = '/data/monitor-history.json';
-const APPS_FILE          = '/data/apps.json';
-const FILEDROP_META_FILE = '/data/filedrop-shares.json';
-const FILEDROP_DIR       = '/filedrop/storage';
+const MONITORS_FILE      = path.join(DATA_DIR, 'monitors.json');
+const MONITOR_HIST_FILE  = path.join(DATA_DIR, 'monitor-history.json');
+const APPS_FILE          = path.join(DATA_DIR, 'apps.json');
+const FILEDROP_META_FILE = path.join(DATA_DIR, 'filedrop-shares.json');
+const FILEDROP_DIR       = path.join(FILEDROP_ROOT, 'storage');
 const FILEDROP_MAX_MB    = parseInt(process.env.FILEDROP_MAX_MB   || '500');
 const FILEDROP_TOTAL_GB  = parseInt(process.env.FILEDROP_TOTAL_GB  || '5');
 const FILEDROP_DEFAULT_EXPIRY = 7;
@@ -3428,7 +3434,7 @@ app.post('/api/migration/validate', auth, async (req, res) => {
       services: Object.keys(services).length,
       apps:     Object.keys(apps).length,
     },
-    score: [wg.up, ag.up, caddyUp].filter(Boolean).length,
+    score: [wg.up, ag.up, caddyR.ok].filter(Boolean).length,
     maxScore: 3,
   });
 });
@@ -3536,21 +3542,24 @@ app.post('/api/xray/restart', auth, async (_req, res) => {
   }
 });
 
-// ── Phase 3: Monitor scheduler ────────────────────────────────────────────────
-setInterval(() => {
-  const monitors = loadMonitors();
-  for (const m of Object.values(monitors)) {
-    if (!m.enabled) continue;
-    if (m.nextCheckAt && Date.now() < new Date(m.nextCheckAt).getTime()) continue;
-    runMonitorCheck(m);
-  }
-}, 60_000);
+// ── Start (skipped when the module is require()'d, e.g. by the test suite) ────
+if (require.main === module) {
+  // Monitor scheduler
+  setInterval(() => {
+    const monitors = loadMonitors();
+    for (const m of Object.values(monitors)) {
+      if (!m.enabled) continue;
+      if (m.nextCheckAt && Date.now() < new Date(m.nextCheckAt).getTime()) continue;
+      runMonitorCheck(m);
+    }
+  }, 60_000);
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+  app.listen(PORT, HOST, () => {
+    console.log(`Portal listening on ${HOST}:${PORT}`);
+    // Re-derive xray/config.json from devices.json on boot so per-device UUIDs survive a
+    // bootstrap.sh re-run (configure_xray regenerates config.json with only the global UUID).
+    if (XRAY_ENABLED) syncXrayClients().catch(() => {});
+  });
+}
 
-app.listen(PORT, HOST, () => {
-  console.log(`Portal listening on ${HOST}:${PORT}`);
-  // Re-derive xray/config.json from devices.json on boot so per-device UUIDs survive a
-  // bootstrap.sh re-run (configure_xray regenerates config.json with only the global UUID).
-  if (XRAY_ENABLED) syncXrayClients().catch(() => {});
-});
+module.exports = app;
