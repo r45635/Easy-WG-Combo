@@ -8,16 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ### Security
 - **File Drop `vpn_only` shares are now enforced server-side.** Previously the share mode was cosmetic and any client with the token could download over the public Internet; downloads now require a VPN-subnet (or loopback/SSH-tunnel) source. See the advisory in [SECURITY.md](SECURITY.md).
 - **File Drop passwords are POST-only** — the `?pw=` query form (which leaked into access logs and the Security → Logs panel) is removed.
+- **File Drop password hashing** raised to PBKDF2-SHA256 600k iterations, computed asynchronously (the unauthenticated download path no longer blocks the event loop); legacy hashes still verify. Downloads are served as `application/octet-stream` with `X-Content-Type-Options: nosniff` and an RFC 5987 `Content-Disposition`.
 - **No more `changeme` fallback.** The portal refuses to start without an admin password instead of booting with a known default; `bootstrap.sh` verifies it on re-run and regenerates the wg-easy hash if missing.
 - **Admin portal is local-only by default** (`PUBLIC_HTTPS_ENABLED=no`). Fresh interactive installs are prompted; the Xray branch now honors the flag (it previously opened `:8443` unconditionally).
 - **Interface modes are enforced server-side** on every privileged endpoint, and raising the mode requires the admin password (closes user→advanced self-escalation).
 - **Auth hardening:** app-level login rate limiting (also covers the Basic-auth path), session-id regeneration on login, revocation of other sessions on password change, and a cross-origin (CSRF) gate on state-changing API requests.
+- **Coarse per-IP request rate limiting** (`express-rate-limit`) across all handlers, including the unauthenticated `/files/` download path.
 - **Trustworthy client IP:** `trust proxy` is now `loopback`, so `X-Forwarded-For` is honored only from Caddy / SSH-tunnel peers and can no longer be spoofed.
+- **Monitoring SSRF guard:** monitor targets are validated on create **and** update; literal private/reserved/link-local addresses (incl. cloud metadata) are rejected, and intervals/timeouts are bounded. Built-in monitors may still probe local services.
+- **Reverse-proxy / Caddyfile injection guards:** target URLs, domains and IP allowlists are validated on every path (create, update, app install); the generator refuses control/brace characters, and the Server Endpoint action snapshots and rolls back the Caddyfile if a reload fails.
+- **Restore hardening:** backup archives are validated before extraction (no absolute paths, `..` traversal, or symlink/hardlink/device entries); extraction uses `--no-same-owner --no-overwrite-dir`. `restore.sh` keeps the repo `docker-compose.yml` unless `--use-archive-compose` is given.
+- **Secrets at rest:** `portal-config.json`, `notifications.json`, `.env` and `.env.secrets` are created/kept `0600`.
+- **Security headers:** portal responses add `X-Frame-Options: SAMEORIGIN`, a `Permissions-Policy`, and a `Content-Security-Policy` in **Report-Only** mode (to be enforced in a later release). *(Applied by `bootstrap.sh` / the Server Endpoint action; a plain `easywg update` does not regenerate the Caddyfile.)*
 
 ### Added
 - `easywg passwd` — rotate the admin password across `.env`, the wg-easy hash and the portal in one step.
 - `SESSION_SECRET` is now actually delivered to the portal container; `WG_EASY_PASSWORD` / `ADGUARD_PASSWORD` can be pinned independently of `ADMIN_PASSWORD`.
-- Test suite (`node:test`) covering File Drop enforcement, capability gating, auth, and boot behavior; `npm test` runs in CI.
+- Test suite (`node:test`, 39 tests) covering File Drop enforcement, capability gating, auth, monitor/Caddy/tar guards and boot behavior; `npm test` runs in CI.
+- CI security gates: Gitleaks (secret scan over full history), CodeQL (JavaScript + Actions), Trivy image scan, and a blocking `npm audit --audit-level=high`.
+- `doctor` now checks that AdGuard is reachable through the portal proxy (flags a diverged AdGuard wizard password).
+
+### Changed
+- Portal base image `node:22-bookworm-slim` is now digest-pinned (matches the other images).
 
 ### Fixed
 - `POST /api/migration/validate` no longer 500s (undefined `caddyUp` reference).
