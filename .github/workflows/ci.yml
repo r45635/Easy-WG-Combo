@@ -60,11 +60,15 @@ jobs:
         working-directory: portal
         run: npm test
 
-      # Non-blocking: a newly disclosed transitive CVE must not red main on its
-      # own schedule. Dependabot opens the fix PR; the weekly cron surfaces it.
-      - name: npm audit (report only)
+      # Moderate: report only (a new transitive CVE must not red main on its own
+      # schedule; Dependabot owns the fix). High/critical: blocking.
+      - name: npm audit (moderate, report only)
         working-directory: portal
         run: npm audit --audit-level=moderate || echo "::warning::npm audit found vulnerabilities — check Dependabot PRs"
+
+      - name: npm audit (high/critical, blocking)
+        working-directory: portal
+        run: npm audit --audit-level=high
 
       - name: Build portal image
         run: docker build -t easywg-portal-ci ./portal
@@ -76,3 +80,22 @@ jobs:
           sleep 5
           docker logs portal-ci
           docker inspect -f '{{.State.Running}}' portal-ci | grep -q true
+
+      - name: Trivy image scan (report only)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: easywg-portal-ci
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+          ignore-unfixed: true
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secret scan (tree + history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
