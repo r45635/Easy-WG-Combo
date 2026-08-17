@@ -21,6 +21,13 @@ test('super_user mode: gateway/apps denied, backups allowed', async () => {
   assert.notStrictEqual((await post('/api/backup/create')).status, 403);          // createBackup allowed
 });
 
+test('fail2ban unban-all requires advancedSecurity (403 below advanced)', async () => {
+  h.setInterfaceMode('super_user');
+  assert.strictEqual((await post('/api/fail2ban/unban-all')).status, 403);
+  h.setInterfaceMode('advanced');
+  assert.notStrictEqual((await post('/api/fail2ban/unban-all')).status, 403);
+});
+
 test('mode escalation requires the admin password (no self-escalation)', async () => {
   h.setInterfaceMode('user');
   assert.strictEqual((await post('/api/settings/interface-mode', { interfaceMode: 'advanced' })).status, 401);

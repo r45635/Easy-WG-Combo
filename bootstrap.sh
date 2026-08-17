@@ -1055,6 +1055,8 @@ main() {
       printf '\n'
     fi
     [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
+    # Shared policy: min 12 chars (16+ recommended). Matches the portal + easywg passwd.
+    [ "${#admin_password}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
 
     local password_hash
     log "Generating WireGuard password hash..."
@@ -1088,6 +1090,7 @@ main() {
         read_secret_prompt "ADMIN_PASSWORD missing from .env — set it now: " _kept_pw
         printf '\n'
         [ -n "$_kept_pw" ] || die "ADMIN_PASSWORD is required."
+        [ "${#_kept_pw}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
         set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$_kept_pw"
       else
         die "ADMIN_PASSWORD is missing from .env. Set it and re-run."

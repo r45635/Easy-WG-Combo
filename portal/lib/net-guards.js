@@ -134,7 +134,30 @@ function validateMonitor(m, opts = {}) {
   return null;
 }
 
+// Returns a dns.lookup-compatible function that refuses to resolve to a
+// private/reserved address. Because the socket uses this lookup's result as its
+// actual connect target, the validated address IS the connected address — there
+// is no separate "resolve then reconnect by hostname" step, so DNS-rebinding /
+// TOCTOU cannot slip a reserved IP past the check. Reuses isReservedIp (v4+v6).
+function makeGuardedLookup(dnsLookup) {
+  const lookup = dnsLookup || require('dns').lookup;
+  return function guardedLookup(hostname, options, callback) {
+    if (typeof options === 'function') { callback = options; options = {}; }
+    lookup(hostname, options || {}, (err, address, family) => {
+      if (err) return callback(err);
+      // options.all:true → address is [{address, family}, ...]
+      if (Array.isArray(address)) {
+        const bad = address.find(a => isReservedIp(a.address));
+        if (bad) return callback(new Error(`blocked: ${hostname} resolves to a private/reserved address (${bad.address})`));
+        return callback(null, address);
+      }
+      if (isReservedIp(address)) return callback(new Error(`blocked: ${hostname} resolves to a private/reserved address (${address})`));
+      return callback(null, address, family);
+    });
+  };
+}
+
 module.exports = {
   normalizeIp, trustedClientIp, isLoopback, ipv4ToInt, ipInCidr, isVpnOrLocalClient,
-  isReservedIp, isLiteralIp, splitHostPort, validateMonitor,
+  isReservedIp, isLiteralIp, splitHostPort, validateMonitor, makeGuardedLookup,
 };

@@ -31,6 +31,9 @@ const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD
 const AG_USER      = process.env.ADGUARD_USER      || 'admin';
 const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || '';
 const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || '';
+// Shared admin-password policy: minimum 12 characters (16+ recommended). Kept in
+// sync with bootstrap.sh and `easywg passwd` (see docs/security-model.md).
+const MIN_PASSWORD_LEN = 12;
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
 const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
@@ -1106,7 +1109,7 @@ app.post('/api/fail2ban/ban', auth, requiresAction('advancedSecurity'), async (r
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/fail2ban/unban-all', auth, async (_req, res) => {
+app.post('/api/fail2ban/unban-all', auth, requiresAction('advancedSecurity'), async (_req, res) => {
   try {
     const current = await fail2banStatus();
     await Promise.all(current.ips.map(ip =>
@@ -1251,8 +1254,8 @@ app.post('/api/auth/password', auth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !passwordsMatch(currentPassword, currentPortalPass))
     return res.status(403).json({ error: 'Current password is incorrect.' });
-  if (!newPassword || newPassword.length < 8)
-    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+  if (!newPassword || newPassword.length < MIN_PASSWORD_LEN)
+    return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD_LEN} characters (16+ recommended).` });
   const settings = loadSettings();
   settings.adminPassword = newPassword;
   saveSettings(settings);
@@ -1379,10 +1382,10 @@ function getHostIp() {
 }
 
 // TCP port-open check (used for Caddy whose admin API is disabled).
-function tcpOpen(host, port, timeoutMs = 2500) {
+function tcpOpen(host, port, timeoutMs = 2500, lookup) {
   return new Promise(resolve => {
     const net = require('net');
-    const sock = net.createConnection({ host, port });
+    const sock = net.createConnection({ host, port, lookup });
     const timer = setTimeout(() => { sock.destroy(); resolve(false); }, timeoutMs);
     sock.once('connect', () => { clearTimeout(timer); sock.destroy(); resolve(true); });
     sock.once('error',   () => { clearTimeout(timer); resolve(false); });
@@ -2832,12 +2835,12 @@ function dockerDelete(apiPath) {
 }
 
 // ── Phase 3: Monitor check functions ─────────────────────────────────────────
-async function checkHttp(url, timeoutMs, expectedStatus) {
+async function checkHttp(url, timeoutMs, expectedStatus, lookup) {
   const start = Date.now();
   const lib = url.startsWith('https') ? httpsLib : http;
   return new Promise(resolve => {
     try {
-      const req = lib.get(url, { rejectUnauthorized: false, timeout: timeoutMs }, res => {
+      const req = lib.get(url, { rejectUnauthorized: false, timeout: timeoutMs, lookup }, res => {
         res.resume();
         resolve({ ok: res.statusCode === expectedStatus, statusCode: res.statusCode, ms: Date.now() - start });
       });
@@ -2846,9 +2849,9 @@ async function checkHttp(url, timeoutMs, expectedStatus) {
     } catch (e) { resolve({ ok: false, error: e.message, ms: Date.now() - start }); }
   });
 }
-async function checkTcp(host, port, timeoutMs) {
+async function checkTcp(host, port, timeoutMs, lookup) {
   const start = Date.now();
-  const ok = await tcpOpen(host, port, timeoutMs);
+  const ok = await tcpOpen(host, port, timeoutMs, lookup);
   return { ok, ms: Date.now() - start };
 }
 async function checkDnsResolve(target, resolver) {
@@ -2869,11 +2872,11 @@ async function checkDockerContainer(name) {
     return { ok: data?.State?.Running === true };
   } catch (e) { return { ok: false, error: e.message }; }
 }
-async function checkTlsDaysLeft(host, port) {
+async function checkTlsDaysLeft(host, port, lookup) {
   return new Promise(resolve => {
     const tls = require('tls');
     const isIp = /^[\d.:]+$/.test(host);
-    const opts = { host, port, rejectUnauthorized: false };
+    const opts = { host, port, rejectUnauthorized: false, lookup };
     if (!isIp) opts.servername = host;
     const sock = tls.connect(opts, () => {
       try {
@@ -2888,22 +2891,28 @@ async function checkTlsDaysLeft(host, port) {
   });
 }
 
+// SSRF-guarded DNS lookup for user-supplied monitor targets. Built-in monitors
+// (isBuiltin) legitimately probe local services and use the default resolver.
+const guardedLookup = netGuards.makeGuardedLookup();
+function monitorLookup(monitor) { return monitor && monitor.builtin ? undefined : guardedLookup; }
+
 async function runMonitorCheck(monitor) {
   let result = { ok: false, error: 'unknown type', ms: 0 };
   try {
     const to = (monitor.timeoutSeconds || 5) * 1000;
+    const lookup = monitorLookup(monitor);
     if (monitor.type === 'http' || monitor.type === 'https') {
-      result = await checkHttp(monitor.target, to, monitor.expectedStatus || 200);
+      result = await checkHttp(monitor.target, to, monitor.expectedStatus || 200, lookup);
     } else if (monitor.type === 'tcp') {
       const [h, p] = (monitor.target || '').split(':');
-      result = await checkTcp(h, parseInt(p || '80'), to);
+      result = await checkTcp(h, parseInt(p || '80'), to, lookup);
     } else if (monitor.type === 'dns') {
       result = await checkDnsResolve(monitor.target, monitor.resolver || VPN_DNS_IP);
     } else if (monitor.type === 'docker' || monitor.type === 'wireguard') {
       result = await checkDockerContainer(monitor.target);
     } else if (monitor.type === 'tls') {
       const [h, p] = (monitor.target || '').split(':');
-      const r = await checkTlsDaysLeft(h, parseInt(p || '443'));
+      const r = await checkTlsDaysLeft(h, parseInt(p || '443'), lookup);
       const minDays = monitor.minDaysLeft || ALERT_CERT_EXPIRY_DAYS;
       result = { ...r, ok: typeof r.daysLeft === 'number' && r.daysLeft >= minDays };
     }
@@ -3752,6 +3761,7 @@ app._internals = {
   generateMainCaddyfile, generateCaddyServices, normalizeTargetUrl,
   isValidTargetUrl, isValidDomain, isValidIpOrCidr,
   hashFilePassword, verifyFilePassword, FILEDROP_PBKDF2_ITER,
+  checkHttp, checkTcp, checkTlsDaysLeft, monitorLookup, guardedLookup,
 };
 
 module.exports = app;
