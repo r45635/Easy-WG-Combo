@@ -403,9 +403,12 @@ function isValidIp(value) {
 }
 
 function isValidIpOrCidr(value) {
-  const raw = String(value || '').trim();
+  if (typeof value !== 'string' || /[\s{}]/.test(value)) return false;
+  const raw = value.trim();
   const ipv4 = /^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)(\/([0-9]|[12]\d|3[0-2]))?$/;
-  const ipv6 = /^[0-9a-fA-F:]+(?:\/\d+)?$/;
+  // Bounded prefix; hex groups only (still permissive on grouping, but free of
+  // the control/brace characters that could break out into the Caddyfile).
+  const ipv6 = /^[0-9a-fA-F:]{2,39}(?:\/(?:12[0-8]|1[01]\d|\d{1,2}))?$/;
   return ipv4.test(raw) || ipv6.test(raw);
 }
 
@@ -748,6 +751,8 @@ app.post('/api/settings/server-endpoint', auth, requiresAction('advancedSecurity
 
   const effective = tlsEmail || readEnvValue('TLS_EMAIL');
   const caddyContent = generateMainCaddyfile(host, effective, domainPointsHere);
+  // Snapshot for rollback: a bad host/email must not leave a broken Caddyfile live.
+  const prevCaddy = fs.existsSync(CADDY_FILE) ? fs.readFileSync(CADDY_FILE, 'utf8') : null;
   fs.writeFileSync(CADDY_FILE, caddyContent);
 
   // When switching to a public cert while Xray owns :443, Caddy validates via HTTP-01 on
@@ -762,7 +767,11 @@ app.post('/api/settings/server-endpoint', auth, requiresAction('advancedSecurity
       : ' ⚠ Could not open port 80 automatically — run “ufw allow 80/tcp” on the host, or the certificate will stay self-signed.';
   }
 
-  await reloadCaddy();
+  const reload = await reloadCaddy();
+  if (!reload.ok) {
+    if (prevCaddy !== null) { fs.writeFileSync(CADDY_FILE, prevCaddy); await reloadCaddy(); }
+    return res.status(500).json({ error: `Caddy reload failed: ${reload.error || 'unknown error'}. Reverted to the previous configuration.` });
+  }
 
   res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${dnsWarn}${portMsg} Portal restarting…` });
   setTimeout(() => dockerPost('/containers/portal/restart', null).catch(() => {}), 500);
@@ -2151,9 +2160,18 @@ function isValidDomain(str) {
   if (typeof str !== 'string' || str.length > 253) return false;
   return /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(str);
 }
+// Returns the normalized href for a valid http(s) target, else null. The WHATWG
+// URL parser silently strips ASCII whitespace, so a raw string like
+// "http://x\nrespond" parses clean but, stored verbatim, injects Caddyfile
+// directives. Reject control/brace characters up front and return u.href so
+// callers persist the normalized value, not the raw input.
+function normalizeTargetUrl(str) {
+  if (typeof str !== 'string' || /[\s{}]/.test(str)) return null;
+  try { const u = new URL(str); return ['http:', 'https:'].includes(u.protocol) ? u.href : null; }
+  catch { return null; }
+}
 function isValidTargetUrl(str) {
-  try { const u = new URL(str); return ['http:', 'https:'].includes(u.protocol); }
-  catch { return false; }
+  return normalizeTargetUrl(str) !== null;
 }
 function isValidCustomAllowedIps(ips) {
   return Array.isArray(ips) && ips.length > 0 && ips.every(ip => isValidIpOrCidr(ip));
@@ -2164,20 +2182,30 @@ function isValidCustomAllowedIps(ips) {
 function generateCaddyServices(services) {
   const enabled = Object.values(services).filter(s => s.enabled !== false);
   if (!enabled.length) return '# No easywg-managed proxy services\n';
+  // Belt-and-braces: never emit a control/brace character from a stored field
+  // into the Caddyfile. Validation on write should already prevent this; this
+  // makes generation fail loudly rather than produce an injected config.
+  const safe = (v) => {
+    const s = String(v ?? '');
+    if (/[\r\n{}]/.test(s)) throw new Error(`Unsafe character in proxy service field: ${JSON.stringify(s)}`);
+    return s;
+  };
   return enabled.map(svc => {
-    const lines = [`# easywg-managed: ${svc.id}`];
-    const site = svc.exposure === 'vpn_only' ? `http://${svc.domain}` : svc.domain;
+    const domain = safe(svc.domain);
+    const target = safe(svc.target);
+    const lines = [`# easywg-managed: ${safe(svc.id)}`];
+    const site = svc.exposure === 'vpn_only' ? `http://${domain}` : domain;
     lines.push(`${site} {`);
     if (svc.exposure === 'vpn_only') lines.push(`  bind ${VPN_DNS_IP}`);
     if (svc.basicAuth && svc.basicAuthUser && svc.basicAuthPasswordHash) {
-      lines.push('  basicauth {', `    ${svc.basicAuthUser} ${svc.basicAuthPasswordHash}`, '  }');
+      lines.push('  basicauth {', `    ${safe(svc.basicAuthUser)} ${safe(svc.basicAuthPasswordHash)}`, '  }');
     }
     if (svc.ipAllowlist?.length) {
-      lines.push('  @allowed {', ...svc.ipAllowlist.map(ip => `    remote_ip ${ip}`), '  }');
-      lines.push('  handle @allowed {', `    reverse_proxy ${svc.target}`, '  }');
+      lines.push('  @allowed {', ...svc.ipAllowlist.map(ip => `    remote_ip ${safe(ip)}`), '  }');
+      lines.push('  handle @allowed {', `    reverse_proxy ${target}`, '  }');
       lines.push('  respond 403');
     } else {
-      lines.push(`  reverse_proxy ${svc.target}`);
+      lines.push(`  reverse_proxy ${target}`);
     }
     lines.push('  header {', '    X-Content-Type-Options "nosniff"', '    Referrer-Policy "same-origin"', '  }');
     lines.push('}');
@@ -2527,7 +2555,8 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
   const { name, domain, target, exposure = 'vpn_only', ipAllowlist = [], notes = '', confirmed = false } = req.body;
   if (!name || !domain || !target) return res.status(400).json({ error: 'name, domain, and target are required' });
   if (!isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
-  if (!isValidTargetUrl(target)) return res.status(400).json({ error: 'target must be a valid http:// or https:// URL' });
+  const normTarget = normalizeTargetUrl(target);
+  if (!normTarget) return res.status(400).json({ error: 'target must be a valid http:// or https:// URL' });
   if (!['vpn_only', 'public'].includes(exposure)) return res.status(400).json({ error: 'exposure must be vpn_only or public' });
   if (exposure === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed: true' });
   if (ipAllowlist.length && !ipAllowlist.every(ip => isValidIpOrCidr(ip))) return res.status(400).json({ error: 'Invalid IP in ipAllowlist' });
@@ -2537,7 +2566,7 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
       return res.status(409).json({ error: 'Domain already registered' });
     const id = `svc_${Date.now()}`;
     const service = {
-      id, name, domain, target, exposure, tls: exposure !== 'vpn_only',
+      id, name, domain, target: normTarget, exposure, tls: exposure !== 'vpn_only',
       basicAuth: false, basicAuthUser: '', basicAuthPasswordHash: '',
       ipAllowlist, enabled: true, notes, createdAt: new Date().toISOString(),
     };
@@ -2557,6 +2586,11 @@ app.patch('/api/proxy/services/:id', auth, requiresAction('publicGateway'), asyn
     const services = loadProxyServices();
     const svc      = services[req.params.id];
     if (!svc) return res.status(404).json({ error: 'Service not found' });
+    if (req.body.ipAllowlist !== undefined) {
+      if (!Array.isArray(req.body.ipAllowlist) || !req.body.ipAllowlist.every(ip => isValidIpOrCidr(ip))) {
+        return res.status(400).json({ error: 'Invalid IP in ipAllowlist' });
+      }
+    }
     for (const key of ['name', 'notes', 'ipAllowlist']) {
       if (req.body[key] !== undefined) svc[key] = req.body[key];
     }
@@ -3099,6 +3133,9 @@ app.post('/api/apps/:id/install', auth, requiresAction('appsLifecycle'), async (
   const { exposure, domain, confirmed } = req.body;
   const mode = exposure === 'public' ? 'public' : 'vpn_only';
   if (mode === 'public' && !confirmed) return res.status(400).json({ error: 'Public exposure requires confirmed:true' });
+  // domain is written into the generated Caddyfile — validate it (this path
+  // previously bypassed validation entirely).
+  if (domain && !isValidDomain(domain)) return res.status(400).json({ error: 'Invalid domain' });
 
   const containerName = `easywg-${catalogEntry.id}`;
   try {
@@ -3661,5 +3698,11 @@ if (require.main === module) {
     if (XRAY_ENABLED) syncXrayClients().catch(() => {});
   });
 }
+
+// Exposed for unit tests (pure generators/validators).
+app._internals = {
+  generateMainCaddyfile, generateCaddyServices, normalizeTargetUrl,
+  isValidTargetUrl, isValidDomain, isValidIpOrCidr,
+};
 
 module.exports = app;
