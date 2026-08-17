@@ -11,6 +11,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
+const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
 const archiveGuards = require('./lib/archive-guards');
 
@@ -471,6 +472,15 @@ app.use((req, res, next) => {
   if (originHost !== req.headers.host) return res.status(403).json({ error: 'Cross-origin request rejected' });
   next();
 });
+
+// Coarse per-IP request limiting (defense-in-depth). The portal is single-admin,
+// but this bounds brute-force/abuse across every handler and, importantly, the
+// unauthenticated /files/ download path. The failure-counting login limiter
+// (below) is the stricter, credential-specific layer on top.
+const rlOpts = { windowMs: 60_000, standardHeaders: 'draft-7', legacyHeaders: false,
+  message: { error: 'Too many requests. Slow down.' } };
+app.use('/files/', rateLimit({ ...rlOpts, limit: 120 }));
+app.use('/api/',   rateLimit({ ...rlOpts, limit: 600 }));
 
 // Constant-time password comparison (hash both sides to equalize length).
 function passwordsMatch(a, b) {
