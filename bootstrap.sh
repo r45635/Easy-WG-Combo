@@ -843,6 +843,9 @@ ensure_env_files() {
   if [ ! -f "$SECRETS_FILE" ]; then
     cp "$SCRIPT_DIR/.env.secrets.example" "$SECRETS_FILE"
   fi
+
+  # These hold the admin password and secrets — keep them owner-only.
+  chmod 600 "$ENV_FILE" "$SECRETS_FILE" 2>/dev/null || true
 }
 
 generate_password_hash() {

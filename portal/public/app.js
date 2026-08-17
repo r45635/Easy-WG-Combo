@@ -1959,12 +1959,7 @@ function closeHelpModal() {
   document.getElementById('help-overlay').classList.add('hidden');
 }
 
-function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
+// (single esc() defined below — escapes & < > " ' — used for all interpolation)
 
 function fmtNum(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

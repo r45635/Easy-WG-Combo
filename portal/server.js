@@ -150,7 +150,8 @@ function loadSettings() {
 }
 
 function saveSettings(data) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(SETTINGS_FILE, 0o600); } catch { /* self-heal pre-existing 0644 files */ }
 }
 
 function updateHostEnvValue(key, value) {
@@ -1900,7 +1901,8 @@ function loadNotifConfig() {
 }
 
 function saveNotifConfig(cfg) {
-  fs.writeFileSync(NOTIF_FILE, JSON.stringify(cfg, null, 2));
+  fs.writeFileSync(NOTIF_FILE, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+  try { fs.chmodSync(NOTIF_FILE, 0o600); } catch { /* self-heal pre-existing 0644 files */ }
 }
 
 function maskSecrets(cfg) {
