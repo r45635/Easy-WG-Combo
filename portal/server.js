@@ -11,6 +11,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
+const netGuards = require('./lib/net-guards');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -371,13 +372,12 @@ function isValidIpOrCidr(value) {
 
 const sessionRegistry = new Map(); // sessionId → {ip, ua, loginAt, lastSeen}
 
+// Delegates to the trust-proxy-aware helper. The old hand-rolled version
+// trusted client-supplied X-Real-IP / X-Forwarded-For before the socket, which
+// let any request spoof its source address. With trust proxy = 'loopback',
+// XFF is only honored from a loopback peer (Caddy / SSH tunnel).
 function clientIp(req) {
-  return (
-    req.headers['x-real-ip'] ||
-    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.socket.remoteAddress ||
-    'unknown'
-  ).replace(/^::ffff:/, '');
+  return netGuards.trustedClientIp(req) || 'unknown';
 }
 
 async function fail2banStatus() {
@@ -394,7 +394,10 @@ app.use((req, _res, next) => { req.body ??= {}; next(); });
 app.use(express.static(path.join(__dirname, 'public')));
 // Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
 // SSH-tunnel access stays plain HTTP and must still receive the cookie.
-app.set('trust proxy', 1);
+// 'loopback' (not 1): trust X-Forwarded-* only when the socket peer is
+// loopback — i.e. Caddy (reverse-proxies from 127.0.0.1) or an SSH tunnel.
+// A remote client can no longer forge XFF to spoof its source IP.
+app.set('trust proxy', 'loopback');
 app.use(session({
   name:              'portal.sid',
   // Random per-boot secret when SESSION_SECRET is unset: sessions do not
@@ -3308,9 +3311,16 @@ function serveFiledrop(req, res) {
   if (share.maxDownloads && share.downloads >= share.maxDownloads) {
     return res.status(410).json({ error: 'Download limit reached' });
   }
-  // Password check
+  // VPN-only shares: enforce source membership in the VPN subnet (or loopback =
+  // SSH-tunnel admin) server-side. The token alone must not let a public client
+  // download. Legacy shares without a `mode` are treated as public.
+  if (share.mode === 'vpn_only' && !netGuards.isVpnOrLocalClient(req, VPN_SUBNET)) {
+    return res.status(403).json({ error: 'This file is only available over the VPN.' });
+  }
+  // Password check — POST body only. Query strings land in access logs, browser
+  // history, referrers and were echoed into the Security → Logs panel.
   if (share.passwordProtected) {
-    const pw = (req.method === 'POST' ? req.body?.password : null) || req.query.pw || '';
+    const pw = (req.method === 'POST' ? req.body?.password : null) || '';
     if (!pw) return res.status(401).json({ error: 'Password required', passwordRequired: true });
     if (!verifyFilePassword(pw, share.passwordHash)) return res.status(401).json({ error: 'Wrong password' });
   }
