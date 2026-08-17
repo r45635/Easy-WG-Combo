@@ -1038,6 +1038,29 @@ main() {
     if [ -n "$wg_port" ]; then
       set_env_value "$ENV_FILE" "WG_PORT" "$wg_port"
     fi
+    # Fail closed on re-run too: the portal now refuses to boot without a
+    # password, so a 'keep' run over an .env that lost ADMIN_PASSWORD must fix it.
+    local _kept_pw
+    _kept_pw="$(sed -n 's/^ADMIN_PASSWORD=//p' "$ENV_FILE" 2>/dev/null | head -n 1)"
+    if [ -z "$_kept_pw" ]; then
+      if has_tty; then
+        read_secret_prompt "ADMIN_PASSWORD missing from .env — set it now: " _kept_pw
+        printf '\n'
+        [ -n "$_kept_pw" ] || die "ADMIN_PASSWORD is required."
+        set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$_kept_pw"
+      else
+        die "ADMIN_PASSWORD is missing from .env. Set it and re-run."
+      fi
+    fi
+    # Ensure wg-easy's PASSWORD_HASH secret exists; regenerate from the password
+    # if the secrets file lost it (otherwise wg-easy boots with auth disabled).
+    if ! grep -q '^export PASSWORD_HASH=' "$SECRETS_FILE" 2>/dev/null; then
+      local _kept_hash
+      log "PASSWORD_HASH missing — regenerating from ADMIN_PASSWORD..."
+      _kept_hash="$(generate_password_hash "$_kept_pw")"
+      [ -n "$_kept_hash" ] || die "Failed to generate PASSWORD_HASH."
+      set_password_hash_secret "$SECRETS_FILE" "$_kept_hash"
+    fi
   fi
 
   log "Saving server name..."

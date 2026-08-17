@@ -25,10 +25,10 @@ const FILEDROP_ROOT = process.env.PORTAL_FILEDROP_DIR || '/filedrop';
 
 const WG_URL       = process.env.WG_EASY_URL   || 'http://127.0.0.1:51821';
 const AG_URL       = process.env.ADGUARD_URL   || 'http://127.0.0.1:3000';
-const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
+const WG_PASSWORD  = process.env.WG_EASY_PASSWORD  || process.env.ADMIN_PASSWORD || '';
 const AG_USER      = process.env.ADGUARD_USER      || 'admin';
-const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || 'changeme';
-const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || 'changeme';
+const AG_PASSWORD  = process.env.ADGUARD_PASSWORD  || process.env.ADMIN_PASSWORD || '';
+const PORTAL_PASS  = process.env.ADMIN_PASSWORD    || '';
 const DEFAULT_SERVER_NAME = process.env.SERVER_NAME || os.hostname();
 const FAIL2BAN_JAIL    = process.env.FAIL2BAN_JAIL    || 'easy-wg-portal';
 const ACCESS_LOG_PATH  = process.env.ACCESS_LOG_PATH  || '/var/log/easy-wg-portal/access.log';
@@ -253,6 +253,19 @@ function openHttpChallengePort() {
 }
 
 let currentPortalPass = loadSettings().adminPassword || PORTAL_PASS;
+
+// Fail closed: never serve with a missing or well-known default credential.
+// Empty ADMIN_PASSWORD used to fall back to 'changeme', so a bare
+// `docker compose up` (or an empty .env) booted a publicly reachable admin
+// portal with a known password. Refuse to start instead.
+if (!currentPortalPass || currentPortalPass === 'changeme') {
+  console.error(
+    'FATAL: no admin password set. The portal will not start.\n' +
+    '       Set ADMIN_PASSWORD in .env (min 16 chars recommended) and use\n' +
+    '       ./compose.sh, or run ./install.sh / ./bootstrap.sh which set it for you.'
+  );
+  process.exit(1);
+}
 
 function getServerName() {
   return loadSettings().serverName || sanitizeServerName(DEFAULT_SERVER_NAME);
