@@ -226,7 +226,7 @@ Run `./easywg help` for the full command list.
 ## Security Notes
 
 - The portal is a **root-equivalent** local admin component (it controls Docker, the firewall and certificates). Treat access to it accordingly — compromise of the portal is compromise of the host.
-- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, use a strong password (≥16), keep Fail2Ban enabled, and prefer restricting by IP.
+- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, keep Fail2Ban enabled and prefer restricting by IP. Admin passwords must be at least 12 characters (16+ recommended).
 - Rotate the admin password with `./easywg passwd` — it updates the portal, the wg-easy hash and `.env` together (the in-portal password change only affects the portal login).
 - See [SECURITY.md](SECURITY.md) for the accepted-risk model.
 - The Docker socket, even read-only, is sensitive. The Apps module requires a writable socket.
