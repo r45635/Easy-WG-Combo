@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ## [Unreleased] — security hardening
 
 ### Security
+- **SSRF IP classification is now semantic**, not textual: IPv4-mapped IPv6 in **both** dotted (`::ffff:127.0.0.1`) and hexadecimal (`::ffff:7f00:1`) notation is correctly blocked, along with a fuller reserved-range set; only globally routable unicast is allowed for user monitors. Malformed IPv6 fails closed.
+- **`easywg passwd` preserves an independent wg-easy credential:** it only regenerates wg-easy's `PASSWORD_HASH` when `WG_EASY_PASSWORD` follows the admin password. An intentionally independent `WG_EASY_PASSWORD` is no longer desynced by a rotation.
+- **The admin password is no longer printed** in the installer's final summary (prevents it leaking into terminal / cloud-init / provisioning logs).
+- **Passwords may not contain `$`** (Docker Compose interprets it in `.env`, which would desync the portal from the wg-easy hash). Rejected with a clear error at the installer, `easywg passwd` and the portal — never silently altered.
+- **SSH-tunnel instructions include `-p <SSH_PORT>`** when a non-default SSH port is configured (installer summary + docs).
 - **Monitoring SSRF — connect-time DNS guard.** Monitor targets are now resolved through a guarded DNS lookup: a hostname that resolves (or rebinds) to a private/reserved/link-local address — including cloud metadata `169.254.169.254`, loopback, RFC1918, CGNAT and IPv6 ULA/link-local — is refused at connect time, not merely when given as a literal IP. The socket connects to the exact address that was validated. Built-in local probes are unaffected.
 - **`POST /api/fail2ban/unban-all`** now requires Advanced mode (it lifts every ban), matching its ban/unban/ignoreip/set-config siblings.
 - **Unified password policy:** minimum **12 characters** (16+ recommended), enforced consistently by the installer, the portal UI/API and `easywg passwd`.

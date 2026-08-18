@@ -23,6 +23,7 @@ The portal, wg-easy and AdGuard Home bind to localhost only. Access requires an 
 
 ```bash
 ssh -i ~/.ssh/your_key -L 19080:localhost:8080 -N root@YOUR_VPS_IP
+# If you changed the SSH port (SSH_PORT), add -p <port>, e.g. ssh -p 2222 -L 19080:localhost:8080 -N root@YOUR_VPS_IP
 ```
 
 No admin port is reachable from the internet. An attacker would need SSH access first.
@@ -37,7 +38,7 @@ This is convenient for remote access without an SSH client, but it increases the
 - Brute-force is limited but possible
 
 **If you use public HTTPS:**
-- Use a strong, unique password (20+ characters)
+- Use a strong, unique password (minimum 12 characters, 16+ recommended for public exposure)
 - Keep Fail2Ban active (enabled by default)
 - Consider restricting by IP in Caddy if your IP is stable
 - Use a real domain with ACME certificates rather than `WG_HOST` fallback
