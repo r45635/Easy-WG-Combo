@@ -86,9 +86,11 @@ export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword'
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh | bash
 ```
 
-The installer sets up Docker, UFW, Caddy, Fail2Ban, configures HTTPS, and starts all containers.
+The installer sets up Docker, UFW, Caddy and Fail2Ban and starts all containers. The admin portal is **local-only by default** (reached via SSH tunnel); public HTTPS is opt-in.
 
-→ [Full setup guide](docs/setup.md) — sizing, options, manual install, environment variables
+**Two ways in:**
+- 🚀 **I just want my own VPN** → the **[beginner guide](docs/setup.md)** takes you from an empty VPS to a working VPN in ~15 minutes (no Linux knowledge needed).
+- 🔧 **I want to understand/control everything** → **[advanced install & reference](docs/advanced-install.md)** (options, env vars, manual install) + [security model](docs/security-model.md), [gateway](docs/gateway.md), [Xray](docs/xray.md), [monitoring](docs/monitoring.md).
 
 ### Updating
 
@@ -114,6 +116,7 @@ The portal, wg-easy and AdGuard Home are bound to localhost and reachable only t
 ```bash
 ssh -i ~/.ssh/your_key -L 19080:localhost:8080 -N root@YOUR_VPS_IP
 # Then open: http://localhost:19080
+# If you changed the SSH port, add -p <port>:  ssh -p 2222 -L 19080:localhost:8080 -N root@YOUR_VPS_IP
 ```
 
 ### Public HTTPS mode
@@ -242,7 +245,8 @@ Run `./easywg help` for the full command list.
 
 | Document | Contents |
 |---|---|
-| [Setup guide](docs/setup.md) | Bootstrap options, manual install, env variables, Fail2Ban, firewall |
+| [Beginner guide](docs/setup.md) | Zero-to-VPN walkthrough — VPS → SSH → install → portal → phone → verify |
+| [Advanced install & reference](docs/advanced-install.md) | Install options, manual install, env variables, exposure, Fail2Ban, firewall, architecture |
 | [Client apps](docs/clients.md) | WireGuard and VLESS+Reality apps for Android, iOS, macOS, Windows, Linux |
 | [Interface modes](docs/interface-modes.md) | User / Super User / Advanced breakdown |
 | [Feature status](docs/feature-status.md) | Detailed status for all features |

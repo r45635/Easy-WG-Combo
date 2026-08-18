@@ -51,6 +51,14 @@ test('password change enforces the 12-char minimum policy', async () => {
   assert.match((await res.json()).error, /at least 12/);
 });
 
+test('password change rejects a "$" (Docker Compose env unsafe)', async () => {
+  const res = await h.api('/api/auth/password', {
+    method: 'POST', body: { currentPassword: h.ADMIN_PASSWORD, newPassword: 'has$dollarsign' },
+  });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /\$/);
+});
+
 // LAST: rotates the admin password, which invalidates Basic-auth for later tests.
 test('password change revokes other sessions', async () => {
   const cookieA = sidFrom(await login(h.ADMIN_PASSWORD));

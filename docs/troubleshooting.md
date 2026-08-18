@@ -24,6 +24,7 @@ If the container is running but the API returns errors, check the portal logs fo
 **SSH tunnel:** If you are using local-only mode, make sure your SSH tunnel is open:
 ```bash
 ssh -i ~/.ssh/your_key -L 19080:localhost:8080 -N root@YOUR_VPS_IP
+# Non-default SSH port? add -p <port>, e.g. ssh -p 2222 -L 19080:localhost:8080 -N root@YOUR_VPS_IP
 ```
 
 ---

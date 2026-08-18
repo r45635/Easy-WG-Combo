@@ -138,6 +138,7 @@ case "${1:-}" in
     [ "$new_pw" = "$confirm_pw" ] || { echo "Error: passwords do not match." >&2; exit 1; }
     [ "${#new_pw}" -ge 12 ] || { echo "Error: password must be at least 12 characters (16+ recommended)." >&2; exit 1; }
     [ "${#new_pw}" -ge 16 ] || echo "Warning: 16+ characters is recommended for a public admin portal."
+    case "$new_pw" in *'$'*) echo "Error: password must not contain '\$' (unsupported by Docker Compose env parsing). Use another character." >&2; exit 1 ;; esac
 
     # 0) Pin ADGUARD_PASSWORD to its current effective value BEFORE rotating, so the
     #    portal's AdGuard proxy keeps working. AdGuard's own credential is set in its
@@ -155,14 +156,21 @@ case "${1:-}" in
     tmp="$(mktemp)"; grep -vE '^ADMIN_PASSWORD=' "$ENV_FILE" > "$tmp" || true
     printf 'ADMIN_PASSWORD=%s\n' "$new_pw" >> "$tmp"; mv "$tmp" "$ENV_FILE"
 
-    # 2) wg-easy PASSWORD_HASH in .env.secrets, using the image pinned in compose.
-    wg_img="$(awk '/image: *ghcr.io\/wg-easy\/wg-easy/{print $2; exit}' "$SCRIPT_DIR/docker-compose.yml")"
-    echo "Regenerating wg-easy password hash..."
-    new_hash="$(docker run --rm "$wg_img" wgpw "$new_pw" | sed -n "s/^PASSWORD_HASH='\(.*\)'\$/\1/p")"
-    [ -n "$new_hash" ] || { echo "Error: failed to generate PASSWORD_HASH." >&2; exit 1; }
-    touch "$SECRETS_FILE"
-    tmp="$(mktemp)"; grep -vE '^(export[[:space:]]+)?PASSWORD_HASH=' "$SECRETS_FILE" > "$tmp" || true
-    printf "export PASSWORD_HASH='%s'\n" "$new_hash" >> "$tmp"; mv "$tmp" "$SECRETS_FILE"
+    # 2) wg-easy PASSWORD_HASH — ONLY when wg-easy follows the admin password.
+    #    If WG_EASY_PASSWORD is set independently in .env, wg-easy has its own
+    #    credential (and a matching hash); regenerating the hash from the new admin
+    #    password would desync it from the portal (which still sends WG_EASY_PASSWORD).
+    if grep -q '^WG_EASY_PASSWORD=' "$ENV_FILE"; then
+      echo "WG_EASY_PASSWORD is set independently — leaving wg-easy's PASSWORD_HASH unchanged."
+    else
+      wg_img="$(awk '/image: *ghcr.io\/wg-easy\/wg-easy/{print $2; exit}' "$SCRIPT_DIR/docker-compose.yml")"
+      echo "Regenerating wg-easy password hash..."
+      new_hash="$(docker run --rm "$wg_img" wgpw "$new_pw" | sed -n "s/^PASSWORD_HASH='\(.*\)'\$/\1/p")"
+      [ -n "$new_hash" ] || { echo "Error: failed to generate PASSWORD_HASH." >&2; exit 1; }
+      touch "$SECRETS_FILE"
+      tmp="$(mktemp)"; grep -vE '^(export[[:space:]]+)?PASSWORD_HASH=' "$SECRETS_FILE" > "$tmp" || true
+      printf "export PASSWORD_HASH='%s'\n" "$new_hash" >> "$tmp"; mv "$tmp" "$SECRETS_FILE"
+    fi
 
     # 3) Apply to running containers, then drop the portal-config.json override so
     #    the new ADMIN_PASSWORD env is authoritative, then restart the portal.
@@ -172,7 +180,7 @@ case "${1:-}" in
       "$SCRIPT_DIR/compose.sh" restart portal
     fi
 
-    echo "Admin password rotated for the portal and wg-easy."
+    echo "Portal admin password rotated (wg-easy hash updated unless WG_EASY_PASSWORD is independent)."
     echo "NOTE: AdGuard Home keeps its own independent credential (ADGUARD_PASSWORD in .env,"
     echo "      pinned above). It is unaffected by this rotation. To change AdGuard's own"
     echo "      login, update it in the AdGuard web wizard and set ADGUARD_PASSWORD to match."

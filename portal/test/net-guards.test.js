@@ -42,10 +42,30 @@ test('isVpnOrLocalClient', () => {
   assert.ok(!g.isVpnOrLocalClient({ ip: '203.0.113.9' }, vpn));
 });
 
-test('isReservedIp blocks loopback/private/link-local/CGNAT', () => {
-  ['127.0.0.1', '10.0.0.5', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '::1', 'fe80::1', 'fd00::1']
-    .forEach(ip => assert.ok(g.isReservedIp(ip), `${ip} should be reserved`));
-  ['8.8.8.8', '1.1.1.1', '203.0.113.9'].forEach(ip => assert.ok(!g.isReservedIp(ip), `${ip} should be public`));
+test('isReservedIp — reserved IPv4 (dotted), IPv6, and IPv4-mapped both notations', () => {
+  const reserved = [
+    // dotted IPv4
+    '127.0.0.1', '10.0.0.5', '172.16.5.5', '192.168.1.1', '169.254.169.254', '100.64.0.1',
+    // IPv6 loopback / unspecified / link-local / ULA
+    '::1', '::', 'fe80::1', 'fc00::1', 'fd12::1',
+    // IPv4-mapped IPv6 — DOTTED
+    '::ffff:127.0.0.1', '::ffff:169.254.169.254', '::ffff:10.0.0.5',
+    // IPv4-mapped IPv6 — HEXADECIMAL (the bypass that must now be blocked)
+    '::ffff:7f00:1', '::ffff:a9fe:a9fe', '::ffff:0a00:0005',
+    // bracketed
+    '[::1]', '[::ffff:7f00:1]',
+  ];
+  reserved.forEach(ip => assert.ok(g.isReservedIp(ip), `${ip} should be reserved`));
+});
+
+test('isReservedIp — allows globally routable public unicast', () => {
+  ['8.8.8.8', '1.1.1.1', '93.184.216.34', '2606:4700:4700::1111', '2001:4860:4860::8888']
+    .forEach(ip => assert.ok(!g.isReservedIp(ip), `${ip} should be public`));
+});
+
+test('isReservedIp — malformed IPv6 fails closed; hostnames pass to connect-time', () => {
+  [':::1', '::ffff:zzzz', '1::2::3', '12345::1', 'gg::1'].forEach(ip => assert.ok(g.isReservedIp(ip), `${ip} malformed → reserved`));
+  ['attacker.example', 'sub.domain.tld'].forEach(h => assert.ok(!g.isReservedIp(h), `${h} hostname → not literal-reserved`));
 });
 
 test('validateMonitor: SSRF, bounds, builtin bypass', () => {
