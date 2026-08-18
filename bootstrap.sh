@@ -189,15 +189,16 @@ print_final_summary() {
   log "Mode: ${action_label}"
   log "Server name: ${server_name}"
   log "WireGuard endpoint: ${wg_host}:${wg_port}/udp"
+  local sshp=""; [ "$ssh_port" != "22" ] && sshp="-p ${ssh_port} "
   if [ "$local_only" = "yes" ]; then
     log "Admin portal: local-only (not exposed to the Internet)"
-    log "  → Run on your machine:  ssh -L ${local_port}:localhost:${local_port} ${SSH_USER:-root}@${wg_host}"
+    log "  → Run on your machine:  ssh ${sshp}-L ${local_port}:localhost:${local_port} ${SSH_USER:-root}@${wg_host}"
     log "  → Then open: ${admin_url}"
     [ "$local_scheme" = "https" ] && log "     (self-signed cert — accept the browser warning)"
   else
     log "Admin URL: ${admin_url}"
   fi
-  log "Admin password: ${admin_password}"
+  log "Admin password: (configured — not shown)"
   log "SSH port: ${ssh_port}/tcp"
   if is_truthy "$xray_enabled"; then
     log "Xray VLESS+Reality: enabled on port 443"
@@ -1075,6 +1076,7 @@ main() {
     [ -n "$admin_password" ] || die "ADMIN_PASSWORD is required."
     # Shared policy: min 12 chars (16+ recommended). Matches the portal + easywg passwd.
     [ "${#admin_password}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
+    case "$admin_password" in *'$'*) die "ADMIN_PASSWORD must not contain '\$' (unsupported by Docker Compose env parsing). Use another character." ;; esac
 
     local password_hash
     log "Generating WireGuard password hash..."
@@ -1109,6 +1111,7 @@ main() {
         printf '\n'
         [ -n "$_kept_pw" ] || die "ADMIN_PASSWORD is required."
         [ "${#_kept_pw}" -ge 12 ] || die "ADMIN_PASSWORD must be at least 12 characters (16+ recommended)."
+        case "$_kept_pw" in *'$'*) die "ADMIN_PASSWORD must not contain '\$' (unsupported by Docker Compose env parsing). Use another character." ;; esac
         set_env_value "$ENV_FILE" "ADMIN_PASSWORD" "$_kept_pw"
       else
         die "ADMIN_PASSWORD is missing from .env. Set it and re-run."

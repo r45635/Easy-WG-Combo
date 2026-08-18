@@ -1256,6 +1256,10 @@ app.post('/api/auth/password', auth, (req, res) => {
     return res.status(403).json({ error: 'Current password is incorrect.' });
   if (!newPassword || newPassword.length < MIN_PASSWORD_LEN)
     return res.status(400).json({ error: `New password must be at least ${MIN_PASSWORD_LEN} characters (16+ recommended).` });
+  // The password must round-trip through .env / rotation, where Docker Compose
+  // interprets '$'. Reject it (never silently alter) — matches bootstrap/easywg passwd.
+  if (newPassword.includes('$'))
+    return res.status(400).json({ error: "Password must not contain '$' (unsupported by Docker Compose env parsing)." });
   const settings = loadSettings();
   settings.adminPassword = newPassword;
   saveSettings(settings);
