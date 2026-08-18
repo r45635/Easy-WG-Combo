@@ -57,23 +57,77 @@ function isVpnOrLocalClient(req, vpnSubnet) {
 
 // ── SSRF guards for the monitoring module ────────────────────────────────────
 
+// Non-globally-routable IPv4 ranges (loopback, RFC1918, link-local incl. cloud
+// metadata 169.254.169.254, CGNAT, benchmarking, TEST-NET, multicast, reserved).
 const BLOCKED_V4_CIDRS = [
-  '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8',
-  '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16',
+  '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8', '169.254.0.0/16',
+  '172.16.0.0/12', '192.0.0.0/24', '192.0.2.0/24', '192.168.0.0/16',
+  '198.18.0.0/15', '198.51.100.0/24', '203.0.113.0/24',
+  '224.0.0.0/4', '240.0.0.0/4', '255.255.255.255/32',
 ];
 
-// True for loopback / private / link-local (incl. cloud metadata 169.254.169.254)
-// / CGNAT literal IPs. Hostnames (non-literals) return false — those are checked
-// at connect time by the probe functions.
-function isReservedIp(value) {
-  const n = normalizeIp(value).replace(/^\[|\]$/g, '');
-  if (ipv4ToInt(n) !== null) return BLOCKED_V4_CIDRS.some(c => ipInCidr(n, c));
-  if (n.includes(':')) {
-    const low = n.toLowerCase();
-    return low === '::1' || low === '::' || low.startsWith('fe8') || low.startsWith('fe9') ||
-           low.startsWith('fea') || low.startsWith('feb') || low.startsWith('fc') || low.startsWith('fd');
+function isReservedV4(dotted) {
+  return BLOCKED_V4_CIDRS.some(c => ipInCidr(dotted, c));
+}
+
+// Parse an IPv6 literal (incl. IPv4-mapped forms, dotted or hex) into 16 bytes,
+// or null if malformed. Handles a single '::' compression and an embedded IPv4
+// tail such as ::ffff:1.2.3.4.
+function parseIpv6(input) {
+  let s = String(input).trim();
+  if (s === '' || s.indexOf(':') === -1) return null;
+  // Embedded dotted-IPv4 tail → convert to two hex groups so the rest is uniform.
+  const lastColon = s.lastIndexOf(':');
+  const tail = s.slice(lastColon + 1);
+  if (tail.includes('.')) {
+    const v4 = ipv4ToInt(tail);
+    if (v4 === null) return null;
+    s = s.slice(0, lastColon + 1) + ((v4 >>> 16) & 0xffff).toString(16) + ':' + (v4 & 0xffff).toString(16);
   }
-  return false; // hostname — resolved and re-checked at connect time
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] === '' ? [] : halves[0].split(':');
+  let groups;
+  if (halves.length === 2) {
+    const back = halves[1] === '' ? [] : halves[1].split(':');
+    const missing = 8 - head.length - back.length;
+    if (missing < 1) return null;                 // '::' must compress ≥1 group
+    groups = [...head, ...Array(missing).fill('0'), ...back];
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) return null;
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 8; i++) {
+    if (!/^[0-9a-fA-F]{1,4}$/.test(groups[i])) return null;
+    const v = parseInt(groups[i], 16);
+    bytes[i * 2] = (v >> 8) & 0xff;
+    bytes[i * 2 + 1] = v & 0xff;
+  }
+  return bytes;
+}
+
+// Semantic classification: true unless the address is a globally routable unicast
+// destination. Covers loopback / RFC1918 / link-local (incl. cloud metadata) /
+// CGNAT and, crucially, IPv4-mapped IPv6 in BOTH dotted (::ffff:127.0.0.1) and hex
+// (::ffff:7f00:1) notation, plus IPv6 loopback/ULA/link-local. Only IPv6 global
+// unicast (2000::/3) is allowed. Hostnames (non-literals) return false — resolved
+// and re-checked at connect time by the guarded lookup.
+function isReservedIp(value) {
+  const s = String(value || '').trim().replace(/^\[|\]$/g, '');
+  if (s === '') return true;                                  // fail closed
+  if (!s.includes(':')) {
+    return ipv4ToInt(s) === null ? false : isReservedV4(s);   // dotted IPv4, or hostname
+  }
+  const bytes = parseIpv6(s);
+  if (!bytes) return true;                                    // malformed IPv6 → fail closed
+  // IPv4-mapped ::ffff:0:0/96 → classify the embedded IPv4.
+  if (bytes.slice(0, 10).every(b => b === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
+    return isReservedV4(`${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`);
+  }
+  if (bytes.every(b => b === 0)) return true;                                     // ::
+  if (bytes.slice(0, 15).every(b => b === 0) && bytes[15] === 1) return true;     // ::1
+  return (bytes[0] & 0xe0) !== 0x20;                          // allow only 2000::/3
 }
 
 function isLiteralIp(host) {
