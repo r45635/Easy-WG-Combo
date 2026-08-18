@@ -82,9 +82,11 @@ The portal has three modes so users are not exposed to unnecessary complexity: *
 Requires a fresh Debian 12/13 or Ubuntu 24.04+ VPS — 1 vCPU and 1 GB RAM is enough.
 
 ```bash
-export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='yourpassword'
+export WG_HOST=YOUR_VPS_IP ADMIN_PASSWORD='choose-a-strong-password'
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh | bash
 ```
+
+> Pick a strong `ADMIN_PASSWORD`: at least 12 characters (16+ recommended), and **no `$`** (Docker Compose interprets it in `.env`).
 
 The installer sets up Docker, UFW, Caddy and Fail2Ban and starts all containers. The admin portal is **local-only by default** (reached via SSH tunnel); public HTTPS is opt-in.
 
@@ -229,7 +231,7 @@ Run `./easywg help` for the full command list.
 ## Security Notes
 
 - The portal is a **root-equivalent** local admin component (it controls Docker, the firewall and certificates). Treat access to it accordingly — compromise of the portal is compromise of the host.
-- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, keep Fail2Ban enabled and prefer restricting by IP. Admin passwords must be at least 12 characters (16+ recommended).
+- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, keep Fail2Ban enabled and prefer restricting by IP. Admin passwords must be at least 12 characters (16+ recommended) and must not contain `$`.
 - Rotate the admin password with `./easywg passwd` — it updates the portal, the wg-easy hash and `.env` together (the in-portal password change only affects the portal login).
 - See [SECURITY.md](SECURITY.md) for the accepted-risk model.
 - The Docker socket, even read-only, is sensitive. The Apps module requires a writable socket.

@@ -78,3 +78,10 @@ test('validateMonitor: SSRF, bounds, builtin bypass', () => {
   assert.strictEqual(g.validateMonitor({ type: 'http', target: 'http://127.0.0.1:8080' }, { isBuiltin: true }), null);
   assert.strictEqual(g.validateMonitor({ type: 'dns', target: 'example.com', resolver: '127.0.0.1' }, { isBuiltin: true }), null);
 });
+
+test('splitHostPort — bracketed IPv6, host:port, and host-only', () => {
+  assert.deepStrictEqual(g.splitHostPort('[2606:4700::1111]:443'), { host: '2606:4700::1111', port: '443' });
+  assert.deepStrictEqual(g.splitHostPort('example.com:8080'), { host: 'example.com', port: '8080' });
+  assert.deepStrictEqual(g.splitHostPort('10.0.0.5:22'), { host: '10.0.0.5', port: '22' });
+  assert.deepStrictEqual(g.splitHostPort('example.com'), { host: 'example.com', port: '' });
+});

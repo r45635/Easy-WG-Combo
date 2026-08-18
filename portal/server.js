@@ -2908,15 +2908,15 @@ async function runMonitorCheck(monitor) {
     if (monitor.type === 'http' || monitor.type === 'https') {
       result = await checkHttp(monitor.target, to, monitor.expectedStatus || 200, lookup);
     } else if (monitor.type === 'tcp') {
-      const [h, p] = (monitor.target || '').split(':');
-      result = await checkTcp(h, parseInt(p || '80'), to, lookup);
+      const { host, port } = netGuards.splitHostPort(monitor.target || '');
+      result = await checkTcp(host, parseInt(port || '80'), to, lookup);
     } else if (monitor.type === 'dns') {
       result = await checkDnsResolve(monitor.target, monitor.resolver || VPN_DNS_IP);
     } else if (monitor.type === 'docker' || monitor.type === 'wireguard') {
       result = await checkDockerContainer(monitor.target);
     } else if (monitor.type === 'tls') {
-      const [h, p] = (monitor.target || '').split(':');
-      const r = await checkTlsDaysLeft(h, parseInt(p || '443'), lookup);
+      const { host, port } = netGuards.splitHostPort(monitor.target || '');
+      const r = await checkTlsDaysLeft(host, parseInt(port || '443'), lookup);
       const minDays = monitor.minDaysLeft || ALERT_CERT_EXPIRY_DAYS;
       result = { ...r, ok: typeof r.daysLeft === 'number' && r.daysLeft >= minDays };
     }

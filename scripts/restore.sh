@@ -56,7 +56,12 @@ LISTING="$(tar -tvzf "$WORK_ARCHIVE" 2>/dev/null)"
 if printf '%s\n' "$LISTING" | awk '{print substr($1,1,1)}' | grep -qE '[lhbcps]'; then
   fail "Unsafe backup archive: contains a symlink/hardlink/device entry."
 fi
-if printf '%s\n' "$LISTING" | awk '{print $6}' | grep -qE '^/|(^|/)\.\.(/|$)'; then
+# Extract the FULL member path (everything after the HH:MM[:SS] timestamp, minus
+# any '-> target' / 'link to' suffix) so a name containing spaces can't hide a
+# traversal — matches the portal's JS validateTarListing.
+if printf '%s\n' "$LISTING" \
+  | sed -E 's/^.*[0-9]{2}:[0-9]{2}(:[0-9]{2})?[[:space:]]+//; s/ -> .*$//; s/ link to .*$//' \
+  | grep -qE '^/|(^|/)\.\.(/|$)'; then
   fail "Unsafe backup archive: absolute path or '..' traversal."
 fi
 
