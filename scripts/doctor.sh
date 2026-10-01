@@ -149,6 +149,18 @@ if command -v systemctl &>/dev/null; then
       && ! grep -q '^datepattern' /etc/fail2ban/filter.d/easy-wg-portal.conf; then
       warn "Fail2Ban filter easy-wg-portal has no datepattern — findtime/bantime are unreliable. Re-run ./bootstrap.sh"
     fi
+    # /var/run is a tmpfs: restarting fail2ban recreates /var/run/fail2ban with a
+    # new inode, while the portal container stays bind-mounted to the old one. The
+    # container then sees an empty directory, fail2ban-client ping fails, and the
+    # Security Center reports Fail2Ban as inactive (-15 on the score) even though
+    # it is running. Restarting the portal re-binds the current directory.
+    if command -v docker &>/dev/null && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx portal; then
+      host_ino="$(stat -c %i /var/run/fail2ban 2>/dev/null || true)"
+      cont_ino="$(docker exec portal stat -c %i /var/run/fail2ban 2>/dev/null || true)"
+      if [ -n "$host_ino" ] && [ -n "$cont_ino" ] && [ "$host_ino" != "$cont_ino" ]; then
+        warn "The portal container has a STALE /var/run/fail2ban mount (host inode $host_ino vs container $cont_ino) — it cannot see Fail2Ban, so the Security Center wrongly reports it inactive. Fix: docker restart portal"
+      fi
+    fi
   else
     warn "Fail2Ban is not active — run: systemctl start fail2ban"
   fi
