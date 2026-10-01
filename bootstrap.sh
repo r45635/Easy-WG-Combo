@@ -738,7 +738,8 @@ configure_caddy() {
     printf '    Referrer-Policy "same-origin"\n'
     printf '    X-Frame-Options "SAMEORIGIN"\n'
     printf '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n'
-    # Report-only first (one release) so violations surface before enforcing.
+    # Enforced since 2026-10 (the frontend is CSP-clean: one external <script>,
+    # no inline on* handlers, no eval, same-origin iframes, data: QR codes).
     # Keep in phase with generateMainCaddyfile() in portal/server.js.
     printf '    Content-Security-Policy "default-src '\''self'\''; script-src '\''self'\''; style-src '\''self'\'' '\''unsafe-inline'\''; img-src '\''self'\'' data:; frame-src '\''self'\''; frame-ancestors '\''self'\''; object-src '\''none'\''; base-uri '\''none'\''"\n'
     printf '  }\n'
