@@ -117,6 +117,22 @@ fi
 if command -v systemctl &>/dev/null; then
   if systemctl is-active fail2ban &>/dev/null; then
     ok "Fail2Ban is active"
+    # "Fail2Ban is active" alone proves nothing about the portal: the service can
+    # run with only the sshd jail while the admin login is left unprotected.
+    jail_name="${FAIL2BAN_JAIL:-easy-wg-portal}"
+    if command -v fail2ban-client &>/dev/null; then
+      if fail2ban-client status "$jail_name" &>/dev/null; then
+        ok "Fail2Ban jail '$jail_name' is loaded (portal login protected)"
+      else
+        warn "Fail2Ban runs but jail '$jail_name' is NOT loaded — the admin login has no brute-force protection. Re-run ./bootstrap.sh"
+      fi
+    fi
+    # Caddy logs a float Unix epoch in "ts"; without an explicit datepattern
+    # fail2ban cannot date the lines and silently degrades to "Simulate NOW".
+    if [ -f /etc/fail2ban/filter.d/easy-wg-portal.conf ] \
+      && ! grep -q '^datepattern' /etc/fail2ban/filter.d/easy-wg-portal.conf; then
+      warn "Fail2Ban filter easy-wg-portal has no datepattern — findtime/bantime are unreliable. Re-run ./bootstrap.sh"
+    fi
   else
     warn "Fail2Ban is not active — run: systemctl start fail2ban"
   fi
