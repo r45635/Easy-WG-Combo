@@ -113,6 +113,28 @@ fail2ban-client status easy-wg-portal
 
 If the jail is missing, re-run the bootstrap or check `/etc/fail2ban/jail.d/easy-wg-portal.conf`.
 
+### Security Center says Fail2Ban is inactive, but it is running
+
+Almost always a **stale mount** after Fail2Ban was restarted. `/var/run` is a tmpfs, so
+`systemctl restart fail2ban` recreates `/var/run/fail2ban` with a **new inode** while the
+portal container stays bind-mounted to the old one. The container then sees an empty
+directory, `fail2ban-client ping` fails from inside it, and the Security score loses 15
+points for a service that is perfectly healthy.
+
+Confirm (the two inodes differ):
+```bash
+stat -c %i /var/run/fail2ban
+docker exec portal stat -c %i /var/run/fail2ban
+```
+
+Fix — re-bind the current directory:
+```bash
+docker restart portal
+```
+
+**Restart the portal container after every `systemctl restart fail2ban`.** `easywg doctor`
+detects this mismatch and tells you when it happens.
+
 ---
 
 ## Backup fails
