@@ -44,8 +44,10 @@ test('PR4: generateMainCaddyfile binds loopback in Xray local-only mode', () => 
     const pub = I.generateMainCaddyfile('vpn.example.com', 'a@b.com', true);
     assert.match(pub, /vpn\.example\.com:8443 \{/);
     assert.doesNotMatch(pub, /127\.0\.0\.1:8443/);
-    // security headers present (CSP report-only, frame-ancestors self for the iframes)
-    assert.match(pub, /Content-Security-Policy-Report-Only/);
+    // security headers present (CSP enforced, frame-ancestors self for the iframes)
+    assert.match(pub, /Content-Security-Policy "default-src 'self'/);
+    // Guard against silently sliding back to report-only, which enforces nothing.
+    assert.doesNotMatch(pub, /Content-Security-Policy-Report-Only/);
     assert.match(pub, /frame-ancestors 'self'/);
     assert.match(pub, /X-Frame-Options "SAMEORIGIN"/);
   } finally {
