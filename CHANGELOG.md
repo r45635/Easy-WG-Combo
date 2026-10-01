@@ -29,7 +29,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Reverse-proxy / Caddyfile injection guards:** target URLs, domains and IP allowlists are validated on every path (create, update, app install); the generator refuses control/brace characters, and the Server Endpoint action snapshots and rolls back the Caddyfile if a reload fails.
 - **Restore hardening:** backup archives are validated before extraction (no absolute paths, `..` traversal, or symlink/hardlink/device entries); extraction uses `--no-same-owner --no-overwrite-dir`. `restore.sh` keeps the repo `docker-compose.yml` unless `--use-archive-compose` is given.
 - **Secrets at rest:** `portal-config.json`, `notifications.json`, `.env` and `.env.secrets` are created/kept `0600`.
-- **Security headers:** portal responses add `X-Frame-Options: SAMEORIGIN`, a `Permissions-Policy`, and a `Content-Security-Policy` in **Report-Only** mode (to be enforced in a later release). *(Applied by `bootstrap.sh` / the Server Endpoint action; a plain `easywg update` does not regenerate the Caddyfile.)*
+- **Security headers:** portal responses add `X-Frame-Options: SAMEORIGIN`, a `Permissions-Policy`, and an **enforced** `Content-Security-Policy`. *(Applied by `bootstrap.sh` / the Server Endpoint action; a plain `easywg update` does not regenerate the Caddyfile.)*
 
 ### Added
 - `easywg passwd` — rotate the admin password across `.env`, the wg-easy hash and the portal in one step.

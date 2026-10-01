@@ -740,7 +740,7 @@ configure_caddy() {
     printf '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n'
     # Report-only first (one release) so violations surface before enforcing.
     # Keep in phase with generateMainCaddyfile() in portal/server.js.
-    printf '    Content-Security-Policy-Report-Only "default-src '\''self'\''; script-src '\''self'\''; style-src '\''self'\'' '\''unsafe-inline'\''; img-src '\''self'\'' data:; frame-src '\''self'\''; frame-ancestors '\''self'\''; object-src '\''none'\''; base-uri '\''none'\''"\n'
+    printf '    Content-Security-Policy "default-src '\''self'\''; script-src '\''self'\''; style-src '\''self'\'' '\''unsafe-inline'\''; img-src '\''self'\'' data:; frame-src '\''self'\''; frame-ancestors '\''self'\''; object-src '\''none'\''; base-uri '\''none'\''"\n'
     printf '  }\n'
     printf '}\n\n'
     printf 'import /etc/caddy/easywg-services.caddy\n'
