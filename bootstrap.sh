@@ -759,8 +759,14 @@ configure_fail2ban() {
 
   run_root mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
 
+  # Caddy writes its access log as JSON with a float Unix epoch in "ts".
+  # fail2ban's built-in date detectors cannot read that, so without an explicit
+  # datepattern it logs "no valid date/time found" and falls back to
+  # "Simulate NOW" — findtime/bantime then rest on the read time rather than the
+  # request time, which silently degrades the jail.
   run_root tee /etc/fail2ban/filter.d/easy-wg-portal.conf >/dev/null <<EOF
 [Definition]
+datepattern = "ts":{EPOCH}
 failregex = ^.*"remote_ip":"<HOST>".*"uri":"/api/login".*"status":401.*$
 ignoreregex =
 EOF
