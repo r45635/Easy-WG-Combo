@@ -229,7 +229,9 @@ function generateMainCaddyfile(adminDomain, tlsEmail, domainPointsHere = true) {
   out += '    Referrer-Policy "same-origin"\n';
   out += '    X-Frame-Options "SAMEORIGIN"\n';
   out += '    Permissions-Policy "geolocation=(), microphone=(), camera=()"\n';
-  // Report-only first (one release) so violations surface before enforcing.
+  // Enforced since 2026-10. The frontend is CSP-clean by construction: one
+  // external <script>, no inline on* handlers, no eval; iframes point at the
+  // same-origin proxy paths; QR codes are data: URIs.
   // Keep in phase with configure_caddy() in bootstrap.sh.
   out += "    Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'\"\n";
   out += '  }\n';

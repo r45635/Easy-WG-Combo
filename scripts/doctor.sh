@@ -104,6 +104,22 @@ echo ""
 # ── Security ──────────────────────────────────────────────────────────────────
 echo "Security:"
 
+# The security headers live in the generated Caddyfile, and `easywg update` does
+# NOT regenerate it — only bootstrap.sh or the Server Endpoint action do. A
+# deployment can therefore run current code while serving no headers at all,
+# which is invisible without this check.
+caddyfile="$SCRIPT_DIR/caddy/Caddyfile"
+if [ -f "$caddyfile" ]; then
+  if grep -q 'Content-Security-Policy' "$caddyfile"; then
+    ok "Caddyfile carries the security headers (CSP present)"
+  else
+    warn "Caddyfile has NO security headers (no Content-Security-Policy) — the portal serves none. Re-run ./bootstrap.sh or apply the Server Endpoint action ('easywg update' does not regenerate the Caddyfile)"
+  fi
+  if grep -q 'Content-Security-Policy-Report-Only' "$caddyfile"; then
+    warn "CSP is still Report-Only in the Caddyfile — it enforces nothing; regenerate to pick up the enforced policy"
+  fi
+fi
+
 if command -v ufw &>/dev/null; then
   if ufw status 2>/dev/null | grep -q 'Status: active'; then
     ok "UFW firewall is active"
