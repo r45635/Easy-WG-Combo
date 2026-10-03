@@ -19,7 +19,8 @@ The Uptime Monitor checks your services on a configurable schedule and sends ale
 | `dns` | `domain.name` | DNS resolves via the VPN DNS server |
 | `docker` | `container-name` | Docker container is in `running` state |
 | `tls` | `host:port` | TLS certificate has ≥ N days remaining |
-| `wireguard` | `wg-easy` | wg-easy container is running |
+
+These six are the only accepted values. Anything else is rejected with `type must be one of: http, https, tcp, dns, docker, tls`. To watch the WireGuard container, use a `docker` monitor targeting `wg-easy` (one is seeded for you — see below).
 
 ## Auto-seeded defaults
 

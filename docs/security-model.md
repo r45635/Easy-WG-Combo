@@ -131,9 +131,31 @@ When Xray is enabled (`XRAY_ENABLED=yes`), the port assignment changes:
 
 > When Xray is enabled, Caddy vacates port 443 and listens on `CADDY_HTTPS_PORT` (default `8443`). Port 443 is fully owned by Xray.
 
-Admin ports (8080, 51821, 3000) are always bound to localhost.
+Admin ports are not reachable from the internet. The portal (`8080`) and wg-easy (`51821`) are bound to loopback; the AdGuard UI (`3000`) is kept private by UFW rather than by its bind address — see [the port table in the advanced guide](advanced-install.md#firewall-ufw).
 
 Port 53 is exposed on the VPN interface (`wg0` inside the wg-easy container) and on the Docker bridge network (for internal forwarding). VPN client DNS queries are DNAT'd from `wg0` to AdGuard Home on the host; the bridge subnet is allowed through UFW. Port 53 is not exposed publicly on the host's external interface.
+
+---
+
+## Security headers
+
+Caddy adds these response headers to the admin portal:
+
+| Header | Value |
+|---|---|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `same-origin` |
+| `X-Frame-Options` | `SAMEORIGIN` |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'` — **enforced**, not report-only |
+
+Two limits worth knowing:
+
+- **They come from Caddy, not from the portal process.** In SSH-tunnel mode you reach the portal directly on `127.0.0.1:8080` and bypass Caddy, so none of these headers are sent. That is acceptable for a loopback-only connection, but do not treat the headers as a property of the portal itself.
+- **They live in `caddy/Caddyfile`, which `easywg update` never regenerates.** An installation created before these headers existed keeps serving without them after updating. Run `./easywg doctor` — it checks for the headers and for a leftover `Report-Only` policy — and fix it with `./bootstrap.sh` or the portal's **Server Endpoint** action.
+
+`style-src` keeps `'unsafe-inline'` because the UI uses inline style attributes; everything else is locked to same-origin, with `object-src` and `base-uri` denied outright.
 
 ---
 

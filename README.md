@@ -16,7 +16,7 @@ It combines WireGuard, AdGuard Home, a custom admin portal, HTTPS access, securi
 - **AdGuard Home DNS** — block ads and malware per device; switch presets without reconnecting
 - **Security Center** — Fail2Ban monitoring, UFW status, TLS certificate, session management, security score
 - **Backups** — local backup and restore with a guided workflow
-- **Monitoring** — HTTP, HTTPS, TCP, DNS, Docker, TLS and service checks with alerts
+- **Monitoring** — HTTP, HTTPS, TCP, DNS, Docker and TLS checks with alerts
 - **Notifications** — email and webhook alerts for monitor events
 - **Mobile-friendly** — responsive UI with hamburger sidebar for smartphone access
 - **Multilingual** — English, French, Chinese
@@ -88,7 +88,7 @@ curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/mai
 
 > Pick a strong `ADMIN_PASSWORD`: at least 12 characters (16+ recommended), and **no `$`** (Docker Compose interprets it in `.env`).
 
-The installer sets up Docker, UFW, Caddy and Fail2Ban and starts all containers. The admin portal is **local-only by default** (reached via SSH tunnel); public HTTPS is opt-in.
+The installer installs Docker, UFW and Fail2Ban on the host, then configures and starts the containers (wg-easy, AdGuard Home, the portal and Caddy). The admin portal is **local-only by default** (reached via SSH tunnel); public HTTPS is opt-in.
 
 **Two ways in:**
 - 🚀 **I just want my own VPN** → the **[beginner guide](docs/setup.md)** takes you from an empty VPS to a working VPN in ~15 minutes (no Linux knowledge needed).
@@ -267,10 +267,10 @@ Run `./easywg help` for the full command list.
 ## Known Limitations
 
 - Single admin user only (no multi-user support)
-- WireGuard pinned to wg-easy v14 — v1.0.x has an incompatible API
+- WireGuard pinned to wg-easy v14 — v15 is a breaking rewrite with an incompatible data model
 - Apps and File Drop require additional VPS setup and are not production-ready
 - Full VPS-to-VPS migration is not yet implemented
-- `adguard` and `portal` use `network_mode: host` (required for DNS on port 53)
+- `adguard`, `portal` and `caddy` use `network_mode: host` (AdGuard needs port 53 on the host; Caddy needs 80/443)
 
 ---
 

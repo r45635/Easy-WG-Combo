@@ -29,17 +29,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Reverse-proxy / Caddyfile injection guards:** target URLs, domains and IP allowlists are validated on every path (create, update, app install); the generator refuses control/brace characters, and the Server Endpoint action snapshots and rolls back the Caddyfile if a reload fails.
 - **Restore hardening:** backup archives are validated before extraction (no absolute paths, `..` traversal, or symlink/hardlink/device entries); extraction uses `--no-same-owner --no-overwrite-dir`. `restore.sh` keeps the repo `docker-compose.yml` unless `--use-archive-compose` is given.
 - **Secrets at rest:** `portal-config.json`, `notifications.json`, `.env` and `.env.secrets` are created/kept `0600`.
-- **Security headers:** portal responses add `X-Frame-Options: SAMEORIGIN`, a `Permissions-Policy`, and an **enforced** `Content-Security-Policy`. *(Applied by `bootstrap.sh` / the Server Endpoint action; a plain `easywg update` does not regenerate the Caddyfile.)*
+- **Security headers:** Caddy now adds `X-Frame-Options: SAMEORIGIN`, a `Permissions-Policy` and a `Content-Security-Policy` alongside the existing HSTS / `X-Content-Type-Options` / `Referrer-Policy`. The CSP is **enforced** — it shipped as `Content-Security-Policy-Report-Only`, which protected nothing and, with no `report-uri` configured, collected nothing either. *(Applied by `bootstrap.sh` / the Server Endpoint action; a plain `easywg update` does not regenerate the Caddyfile — see [docs/security-model.md](docs/security-model.md#security-headers).)*
+- **Fail2Ban reads Caddy's timestamps:** the `easy-wg-portal` filter now sets `datepattern = "ts":{EPOCH}`. Caddy logs a floating-point epoch that Fail2Ban could not parse, so it fell back to "Simulate NOW" and measured `findtime`/`bantime` from the time it read the line instead of the time of the attempt. Existing installs: re-run `./bootstrap.sh`.
 
 ### Added
 - `easywg passwd` — rotate the admin password across `.env`, the wg-easy hash and the portal in one step.
 - `SESSION_SECRET` is now actually delivered to the portal container; `WG_EASY_PASSWORD` / `ADGUARD_PASSWORD` can be pinned independently of `ADMIN_PASSWORD`.
-- Test suite (`node:test`, 39 tests) covering File Drop enforcement, capability gating, auth, monitor/Caddy/tar guards and boot behavior; `npm test` runs in CI.
+- Test suite (`node:test`, 53 tests) covering File Drop enforcement, capability gating, auth, monitor/Caddy/tar guards and boot behavior; `npm test` runs in CI.
 - CI security gates: Gitleaks (secret scan over full history), CodeQL (JavaScript + Actions), Trivy image scan, and a blocking `npm audit --audit-level=high`.
 - `doctor` now checks that AdGuard is reachable through the portal proxy (flags a diverged AdGuard wizard password).
+- `doctor` now flags a `caddy/Caddyfile` that serves no security headers, or one still carrying a report-only CSP — the case an `easywg update` cannot fix on its own.
+- `doctor` now detects a stale `/var/run/fail2ban` bind mount in the portal container (left behind by `systemctl restart fail2ban`, which recreates the directory with a new inode). The portal then reports Fail2Ban inactive while it is running; the fix is `docker restart portal`.
+- `doctor` now verifies the Fail2Ban filter carries a `datepattern`.
 
 ### Changed
 - Portal base image `node:22-bookworm-slim` is now digest-pinned (matches the other images).
+- Dependency updates: Express 4 → 5, nodemailer → 10.x, express-rate-limit → 8.x, AdGuard Home → `v0.107.79`, Xray → `26.9.9`. `ip-address` was pinned to 10.7.2 to clear a transitive advisory pulled in by express-rate-limit 8 (the portal's own CIDR checks in `portal/lib/net-guards.js` were never affected).
 
 ### Fixed
 - `POST /api/migration/validate` no longer 500s (undefined `caddyUp` reference).

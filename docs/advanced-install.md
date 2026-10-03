@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/mai
 ```
 
 The installer will:
-- Install Docker, Docker Compose, UFW, Caddy, Fail2Ban
+- Install the host packages: Docker, Docker Compose, UFW, Fail2Ban (Caddy is **not** installed on the host — it runs as a container)
 - Create `.env` and `.env.secrets`
 - Generate the WireGuard password hash
 - Apply firewall rules
@@ -136,7 +136,13 @@ When Xray is enabled (`XRAY_ENABLED=yes`), the installer also opens (subject to 
 | `8443/tcp` | HTTPS admin portal — opened only when public HTTPS is enabled; otherwise the portal binds to `127.0.0.1:8443` (tunnel) |
 | `80/tcp` | Opened only with a real domain + `TLS_EMAIL` — Let's Encrypt HTTP-01 challenge (TLS-ALPN-01 is impossible since Xray owns 443) |
 
-All admin ports (8080, 51821, 3000) are bound to localhost — not reachable from the internet.
+None of the admin ports are reachable from the internet, but for two different reasons — worth knowing before you change anything:
+
+| Port | Service | What keeps it private |
+|---|---|---|
+| `8080` | portal | Bound to `PORTAL_HOST` (default `127.0.0.1`) |
+| `51821` | wg-easy | Published on `127.0.0.1` only by `docker-compose.yml` |
+| `3000` | AdGuard UI | **UFW only.** AdGuard runs with `network_mode: host` and listens on whatever its own `AdGuardHome.yaml` says — the setup wizard writes all interfaces by default. The port is never opened in UFW, so it stays unreachable; it is *not* bound to loopback. If you disable UFW or sit behind a provider firewall instead, set AdGuard's listen address to `127.0.0.1` in its settings.
 
 Port 53 is exposed only on the VPN interface (wg0, inside the wg-easy container). VPN clients send DNS to `10.8.0.1`, which is forwarded via iptables DNAT inside the container to AdGuard Home running on the host.
 
@@ -145,7 +151,7 @@ Port 53 is exposed only on the VPN interface (wg0, inside the wg-easy container)
 | Container | Network | Role | Admin access |
 |---|---|---|---|
 | `wg-easy` v14 | Docker bridge | WireGuard peer management | `127.0.0.1:51821` |
-| `adguard` | host | DNS filtering + AdGuard UI | `127.0.0.1:3000`, `0.0.0.0:53` |
+| `adguard` | host | DNS filtering + AdGuard UI | `:3000` (closed by UFW, see above), `:53` |
 | `portal` | host | Admin UI + API | `127.0.0.1:8080` |
 | `caddy` | host | HTTPS reverse proxy | `80/443` public, or `127.0.0.1:8443` local-only under Xray |
 | `xray` *(optional)* | host | VLESS+Reality DPI-resistant tunnel | `0.0.0.0:443` (when `XRAY_ENABLED=yes`) |
@@ -154,7 +160,7 @@ Port 53 is exposed only on the VPN interface (wg0, inside the wg-easy container)
 
 `wg-easy` runs in a Docker bridge network. Its `wg0` interface (`10.8.0.1`) is inside the container. DNS queries from VPN clients arrive on `wg0` and are DNAT'd to the Docker bridge gateway (`172.18.x.1`) where AdGuard listens.
 
-`wg-easy` is pinned to `v14` — the v1.0.x line has an incompatible API rewrite.
+`wg-easy` is pinned to `v14` — `v15` is a breaking rewrite with an incompatible data model and API. Dependabot is configured to never propose that major bump.
 
 `PASSWORD_HASH` lives in `.env.secrets` (gitignored) and is injected via the shell environment — docker-compose variable interpolation mangles bcrypt `$` signs when read from `env_file:` or `.env`.
 
@@ -176,6 +182,8 @@ The command is safe by construction:
 5. Runs a service health check.
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14. See [CHANGELOG.md](../CHANGELOG.md) for version history.
+
+> ⚠️ **`easywg update` does not regenerate `caddy/Caddyfile`.** That file is generated once at install and then left alone, so your edits survive — but it also means changes to the security headers or the TLS block shipped in a new release are **not** picked up by an update. If a release changes them, re-run `./bootstrap.sh` or apply the **Server Endpoint** action in the portal. `./easywg doctor` warns when your Caddyfile is missing the headers.
 
 ## See also
 

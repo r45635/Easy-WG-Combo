@@ -137,6 +137,38 @@ detects this mismatch and tells you when it happens.
 
 ---
 
+## The portal serves no security headers (no CSP)
+
+`./easywg doctor` reports:
+
+```
+[WARN] Caddyfile has NO security headers (no Content-Security-Policy)
+```
+
+`easywg update` pulls code and images but **never regenerates `caddy/Caddyfile`** — it is
+generated at install time and then left alone so your edits survive. An installation
+created before the headers were added therefore keeps serving without them, release after
+release.
+
+Check what is actually being sent (not what the repo contains):
+
+```bash
+curl -sI https://YOUR_DOMAIN/ | grep -iE 'content-security-policy|x-frame-options|permissions-policy|strict-transport|x-content-type|referrer-policy'
+```
+
+Expect **six** lines. Fewer means the Caddyfile predates the header block.
+
+Fix, either:
+- re-run `./bootstrap.sh` (regenerates the Caddyfile), or
+- apply the **Server Endpoint** action in the portal (Settings → Server Endpoint), which
+  rewrites the Caddyfile and reloads Caddy.
+
+If you hand-edited the Caddyfile (a mounted external certificate, for example), back it up
+first and re-apply your changes afterwards — then `docker exec caddy caddy validate
+--config /etc/caddy/Caddyfile` before reloading.
+
+---
+
 ## Backup fails
 
 Check that the backup directory is writable:

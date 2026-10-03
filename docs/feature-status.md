@@ -33,7 +33,7 @@
 | Notifications | Beta | SMTP and webhook alerts; configure in Notifications tab |
 | Device Inventory | Beta | Per-device metadata, expiry, routing mode, enable/disable/revoke |
 | DNS Profiles | Beta | Per-device named profiles with timed bypass |
-| Monitoring | Beta | HTTP, HTTPS, TCP, DNS, Docker, TLS and service checks; 60s scheduler |
+| Monitoring | Beta | `http`, `https`, `tcp`, `dns`, `docker`, `tls` checks; scheduler ticks every 60s |
 | Server name | Stable | Shown in UI, embedded in downloaded `.conf` filenames |
 | Fail2Ban integration | Stable | Auto-configured by installer; manages login bruteforce |
 
