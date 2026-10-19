@@ -14,6 +14,7 @@ const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto
 const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
 const archiveGuards = require('./lib/archive-guards');
+const updateCheck = require('./lib/update-check');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -66,6 +67,27 @@ const DNS_PROFILES_FILE   = path.join(DATA_DIR, 'dns-profiles.json');
 const PROXY_SERVICES_FILE = path.join(DATA_DIR, 'proxy-services.json');
 const CADDY_SERVICES_FILE = path.join(CADDY_DIR, 'easywg-services.caddy');
 const CADDY_FILE          = path.join(CADDY_DIR, 'Caddyfile');
+
+// Own version. APP_VERSION is baked at image build time (CI passes the repo
+// VERSION file as a build arg), so an image-based deployment knows what it is
+// without needing the git checkout. The mounted file and package.json are
+// fallbacks for a locally built or dev container.
+const APP_VERSION = (() => {
+  const fromEnv = (process.env.APP_VERSION || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const f = fs.readFileSync(path.join(__dirname, 'VERSION'), 'utf8').trim();
+    if (f) return f;
+  } catch { /* not mounted — fall through */ }
+  try { return require('./package.json').version || 'dev'; } catch { return 'dev'; }
+})();
+
+// Release check. On by default: an operator who is not told they are behind
+// cannot act on an advisory — that is exactly how a CVSS 9.1 sat unnoticed in
+// a deployed portal. Set UPDATE_CHECK_ENABLED=no to stop the outbound call.
+const UPDATE_CHECK_ENABLED = (process.env.UPDATE_CHECK_ENABLED || 'yes').toLowerCase() !== 'no';
+const UPDATE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 h — GitHub allows 60 req/h/IP
+let updateCache = { at: 0, data: null };
 const VPN_DNS_IP          = process.env.WG_DEFAULT_DNS || '10.8.0.1';
 const VPN_SUBNET          = (() => { const p = VPN_DNS_IP.split('.'); p[3] = '0'; return p.join('.') + '/24'; })();
 
@@ -1304,6 +1326,59 @@ app.get('/api/system/status', auth, async (_req, res) => {
   ]);
   const caddy = { name: 'caddy', up: caddyR.ok };
   res.json({ 'wg-easy': wg, adguard: ag, caddy, portal: { name: 'portal', up: true } });
+});
+
+// ── Release check + configuration drift ───────────────────────────────────────
+//
+// Two questions an operator cannot answer from inside the UI today:
+//   "am I running the current release?"  and  "is my Caddyfile still serving
+//   the security headers?" — the latter matters because `easywg update` never
+//   regenerates the Caddyfile, so an updated install can quietly serve none.
+//
+// Both halves fail soft: no network, a rate-limited API or an unreadable
+// Caddyfile yields "unknown", never a false alarm and never a 5xx.
+async function fetchLatestRelease() {
+  const fresh = Date.now() - updateCache.at < UPDATE_CACHE_TTL;
+  if (fresh && updateCache.data) return updateCache.data;
+  try {
+    const r = await fetch(updateCheck.RELEASES_URL, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'easy-wg-combo-portal' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const parsed = updateCheck.parseLatestRelease(await r.json());
+    updateCache = { at: Date.now(), data: parsed };
+    return parsed;
+  } catch {
+    // Keep a previous good answer rather than flapping to "unknown" on one
+    // failed poll; only the timestamp stays old so we retry next time.
+    return updateCache.data;
+  }
+}
+
+function readCaddyfileDrift() {
+  let text = '';
+  try { text = fs.readFileSync(CADDY_FILE, 'utf8'); } catch { text = ''; }
+  return updateCheck.evaluateDrift(updateCheck.inspectCaddyHeaders(text));
+}
+
+app.get('/api/system/updates', auth, async (req, res) => {
+  const drift = readCaddyfileDrift();
+  if (!UPDATE_CHECK_ENABLED) {
+    return res.json({
+      version: APP_VERSION,
+      release: { updateAvailable: false, current: APP_VERSION, latest: null, reason: 'disabled' },
+      drift,
+    });
+  }
+  if (req.query.refresh === '1') updateCache = { at: 0, data: updateCache.data };
+  const latest = await fetchLatestRelease();
+  res.json({
+    version: APP_VERSION,
+    release: updateCheck.evaluateUpdate(APP_VERSION, latest),
+    drift,
+    checkedAt: updateCache.at ? new Date(updateCache.at).toISOString() : null,
+  });
 });
 
 // ── TLS certificate info ──────────────────────────────────────────────────────

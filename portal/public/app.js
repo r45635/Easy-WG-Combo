@@ -13,6 +13,10 @@ const I18N = {
     'nav.wireguard': 'WireGuard',
     'nav.adguard': 'AdGuard Home',
     'dashboard.refresh': '↻ Refresh',
+    'update.available': 'Version {latest} is available — this server runs {current}.',
+    'update.notes': 'Release notes',
+    'update.driftHeaders': 'Caddy is not sending every security header ({missing} missing). An update never regenerates the Caddyfile: re-run ./bootstrap.sh, or apply Server Endpoint in Settings.',
+    'update.driftCsp': 'The Content-Security-Policy is still Report-Only — it blocks nothing. Regenerate the Caddyfile to pick up the enforced policy.',
     'dashboard.totalClients': 'Total clients',
     'dashboard.connected': 'Connected',
     'dashboard.dnsQueries': 'DNS queries today',
@@ -391,6 +395,10 @@ const I18N = {
     'nav.wireguard': 'WireGuard',
     'nav.adguard': 'AdGuard Home',
     'dashboard.refresh': '↻ Actualiser',
+    'update.available': 'La version {latest} est disponible — ce serveur tourne en {current}.',
+    'update.notes': 'Notes de version',
+    'update.driftHeaders': 'Caddy n’envoie pas tous les en-têtes de sécurité ({missing} manquant(s)). Une mise à jour ne régénère jamais le Caddyfile : relancez ./bootstrap.sh, ou appliquez Server Endpoint dans Réglages.',
+    'update.driftCsp': 'La Content-Security-Policy est encore en Report-Only — elle ne bloque rien. Régénérez le Caddyfile pour appliquer la politique.',
     'dashboard.totalClients': 'Clients total',
     'dashboard.connected': 'Connectés',
     'dashboard.dnsQueries': 'Requêtes DNS aujourd\'hui',
@@ -761,6 +769,10 @@ const I18N = {
     'nav.wireguard': 'WireGuard',
     'nav.adguard': 'AdGuard Home',
     'dashboard.refresh': '↻ 刷新',
+    'update.available': '版本 {latest} 已发布 — 本服务器运行的是 {current}。',
+    'update.notes': '版本说明',
+    'update.driftHeaders': 'Caddy 并未发送全部安全响应头（缺少 {missing} 个）。更新不会重新生成 Caddyfile：请重新运行 ./bootstrap.sh，或在“设置”中应用 Server Endpoint。',
+    'update.driftCsp': 'Content-Security-Policy 仍为 Report-Only 模式 — 不会拦截任何内容。请重新生成 Caddyfile 以启用强制策略。',
     'dashboard.totalClients': '客户端总数',
     'dashboard.connected': '已连接',
     'dashboard.dnsQueries': '今日 DNS 请求',
@@ -1411,8 +1423,46 @@ async function renameServer() {
   renderServerName();
 }
 
+// Release + configuration drift banners. Both are advisory: a failed call or
+// an unreadable Caddyfile leaves the banners hidden rather than alarming.
+async function loadUpdateBanners() {
+  const updateEl = document.getElementById('update-banner');
+  const driftEl  = document.getElementById('drift-banner');
+  if (!updateEl || !driftEl) return;
+  updateEl.classList.add('hidden');
+  driftEl.classList.add('hidden');
+
+  const info = await GET('/api/system/updates');
+  if (!info) return;
+
+  if (info.release && info.release.updateAvailable) {
+    const msg = t('update.available', {
+      latest: info.release.latest,
+      current: info.release.current,
+    });
+    updateEl.textContent = msg + ' ';
+    if (info.release.url) {
+      const a = document.createElement('a');
+      a.href = info.release.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = t('update.notes');
+      updateEl.appendChild(a);
+    }
+    updateEl.classList.remove('hidden');
+  }
+
+  if (info.drift && info.drift.drift) {
+    driftEl.textContent = info.drift.reason === 'csp-report-only'
+      ? t('update.driftCsp')
+      : t('update.driftHeaders', { missing: (info.drift.missing || []).length });
+    driftEl.classList.remove('hidden');
+  }
+}
+
 async function loadDashboard() {
   const mode = state.interfaceMode;
+  loadUpdateBanners();
 
   // Always fetch clients and DNS stats
   const [clients, stats] = await Promise.all([

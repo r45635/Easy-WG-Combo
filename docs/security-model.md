@@ -157,6 +157,21 @@ Two limits worth knowing:
 
 `style-src` keeps `'unsafe-inline'` because the UI uses inline style attributes; everything else is locked to same-origin, with `object-src` and `base-uri` denied outright.
 
+### Drift detection
+
+The dashboard reads the live `caddy/Caddyfile` and warns when it is missing any of the six headers, or when the CSP is still `Report-Only`. This exists because the second limit above is silent otherwise: an install created before the headers were added keeps serving without them, release after release, and nothing says so. `./easywg doctor` performs the same check from the shell.
+
+## Outbound connections
+
+The portal reaches the Internet in exactly two situations:
+
+| What | Where to | When | How to stop it |
+|---|---|---|---|
+| Release check | `api.github.com` | Dashboard load, cached 6 h | `UPDATE_CHECK_ENABLED=no` in `.env` |
+| Uptime monitors | Whatever you configure | On each monitor's schedule | Delete or disable the monitor |
+
+The release check sends no identifying data — only the HTTP request itself, which necessarily reveals your server's IP to GitHub. It is on by default because an operator who is not told they are behind cannot act on an advisory. Disable it if that trade is wrong for you; nothing else in the portal phones home.
+
 ---
 
 ## Authentication

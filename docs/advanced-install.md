@@ -61,7 +61,7 @@ export PRUNE_BEFORE_DEPLOY=yes
 curl -fsSL https://raw.githubusercontent.com/r45635/Easy-WG-Combo/refs/heads/main/install.sh | bash
 ```
 
-Other optional install variables: `ADMIN_DOMAIN`, `TLS_EMAIL`, `MIN_FREE_MB`, `BACKUP_DIR`, `FAIL2BAN_JAIL`, `FAIL2BAN_MAXRETRY`, `FAIL2BAN_FINDTIME`, `FAIL2BAN_BANTIME`.
+Other optional install variables: `ADMIN_DOMAIN`, `TLS_EMAIL`, `MIN_FREE_MB`, `BACKUP_DIR`, `FAIL2BAN_JAIL`, `FAIL2BAN_MAXRETRY`, `FAIL2BAN_FINDTIME`, `FAIL2BAN_BANTIME`, `UPDATE_CHECK_ENABLED`.
 
 > `WG_EASY_PASSWORD` and `ADGUARD_PASSWORD` are **not** read by the installer — they are runtime overrides. To pin a backend credential independently of `ADMIN_PASSWORD`, add it to `.env` by hand (e.g. `ADGUARD_PASSWORD=...`) and re-run `./compose.sh up -d`.
 

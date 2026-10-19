@@ -8,6 +8,14 @@ RUN apt-get update \
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
+
+# Baked at build time so an image-based deployment knows its own version
+# without needing the git checkout (CI passes the repo VERSION file).
+# A local `compose up --build` leaves it empty; server.js then falls back to a
+# mounted VERSION file, then package.json.
+ARG APP_VERSION=""
+ENV APP_VERSION=$APP_VERSION
+
 RUN mkdir -p /data
 EXPOSE 8080
 CMD ["node", "server.js"]

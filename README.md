@@ -18,6 +18,7 @@ It combines WireGuard, AdGuard Home, a custom admin portal, HTTPS access, securi
 - **Backups** — local backup and restore with a guided workflow
 - **Monitoring** — HTTP, HTTPS, TCP, DNS, Docker and TLS checks with alerts
 - **Notifications** — email and webhook alerts for monitor events
+- **Update & drift check** — tells you when a newer release exists, and when your Caddyfile has stopped serving the security headers
 - **Mobile-friendly** — responsive UI with hamburger sidebar for smartphone access
 - **Multilingual** — English, French, Chinese
 
@@ -238,6 +239,7 @@ Run `./easywg help` for the full command list.
 - Gateway can expose services publicly. Review each service before enabling public access.
 - File Drop public links are accessible without VPN. Use passwords and expiry.
 - Backups may contain secrets (WireGuard keys, API tokens). Store them securely.
+- The dashboard checks GitHub once every 6 hours for a newer release. It sends nothing but the request itself. Set `UPDATE_CHECK_ENABLED=no` in `.env` to disable it.
 
 → [Full security model](docs/security-model.md)
 

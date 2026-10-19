@@ -34,6 +34,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Fail2Ban reads Caddy's timestamps:** the `easy-wg-portal` filter now sets `datepattern = "ts":{EPOCH}`. Caddy logs a floating-point epoch that Fail2Ban could not parse, so it fell back to "Simulate NOW" and measured `findtime`/`bantime` from the time it read the line instead of the time of the attempt. Existing installs: re-run `./bootstrap.sh`.
 
 ### Added
+- **Release and configuration-drift check on the dashboard.** The portal now reports its own version, compares it against the latest GitHub release (cached 6 h, `UPDATE_CHECK_ENABLED=no` to disable), and — more importantly — warns when the live `caddy/Caddyfile` has stopped serving any of the six security headers or still carries a report-only CSP. Both halves fail soft: no network, a rate-limited API or an unreadable Caddyfile leaves the banners hidden rather than raising a false alarm. New endpoint `GET /api/system/updates`; translated EN/FR/ZH.
+- The portal image carries its version in `APP_VERSION`, baked at build time, so an image-based deployment no longer needs the git checkout to know what it runs.
 - `easywg passwd` — rotate the admin password across `.env`, the wg-easy hash and the portal in one step.
 - `SESSION_SECRET` is now actually delivered to the portal container; `WG_EASY_PASSWORD` / `ADGUARD_PASSWORD` can be pinned independently of `ADMIN_PASSWORD`.
 - Test suite (`node:test`, 53 tests) covering File Drop enforcement, capability gating, auth, monitor/Caddy/tar guards and boot behavior; `npm test` runs in CI.
