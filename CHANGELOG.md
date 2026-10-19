@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ## [Unreleased] — security hardening
 
 ### Security
+- **Critical: `proxy-addr` IP spoofing (GHSA-jqcg-44mw-7w3h, CVSS 9.1).** express 5.2.1 pulled `proxy-addr` 2.0.7, where an IPv4-mapped IPv6 peer address can match an IPv4 trust subnet. express **5.3.0** requires `proxy-addr` ^2.0.8. The portal sets `trust proxy` to `loopback`, so the spoofable value is the one keying the per-IP rate limiter and shown in the sessions view; the Fail2Ban jail reads Caddy's access log and was not affected. **Update any instance running an earlier build.**
 - **SSRF IP classification is now semantic**, not textual: IPv4-mapped IPv6 in **both** dotted (`::ffff:127.0.0.1`) and hexadecimal (`::ffff:7f00:1`) notation is correctly blocked, along with a fuller reserved-range set; only globally routable unicast is allowed for user monitors. Malformed IPv6 fails closed.
 - **`easywg passwd` preserves an independent wg-easy credential:** it only regenerates wg-easy's `PASSWORD_HASH` when `WG_EASY_PASSWORD` follows the admin password. An intentionally independent `WG_EASY_PASSWORD` is no longer desynced by a rotation.
 - **The admin password is no longer printed** in the installer's final summary (prevents it leaking into terminal / cloud-init / provisioning logs).
@@ -44,7 +45,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 - Portal base image `node:22-bookworm-slim` is now digest-pinned (matches the other images).
-- Dependency updates: Express 4 → 5, nodemailer → 10.x, express-rate-limit → 8.x, AdGuard Home → `v0.107.79`, Xray → `26.9.9`. `ip-address` was pinned to 10.7.2 to clear a transitive advisory pulled in by express-rate-limit 8 (the portal's own CIDR checks in `portal/lib/net-guards.js` were never affected).
+- Dependency updates: Express 4 → **5.3.0**, nodemailer → **10.1.7**, express-rate-limit → **8.7.1**, AdGuard Home → `v0.107.79`, Xray → `26.10.17`, Caddy digest refreshed. `ip-address` was pinned to 10.7.2 to clear a transitive advisory pulled in by express-rate-limit 8 (the portal's own CIDR checks in `portal/lib/net-guards.js` were never affected).
 
 ### Fixed
 - `POST /api/migration/validate` no longer 500s (undefined `caddyUp` reference).
