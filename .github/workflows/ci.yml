@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   shell:
@@ -112,3 +113,50 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publishes the portal image so a server can pull it instead of building it.
+  # The target boxes are 1 vCPU / 1 GB: building there is what this project's
+  # own guidance forbids, and it is why updating currently means a manual
+  # `docker save | ssh docker load`.
+  #
+  # Gated on a push to this repository and on every other job passing, so a
+  # fork or a pull request can never publish.
+  publish:
+    runs-on: ubuntu-latest
+    needs: [shell, compose, portal, secrets]
+    if: github.event_name == 'push' && github.repository == 'r45635/Easy-WG-Combo'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read project version
+        id: ver
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/r45635/easy-wg-combo-portal
+          tags: |
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./portal
+          push: true
+          platforms: linux/amd64
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
