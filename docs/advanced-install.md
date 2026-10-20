@@ -183,6 +183,22 @@ The command is safe by construction:
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14. See [CHANGELOG.md](../CHANGELOG.md) for version history.
 
+### Updating without compiling on the server
+
+`easywg update` ends with `compose up -d --build`, which compiles the portal **on the machine running it**. On a 1 vCPU / 1 GB VPS that is slow at best and has taken a server down at worst.
+
+Since the portal image is published, you can skip the build entirely:
+
+```bash
+cd ~/Easy-WG-Combo
+./easywg backup
+git pull --ff-only origin main
+./compose.sh pull            # fetches ghcr.io/r45635/easy-wg-combo-portal
+./compose.sh up -d --no-build
+```
+
+`wg-easy` is not recreated when its digest is unchanged, so **the VPN is not interrupted**. Prefer this path on any small VPS; `--build` remains the right choice when you have local changes to `portal/`.
+
 > ⚠️ **`easywg update` does not regenerate `caddy/Caddyfile`.** That file is generated once at install and then left alone, so your edits survive — but it also means changes to the security headers or the TLS block shipped in a new release are **not** picked up by an update. If a release changes them, re-run `./bootstrap.sh` or apply the **Server Endpoint** action in the portal. `./easywg doctor` warns when your Caddyfile is missing the headers.
 
 ## See also
