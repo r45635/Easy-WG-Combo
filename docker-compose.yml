@@ -48,7 +48,7 @@ services:
     # `compose pull` fetches the prebuilt image — so a 1 GB VPS can update with
     # `up -d --no-build` instead of compiling — while `up -d --build` still
     # rebuilds from source for development.
-    image: ghcr.io/r45635/easy-wg-combo-portal:0.5.2
+    image: ghcr.io/r45635/easy-wg-combo-portal:${PORTAL_IMAGE_TAG:?use ./compose.sh — it derives this from the VERSION file; docker compose directly cannot}
     build: ./portal
     container_name: portal
     restart: unless-stopped

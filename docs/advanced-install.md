@@ -81,7 +81,7 @@ echo "export PASSWORD_HASH='<hash>'" > .env.secrets
 ./compose.sh up -d
 ```
 
-**Always use `./compose.sh`**, never `docker compose` directly. `compose.sh` injects `PASSWORD_HASH` from `.env.secrets` — docker-compose would mangle the bcrypt `$` signs.
+**Always use `./compose.sh`**, never `docker compose` directly. `compose.sh` injects `PASSWORD_HASH` from `.env.secrets` (docker-compose would mangle the bcrypt `$` signs) and derives the portal image tag from the `VERSION` file. This is no longer just advice: `docker compose` on its own now stops with an error naming `compose.sh`, rather than quietly rendering an image with an empty tag.
 
 ## HTTPS / admin exposure
 
@@ -183,21 +183,20 @@ The command is safe by construction:
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14. See [CHANGELOG.md](../CHANGELOG.md) for version history.
 
-### Updating without compiling on the server
+### `easywg update` pulls, it does not compile
 
-`easywg update` ends with `compose up -d --build`, which compiles the portal **on the machine running it**. On a 1 vCPU / 1 GB VPS that is slow at best and has taken a server down at worst.
+Since the portal image is published, `easywg update` looks for the image CI built for **the exact commit it just checked out** (`sha-<commit>`) and recreates the container from it. Nothing is compiled on the server.
 
-Since the portal image is published, you can skip the build entirely:
+It uses the commit tag rather than the release tag on purpose: the update refuses to run on a dirty checkout, so the tree is exactly that commit, and the commit tag cannot drift from the code — the version tag can, whenever a commit does not bump `VERSION`.
 
-```bash
-cd ~/Easy-WG-Combo
-./easywg backup
-git pull --ff-only origin main
-./compose.sh pull            # fetches ghcr.io/r45635/easy-wg-combo-portal
-./compose.sh up -d --no-build
+If no image exists for that commit — you have local commits, you are on a fork, or CI has not finished — it says so and falls back to building locally:
+
+```
+No published image for this commit (local commits, a fork, or CI still running).
+Falling back to building the portal on this machine — slow on a small VPS.
 ```
 
-`wg-easy` is not recreated when its digest is unchanged, so **the VPN is not interrupted**. Prefer this path on any small VPS; `--build` remains the right choice when you have local changes to `portal/`.
+`wg-easy` is not recreated when its digest is unchanged, so **the VPN is not interrupted**.
 
 > ⚠️ **`easywg update` does not regenerate `caddy/Caddyfile`.** That file is generated once at install and then left alone, so your edits survive — but it also means changes to the security headers or the TLS block shipped in a new release are **not** picked up by an update. If a release changes them, re-run `./bootstrap.sh` or apply the **Server Endpoint** action in the portal. `./easywg doctor` warns when your Caddyfile is missing the headers.
 

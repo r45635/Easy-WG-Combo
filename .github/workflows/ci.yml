@@ -28,13 +28,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Validate through compose.sh, the supported entry point: it is what
+      # derives PORTAL_IMAGE_TAG from the VERSION file and injects the secrets.
+      # Calling `docker compose` directly here would validate a path no
+      # installation uses, and would have missed the portal image rendering
+      # with an empty tag.
       - name: Validate base compose config
         run: |
           cp .env.example .env
-          docker compose config -q
+          echo "export PASSWORD_HASH='ci-placeholder'" > .env.secrets
+          ./compose.sh config -q
 
       - name: Validate xray overlay config
-        run: docker compose -f docker-compose.yml -f docker-compose.xray.yml config -q
+        run: XRAY_ENABLED=yes ./compose.sh config -q
+
+      - name: docker compose directly must fail loudly, not render an empty tag
+        run: |
+          if docker compose config -q 2>/dev/null; then
+            echo "docker compose succeeded without PORTAL_IMAGE_TAG — the guard is gone."
+            exit 1
+          fi
+          echo "Refused as expected."
+
 
   portal:
     runs-on: ubuntu-latest

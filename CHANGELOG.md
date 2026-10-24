@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-10-24
+
+### Changed
+- **`easywg update` no longer compiles on the server.** It now pulls the image CI built for the exact commit it just checked out (`sha-<commit>`) and recreates the container from it. The commit tag rather than the release tag is deliberate: the update refuses to run on a dirty checkout, so the tree *is* that commit and the tag cannot drift from the code — the version tag can, whenever a commit does not bump `VERSION`. With no image for that commit (local commits, a fork, CI still running) it says so and falls back to building, which is now the exception rather than the default. On a 1 vCPU / 1 GB VPS that difference is the whole point.
+- **`docker-compose.yml` no longer carries a version.** The portal image tag comes from `PORTAL_IMAGE_TAG`, which `compose.sh` derives from the `VERSION` file — one less place to keep in sync on a release, and the one most easily forgotten now that the image is published.
+- **Using `docker compose` directly now fails with an error naming `compose.sh`**, instead of quietly rendering the portal image with an empty tag. The CI compose job validates through `compose.sh` — the path installations actually use — and asserts that the direct call is still refused.
+
 ## [0.5.2] — 2026-10-24
 
 ### Changed
@@ -63,7 +70,7 @@ learning to tell you when it is behind. **Update any instance running
 ### Added
 - **Release and configuration-drift check on the dashboard.** The portal now reports its own version, compares it against the latest GitHub release (cached 6 h, `UPDATE_CHECK_ENABLED=no` to disable), and — more importantly — warns when the live `caddy/Caddyfile` has stopped serving any of the six security headers or still carries a report-only CSP. Both halves fail soft: no network, a rate-limited API or an unreadable Caddyfile leaves the banners hidden rather than raising a false alarm. New endpoint `GET /api/system/updates`; translated EN/FR/ZH.
 - The portal image carries its version in `APP_VERSION`, baked at build time, so an image-based deployment no longer needs the git checkout to know what it runs.
-- **CI publishes the portal image to `ghcr.io/r45635/easy-wg-combo-portal`** (version, commit SHA and `latest` tags), after every other job passes, and only on a push to this repository — a fork or a pull request cannot publish. This is the groundwork for updating a server by *pulling* the portal instead of compiling it there: on a 1 vCPU / 1 GB VPS, `compose up -d --build` is exactly what this project tells you not to do. The package is public, and `docker-compose.yml` now carries both `image:` and `build:`: `compose pull` fetches the prebuilt image so a small VPS can update with `./compose.sh up -d --no-build` instead of compiling, while `up -d --build` still builds from source for development. See [Updating without compiling on the server](docs/advanced-install.md#updating-without-compiling-on-the-server).
+- **CI publishes the portal image to `ghcr.io/r45635/easy-wg-combo-portal`** (version, commit SHA and `latest` tags), after every other job passes, and only on a push to this repository — a fork or a pull request cannot publish. This is the groundwork for updating a server by *pulling* the portal instead of compiling it there: on a 1 vCPU / 1 GB VPS, `compose up -d --build` is exactly what this project tells you not to do. The package is public, and `docker-compose.yml` now carries both `image:` and `build:`: `compose pull` fetches the prebuilt image so a small VPS can update with `./compose.sh up -d --no-build` instead of compiling, while `up -d --build` still builds from source for development. See [Updating without compiling on the server](docs/advanced-install.md#easywg-update-pulls-it-does-not-compile).
 - `easywg passwd` — rotate the admin password across `.env`, the wg-easy hash and the portal in one step.
 - `SESSION_SECRET` is now actually delivered to the portal container; `WG_EASY_PASSWORD` / `ADGUARD_PASSWORD` can be pinned independently of `ADMIN_PASSWORD`.
 - Test suite (`node:test`, 53 tests) covering File Drop enforcement, capability gating, auth, monitor/Caddy/tar guards and boot behavior; `npm test` runs in CI.
@@ -115,6 +122,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.4.0...v0.5.0

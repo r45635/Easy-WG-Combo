@@ -113,8 +113,26 @@ case "${1:-}" in
       exit 1
     fi
     git -C "$SCRIPT_DIR" pull --ff-only origin main
-    "$SCRIPT_DIR/compose.sh" pull
-    "$SCRIPT_DIR/compose.sh" up -d --build
+
+    # Prefer the image CI published for this exact commit. The dirty-tree guard
+    # above means the checkout is exactly that commit, so the sha-<commit> tag
+    # cannot drift from the code — which the version tag can, whenever a commit
+    # does not bump VERSION. Building here is the fallback, not the default:
+    # these servers are 1 vCPU / 1 GB and compiling on them is what this
+    # project tells you not to do.
+    portal_repo="$(awk -F'"'"':'"'"' '"'"'/image: *ghcr.io\/r45635\/easy-wg-combo-portal/{sub(/^ *image: */,"",$0); split($0,a,":"); print a[1]; exit}'"'"' "$SCRIPT_DIR/docker-compose.yml")"
+    commit_tag="sha-$(git -C "$SCRIPT_DIR" rev-parse HEAD)"
+    if [ -n "$portal_repo" ] && docker pull -q "${portal_repo}:${commit_tag}" >/dev/null 2>&1; then
+      echo "Published portal image found for this commit — updating without compiling."
+      export PORTAL_IMAGE_TAG="$commit_tag"
+      "$SCRIPT_DIR/compose.sh" pull
+      "$SCRIPT_DIR/compose.sh" up -d --no-build
+    else
+      echo "No published image for this commit (local commits, a fork, or CI still running)."
+      echo "Falling back to building the portal on this machine — slow on a small VPS."
+      "$SCRIPT_DIR/compose.sh" pull
+      "$SCRIPT_DIR/compose.sh" up -d --build
+    fi
     bash "$SCRIPTS_DIR/health.sh" --services-only || true
     echo "Update complete — now at v$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo dev) ($(git -C "$SCRIPT_DIR" rev-parse --short HEAD))"
     ;;

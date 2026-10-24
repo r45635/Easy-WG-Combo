@@ -5,7 +5,7 @@ REPO_URL="${REPO_URL:-https://github.com/r45635/Easy-WG-Combo.git}"
 APP_DIR="${APP_DIR:-$HOME/Easy-WG-Combo}"
 # install.sh runs standalone (curl | bash) before the repo exists, so it cannot
 # read the VERSION file — keep this literal in sync with VERSION on release.
-INSTALL_VERSION="0.5.2"
+INSTALL_VERSION="0.5.3"
 
 log() {
   printf '%s\n' "$*"

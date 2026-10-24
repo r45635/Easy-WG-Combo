@@ -22,6 +22,11 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 set +a
 
+# Portal image tag. Defaults to the VERSION file, so docker-compose.yml never
+# carries a version to keep in sync; `easywg update` overrides it with the
+# sha-<commit> tag of the checkout so a server can pull instead of compiling.
+export PORTAL_IMAGE_TAG="${PORTAL_IMAGE_TAG:-$(cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo latest)}"
+
 COMPOSE_FILES="-f $SCRIPT_DIR/docker-compose.yml"
 if [ "${XRAY_ENABLED:-no}" = "yes" ] && [ -f "$SCRIPT_DIR/docker-compose.xray.yml" ]; then
   COMPOSE_FILES="$COMPOSE_FILES -f $SCRIPT_DIR/docker-compose.xray.yml"
