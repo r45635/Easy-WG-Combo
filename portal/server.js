@@ -598,8 +598,9 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
       // upstreamUrl comes from netGuards.resolveUpstreamUrl(), which collapses
       // leading slashes and returns null unless the resolved origin equals the
       // backend's, so this request cannot leave wg-easy / AdGuard. CodeQL does
-      // not model the helper as a sanitizer; see portal/test/net-guards.test.js.
-      const upstream = await fetch(upstreamUrl, init); // codeql[js/request-forgery]
+      // not model the helper as a sanitizer; the alert is accepted in
+      // .github/codeql-accepted.txt. See portal/test/net-guards.test.js.
+      const upstream = await fetch(upstreamUrl, init);
 
       res.status(upstream.status);
 
@@ -1397,9 +1398,9 @@ app.get('/api/tls/cert', auth, (req, res) => {
   // Intentional: reads THIS host's own certificate on :443 to report its
   // expiry, and that certificate is self-signed in the documented fallback.
   // Validating it would make the check impossible. Nothing is sent over this
-  // socket.
+  // socket. Accepted in .github/codeql-accepted.txt.
   const sock  = tls.connect(
-    { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, // codeql[js/disabling-certificate-validation]
+    { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp },
     () => {
       try {
         const cert = sock.getPeerCertificate();
@@ -1674,7 +1675,7 @@ async function computeSecurityScore() {
       const hostIp = getHostIp();
       // Same as /api/tls/cert: reads this host's own, possibly self-signed,
       // certificate for its expiry.
-      const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => { // codeql[js/disabling-certificate-validation]
+      const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => {
         const cert = sock.getPeerCertificate();
         sock.destroy();
         if (cert.valid_to) {

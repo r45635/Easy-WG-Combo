@@ -117,12 +117,11 @@ jobs:
   # CodeQL writes its findings to the Security tab and the workflow still
   # reports success — so a green CodeQL run says nothing about what it found.
   # That is how a real SSRF sat open from 17 August to 24 October here.
-  # This turns the queue into a signal: any open alert fails the build, the
-  # same way the npm audit gate treats a high advisory.
+  # This turns the queue into a signal: an open alert fails the build unless it
+  # is listed, with a reason, in .github/codeql-accepted.txt.
   #
-  # To clear one legitimately: fix it, or suppress it in the source with a
-  # `// codeql[rule-id]` comment that says why. Dismissing from the web UI
-  # also works but leaves no trace next to the code.
+  # Inline `// codeql[rule-id]` comments do NOT work — GitHub code scanning
+  # ignores them — which is why acceptance lives in that file instead.
   #
   # Deliberately NOT in publish's `needs`: this reads the repository's current
   # alert set, which CodeQL updates asynchronously in its own workflow, so a
@@ -134,22 +133,35 @@ jobs:
     permissions:
       security-events: read
     steps:
-      - name: Fail if any code-scanning alert is open
+      - uses: actions/checkout@v7
+
+      - name: Fail on any unreviewed code-scanning alert
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          alerts=$(gh api \
-            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
-            --jq '[.[] | "\(.rule.security_severity_level // .rule.severity)\t\(.rule.id)\t\(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line)"] | .[]' 2>/dev/null || true)
-          if [ -z "$alerts" ]; then
-            echo "No open code-scanning alerts."
-            exit 0
+          gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            --jq '.[] | "\(.rule.id)\t\(.most_recent_instance.location.path)"' \
+            > /tmp/open.tsv 2>/dev/null || : > /tmp/open.tsv
+
+          grep -vE '^\s*(#|$)' .github/codeql-accepted.txt | sed 's/[[:space:]]*$//' \
+            | sort -u > /tmp/accepted.tsv
+
+          sort -u /tmp/open.tsv > /tmp/open.sorted
+          unreviewed=$(comm -23 /tmp/open.sorted /tmp/accepted.tsv || true)
+
+          echo "Open alerts:      $(wc -l < /tmp/open.sorted | tr -d ' ')"
+          echo "Accepted entries: $(wc -l < /tmp/accepted.tsv | tr -d ' ')"
+
+          if [ -n "$unreviewed" ]; then
+            echo ""
+            echo "Unreviewed code-scanning alerts:"
+            echo "$unreviewed" | sed 's/^/  /'
+            echo ""
+            echo "Fix them, or add the rule and path to .github/codeql-accepted.txt"
+            echo "with a comment explaining why the alert is acceptable."
+            exit 1
           fi
-          echo "Open code-scanning alerts:"
-          echo "$alerts" | sed 's/^/  /'
-          echo ""
-          echo "Fix them, or suppress with a '// codeql[rule-id]' comment stating why."
-          exit 1
+          echo "No unreviewed alerts."
 
   # Publishes the portal image so a server can pull it instead of building it.
   # The target boxes are 1 vCPU / 1 GB: building there is what this project's

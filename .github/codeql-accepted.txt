@@ -1,0 +1,26 @@
+# Code-scanning alerts accepted after review.
+#
+# One `rule-id<TAB>path` per line. The CI `codescan` job fails on any open
+# alert that is NOT listed here, so a new finding breaks the build while a
+# reviewed one does not. Lines are matched on rule and file, never on line
+# number, so ordinary edits do not silently re-arm or re-silence anything.
+#
+# GitHub code scanning does not honour `// codeql[rule-id]` comments in source,
+# so this file is where an accepted alert is recorded and reviewed — in the
+# repository, alongside the code, rather than in a web UI nobody opens.
+#
+# Adding a line here is a security decision. Say why, and keep it short.
+
+# The proxy must fetch a URL; that is its function. The URL comes from
+# netGuards.resolveUpstreamUrl(), which collapses leading slashes and returns
+# null unless the resolved origin equals the backend's, so the request cannot
+# leave wg-easy / AdGuard. Proven against a local listener before and after the
+# fix, and on both production servers. CodeQL does not model the helper as a
+# sanitizer. Regression tests: portal/test/net-guards.test.js.
+js/request-forgery	portal/server.js
+
+# The portal reads THIS host's own certificate on :443 to report its expiry,
+# and that certificate is self-signed in the documented fallback — validating
+# it would make the check impossible. Nothing is sent over those sockets and
+# the peer is the local host. Two sites: /api/tls/cert and the security score.
+js/disabling-certificate-validation	portal/server.js
