@@ -12,6 +12,8 @@ learning to tell you when it is behind. **Update any instance running
 0.4.0.**
 
 ### Security
+- **`body-parser` denial of service (GHSA-27r3-jxmh-p828, high).** express 5.3.0 pulled `body-parser` 2.3.0, which can be stalled by trailing bytes after a compressed request body. Raised to 2.4.0. The portal parses JSON bodies on its API, including the unauthenticated login and File Drop paths, so this one is reachable — the per-IP rate limiter bounds it but does not remove it.
+- **`ip-address` quadratic parsing (GHSA-rxp7-6hxx-x8q5, moderate).** Raised to 10.7.4. Pulled by express-rate-limit; the portal's own CIDR checks in `portal/lib/net-guards.js` do not use it.
 - **Critical: `proxy-addr` IP spoofing (GHSA-jqcg-44mw-7w3h, CVSS 9.1).** express 5.2.1 pulled `proxy-addr` 2.0.7, where an IPv4-mapped IPv6 peer address can match an IPv4 trust subnet. express **5.3.0** requires `proxy-addr` ^2.0.8. The portal sets `trust proxy` to `loopback`, so the spoofable value is the one keying the per-IP rate limiter and shown in the sessions view; the Fail2Ban jail reads Caddy's access log and was not affected. **Update any instance running an earlier build.**
 - **SSRF IP classification is now semantic**, not textual: IPv4-mapped IPv6 in **both** dotted (`::ffff:127.0.0.1`) and hexadecimal (`::ffff:7f00:1`) notation is correctly blocked, along with a fuller reserved-range set; only globally routable unicast is allowed for user monitors. Malformed IPv6 fails closed.
 - **`easywg passwd` preserves an independent wg-easy credential:** it only regenerates wg-easy's `PASSWORD_HASH` when `WG_EASY_PASSWORD` follows the admin password. An intentionally independent `WG_EASY_PASSWORD` is no longer desynced by a rotation.
