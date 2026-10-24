@@ -85,3 +85,47 @@ test('splitHostPort — bracketed IPv6, host:port, and host-only', () => {
   assert.deepStrictEqual(g.splitHostPort('10.0.0.5:22'), { host: '10.0.0.5', port: '22' });
   assert.deepStrictEqual(g.splitHostPort('example.com'), { host: 'example.com', port: '' });
 });
+
+// Regression: CodeQL js/request-forgery on portal/server.js — proven
+// exploitable before the fix. `new URL(path, base)` discards the base for an
+// absolute or protocol-relative path, so GET /adguard//attacker/ was proxied
+// to the attacker, carrying the Basic credentials the proxy injects.
+test('resolveUpstreamUrl — keeps ordinary paths on the backend', () => {
+  const base = 'http://127.0.0.1:3000';
+  assert.strictEqual(g.resolveUpstreamUrl('/control/status', base).href, 'http://127.0.0.1:3000/control/status');
+  assert.strictEqual(g.resolveUpstreamUrl('/', base).href, 'http://127.0.0.1:3000/');
+  assert.strictEqual(g.resolveUpstreamUrl('', base).href, 'http://127.0.0.1:3000/');
+  assert.strictEqual(g.resolveUpstreamUrl('/a?b=1#c', base).href, 'http://127.0.0.1:3000/a?b=1#c');
+});
+
+test('resolveUpstreamUrl — a protocol-relative path cannot escape the backend', () => {
+  const base = 'http://127.0.0.1:3000';
+  for (const evil of [
+    '//evil.example.com/x',
+    '///evil.example.com/x',
+    '////evil.example.com',
+    '//evil.example.com',
+    '\\\\evil.example.com/x',
+    '/\\evil.example.com/x',
+  ]) {
+    const u = g.resolveUpstreamUrl(evil, base);
+    assert.ok(u, `${evil} should resolve, not return null`);
+    assert.strictEqual(u.origin, base, `${evil} escaped to ${u.origin}`);
+    assert.ok(!u.hostname.includes('evil'), `${evil} reached ${u.hostname}`);
+  }
+});
+
+test('resolveUpstreamUrl — an absolute URL cannot escape the backend', () => {
+  const base = 'http://127.0.0.1:3000';
+  for (const evil of ['http://evil.example.com/x', 'https://evil.example.com/x', 'file:///etc/passwd']) {
+    const u = g.resolveUpstreamUrl(evil, base);
+    // Treated as a path, so it stays on the backend rather than being honored.
+    assert.strictEqual(u.origin, base, `${evil} escaped to ${u && u.origin}`);
+  }
+});
+
+test('resolveUpstreamUrl — null-ish input and a bad base fail closed', () => {
+  assert.strictEqual(g.resolveUpstreamUrl('/x', 'not a url'), null);
+  assert.strictEqual(g.resolveUpstreamUrl(null, 'http://127.0.0.1:3000').href, 'http://127.0.0.1:3000/');
+  assert.strictEqual(g.resolveUpstreamUrl(undefined, 'http://127.0.0.1:3000').href, 'http://127.0.0.1:3000/');
+});

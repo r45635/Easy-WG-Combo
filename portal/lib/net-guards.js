@@ -211,7 +211,26 @@ function makeGuardedLookup(dnsLookup) {
   };
 }
 
+// Resolve a reverse-proxy target, refusing anything that leaves the intended
+// backend. Returns null when the path would escape it.
+//
+// `new URL(path, base)` DISCARDS the base when path is absolute
+// ("http://x/") or protocol-relative ("//x/"). The proxy builds its path from
+// req.originalUrl, so /adguard//attacker/ resolved to http://attacker/ — and
+// the proxy injects Basic credentials, which then left with the request.
+// Collapsing the leading slashes closes it; the origin check states the
+// guarantee rather than implying it.
+function resolveUpstreamUrl(upstreamPath, targetBaseUrl) {
+  let base;
+  try { base = new URL(targetBaseUrl); } catch { return null; }
+  const safePath = '/' + String(upstreamPath == null ? '' : upstreamPath).replace(/^[/\\]+/, '');
+  let url;
+  try { url = new URL(safePath, base); } catch { return null; }
+  return url.origin === base.origin ? url : null;
+}
+
 module.exports = {
   normalizeIp, trustedClientIp, isLoopback, ipv4ToInt, ipInCidr, isVpnOrLocalClient,
   isReservedIp, isLiteralIp, splitHostPort, validateMonitor, makeGuardedLookup,
+  resolveUpstreamUrl,
 };

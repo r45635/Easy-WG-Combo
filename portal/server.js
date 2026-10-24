@@ -563,7 +563,8 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
       if (opts.wgAuth && !wgCookie) await wgAuth();
 
       const upstreamPath = buildUpstreamPath(req, basePath, opts.keepPrefix);
-      const upstreamUrl = new URL(upstreamPath, targetBaseUrl);
+      const upstreamUrl = netGuards.resolveUpstreamUrl(upstreamPath, targetBaseUrl);
+      if (!upstreamUrl) return res.status(400).json({ error: 'Bad upstream path' });
 
       const headers = forwardReqHeaders(req);
 

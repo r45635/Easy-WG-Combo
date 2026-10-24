@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-24
+
+### Security
+- **Server-side request forgery in the wg-easy / AdGuard proxy (CodeQL `js/request-forgery`).** `proxyTo()` built its target with `new URL(path, base)`, and `new URL` **discards the base** when the path is absolute (`http://x/`) or protocol-relative (`//x/`). The path came from `req.originalUrl`, so `GET /adguard//attacker/` was proxied to the attacker — **carrying the Basic credentials the proxy injects**, which leaked the AdGuard password. Reproduced against a local listener before the fix and confirmed blocked after.
+
+  Exploitation needs an authenticated admin session and the admin following a crafted link: the cross-origin gate covers only state-changing methods, and the session cookie is `sameSite=lax`, so a top-level navigation carries it. Not reachable by an unauthenticated visitor.
+
+  The path is now collapsed to a single leading slash and the resolved origin is checked against the backend's, in `netGuards.resolveUpstreamUrl()` — a request that would leave the backend is refused with 400. Four regression tests cover protocol-relative, multi-slash, backslash and absolute-URL forms.
+
+  **If you ran 0.5.0 or earlier with the admin portal exposed, rotate the AdGuard password.**
+
 ## [0.5.0] — 2026-10-24 — security hardening
 
 Three months of hardening, a critical dependency fix, and the portal
@@ -96,6 +107,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.3.0-alpha...v0.4.0
 [0.3.0-alpha]: https://github.com/r45635/Easy-WG-Combo/releases/tag/v0.3.0-alpha
