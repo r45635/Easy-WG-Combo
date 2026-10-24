@@ -595,12 +595,11 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
         }
       }
 
-      // codeql[js/request-forgery] -- upstreamUrl comes from
-      // netGuards.resolveUpstreamUrl(), which collapses leading slashes and
-      // returns null unless the resolved origin equals the backend's, so this
-      // request cannot leave wg-easy / AdGuard. CodeQL does not model the
-      // helper as a sanitizer. Covered by portal/test/net-guards.test.js.
-      const upstream = await fetch(upstreamUrl, init);
+      // upstreamUrl comes from netGuards.resolveUpstreamUrl(), which collapses
+      // leading slashes and returns null unless the resolved origin equals the
+      // backend's, so this request cannot leave wg-easy / AdGuard. CodeQL does
+      // not model the helper as a sanitizer; see portal/test/net-guards.test.js.
+      const upstream = await fetch(upstreamUrl, init); // codeql[js/request-forgery]
 
       res.status(upstream.status);
 
@@ -1395,12 +1394,12 @@ app.get('/api/tls/cert', auth, (req, res) => {
   let resolved = false;
   const done = (payload) => { if (!resolved) { resolved = true; res.json(payload); } };
   const hostIp = getHostIp();
-  // codeql[js/disabling-certificate-validation] -- intentional: this reads
-  // THIS host's own certificate on :443 to report its expiry, and that
-  // certificate is self-signed in the documented fallback. Validation would
-  // make the check impossible. Nothing is sent over this socket.
+  // Intentional: reads THIS host's own certificate on :443 to report its
+  // expiry, and that certificate is self-signed in the documented fallback.
+  // Validating it would make the check impossible. Nothing is sent over this
+  // socket.
   const sock  = tls.connect(
-    { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp },
+    { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, // codeql[js/disabling-certificate-validation]
     () => {
       try {
         const cert = sock.getPeerCertificate();
@@ -1673,9 +1672,9 @@ async function computeSecurityScore() {
     const tls = require('tls');
     await new Promise((resolve, reject) => {
       const hostIp = getHostIp();
-      // codeql[js/disabling-certificate-validation] -- same as /api/tls/cert:
-      // reads this host's own, possibly self-signed, certificate for its expiry.
-      const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => {
+      // Same as /api/tls/cert: reads this host's own, possibly self-signed,
+      // certificate for its expiry.
+      const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => { // codeql[js/disabling-certificate-validation]
         const cert = sock.getPeerCertificate();
         sock.destroy();
         if (cert.valid_to) {
