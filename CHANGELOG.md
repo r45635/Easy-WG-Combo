@@ -3,7 +3,13 @@
 All notable changes to Easy-WG-Combo are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/) (pre-1.0: minor bumps may contain breaking changes).
 
-## [Unreleased] — security hardening
+## [Unreleased]
+
+## [0.5.0] — 2026-10-24 — security hardening
+
+Three months of hardening, a critical dependency fix, and the portal
+learning to tell you when it is behind. **Update any instance running
+0.4.0.**
 
 ### Security
 - **Critical: `proxy-addr` IP spoofing (GHSA-jqcg-44mw-7w3h, CVSS 9.1).** express 5.2.1 pulled `proxy-addr` 2.0.7, where an IPv4-mapped IPv6 peer address can match an IPv4 trust subnet. express **5.3.0** requires `proxy-addr` ^2.0.8. The portal sets `trust proxy` to `loopback`, so the spoofable value is the one keying the per-IP rate limiter and shown in the sessions view; the Fail2Ban jail reads Caddy's access log and was not affected. **Update any instance running an earlier build.**
@@ -88,5 +94,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.3.0-alpha...v0.4.0
 [0.3.0-alpha]: https://github.com/r45635/Easy-WG-Combo/releases/tag/v0.3.0-alpha

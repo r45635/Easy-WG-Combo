@@ -145,10 +145,12 @@ jobs:
         with:
           images: ghcr.io/r45635/easy-wg-combo-portal
           tags: |
+            # The VERSION file already gives one image tag per release; this
+            # workflow does not run on tag pushes, so a type=ref,event=tag
+            # entry here would never produce anything.
             type=raw,value=${{ steps.ver.outputs.version }}
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
 
       - name: Build and push
         uses: docker/build-push-action@v6
