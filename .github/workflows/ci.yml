@@ -114,6 +114,43 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # CodeQL writes its findings to the Security tab and the workflow still
+  # reports success — so a green CodeQL run says nothing about what it found.
+  # That is how a real SSRF sat open from 17 August to 24 October here.
+  # This turns the queue into a signal: any open alert fails the build, the
+  # same way the npm audit gate treats a high advisory.
+  #
+  # To clear one legitimately: fix it, or suppress it in the source with a
+  # `// codeql[rule-id]` comment that says why. Dismissing from the web UI
+  # also works but leaves no trace next to the code.
+  #
+  # Deliberately NOT in publish's `needs`: this reads the repository's current
+  # alert set, which CodeQL updates asynchronously in its own workflow, so a
+  # just-pushed fix can still read as stale. It must be able to go red without
+  # deadlocking a release.
+  codescan:
+    runs-on: ubuntu-latest
+    if: github.repository == 'r45635/Easy-WG-Combo'
+    permissions:
+      security-events: read
+    steps:
+      - name: Fail if any code-scanning alert is open
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          alerts=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            --jq '[.[] | "\(.rule.security_severity_level // .rule.severity)\t\(.rule.id)\t\(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line)"] | .[]' 2>/dev/null || true)
+          if [ -z "$alerts" ]; then
+            echo "No open code-scanning alerts."
+            exit 0
+          fi
+          echo "Open code-scanning alerts:"
+          echo "$alerts" | sed 's/^/  /'
+          echo ""
+          echo "Fix them, or suppress with a '// codeql[rule-id]' comment stating why."
+          exit 1
+
   # Publishes the portal image so a server can pull it instead of building it.
   # The target boxes are 1 vCPU / 1 GB: building there is what this project's
   # own guidance forbids, and it is why updating currently means a manual

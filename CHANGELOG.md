@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-10-24
+
+### Changed
+- **The prototype-pollution class is removed at the root, not guarded against.** The seven record stores are now built with `Object.create(null)`, so `store["__proto__"]` is an ordinary absent key rather than `Object.prototype` — there is no prototype chain for a user-supplied id to reach, and nothing for a later assignment to corrupt. `safeLookup()` from 0.5.1 stays as a second line. A hostile store file carrying an own `__proto__` key is inert for the same reason.
+- **Backup paths are resolved and contained rather than pattern-matched.** `resolveBackupPath()` resolves the filename against `BACKUP_DIR` and requires the result to sit directly inside it. The filename pattern check remains the first line; the containment check is the one that holds regardless, and it is legible to a reader and to static analysis alike.
+- **CI fails when any code-scanning alert is open.** CodeQL writes to the Security tab while its workflow still reports success, so a green run said nothing about what it found — which is how a real SSRF stayed open from 17 August to 24 October. The queue is now a build signal. Three alerts that are intentional or unmodellable carry `// codeql[rule-id]` suppression comments stating why, next to the code rather than in a web UI.
+
 ## [0.5.1] — 2026-10-24
 
 ### Security
@@ -108,6 +115,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.3.0-alpha...v0.4.0

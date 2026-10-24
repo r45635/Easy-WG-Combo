@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { safeLookup } = require('../lib/safe-lookup');
+const { safeLookup, nullProtoStore } = require('../lib/safe-lookup');
 
 test('safeLookup — returns own entries unchanged', () => {
   const store = JSON.parse('{"dev_1":{"name":"phone"},"dev_2":{"name":"laptop"}}');
@@ -52,4 +52,42 @@ test('safeLookup — hostile or absent input fails closed', () => {
   assert.strictEqual(safeLookup({ x: 1 }, null), undefined);
   assert.strictEqual(safeLookup({ x: 1 }, undefined), undefined);
   assert.strictEqual(safeLookup({ x: 1 }, {}), undefined);
+});
+
+test('nullProtoStore — no prototype chain for a user id to reach', () => {
+  const store = nullProtoStore(JSON.parse('{"dev_1":{"name":"phone"}}'));
+  assert.strictEqual(Object.getPrototypeOf(store), null);
+  // The root fix: the raw lookup is now undefined, not Object.prototype.
+  assert.strictEqual(store['__proto__'], undefined);
+  assert.strictEqual(store['constructor'], undefined);
+  assert.strictEqual(store['toString'], undefined);
+  assert.deepStrictEqual(store.dev_1, { name: 'phone' });
+});
+
+test('nullProtoStore — a hostile file cannot smuggle a prototype in', () => {
+  // JSON.parse creates __proto__ as an OWN key rather than invoking the setter,
+  // so a crafted store file would carry it. On a null-prototype target it is
+  // just an ordinary key with nothing behind it.
+  const store = nullProtoStore(JSON.parse('{"__proto__":{"polluted":true},"dev_1":{}}'));
+  assert.strictEqual(Object.getPrototypeOf(store), null);
+  assert.strictEqual({}.polluted, undefined);
+  assert.strictEqual(safeLookup(store, '__proto__'), undefined, 'still refused by the second line');
+});
+
+test('nullProtoStore — ordinary object operations still work', () => {
+  const store = nullProtoStore({ a: 1, b: 2 });
+  assert.deepStrictEqual(Object.keys(store).sort(), ['a', 'b']);
+  assert.deepStrictEqual(Object.entries(store).length, 2);
+  assert.strictEqual(JSON.stringify(store), '{"a":1,"b":2}');
+  assert.deepStrictEqual({ ...store }, { a: 1, b: 2 });
+  store.c = 3;
+  assert.strictEqual(store.c, 3);
+});
+
+test('nullProtoStore — absent or hostile input yields an empty store', () => {
+  for (const bad of [null, undefined, 'x', 42]) {
+    const s = nullProtoStore(bad);
+    assert.strictEqual(Object.getPrototypeOf(s), null);
+    assert.deepStrictEqual(Object.keys(s), []);
+  }
 });

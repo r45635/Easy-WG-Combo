@@ -15,7 +15,7 @@ const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
 const archiveGuards = require('./lib/archive-guards');
 const updateCheck = require('./lib/update-check');
-const { safeLookup } = require('./lib/safe-lookup');
+const { safeLookup, nullProtoStore } = require('./lib/safe-lookup');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -595,6 +595,11 @@ function proxyTo(basePath, targetBaseUrl, opts = {}) {
         }
       }
 
+      // codeql[js/request-forgery] -- upstreamUrl comes from
+      // netGuards.resolveUpstreamUrl(), which collapses leading slashes and
+      // returns null unless the resolved origin equals the backend's, so this
+      // request cannot leave wg-easy / AdGuard. CodeQL does not model the
+      // helper as a sanitizer. Covered by portal/test/net-guards.test.js.
       const upstream = await fetch(upstreamUrl, init);
 
       res.status(upstream.status);
@@ -1390,6 +1395,10 @@ app.get('/api/tls/cert', auth, (req, res) => {
   let resolved = false;
   const done = (payload) => { if (!resolved) { resolved = true; res.json(payload); } };
   const hostIp = getHostIp();
+  // codeql[js/disabling-certificate-validation] -- intentional: this reads
+  // THIS host's own certificate on :443 to report its expiry, and that
+  // certificate is self-signed in the documented fallback. Validation would
+  // make the check impossible. Nothing is sent over this socket.
   const sock  = tls.connect(
     { host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp },
     () => {
@@ -1664,6 +1673,8 @@ async function computeSecurityScore() {
     const tls = require('tls');
     await new Promise((resolve, reject) => {
       const hostIp = getHostIp();
+      // codeql[js/disabling-certificate-validation] -- same as /api/tls/cert:
+      // reads this host's own, possibly self-signed, certificate for its expiry.
       const sock = tls.connect({ host: hostIp, port: 443, rejectUnauthorized: false, servername: hostIp }, () => {
         const cert = sock.getPeerCertificate();
         sock.destroy();
@@ -1769,6 +1780,20 @@ function assertSafeBackupFilename(filename) {
   }
 }
 
+// Resolve a user-supplied backup filename to an absolute path, proving it stays
+// inside BACKUP_DIR. The name check above is the first line; this is the one
+// that holds regardless of what gets past it — and, unlike a pattern test, it
+// is a containment check a reader (and a static analyser) can follow.
+function resolveBackupPath(filename) {
+  assertSafeBackupFilename(filename);
+  const root = path.resolve(BACKUP_DIR);
+  const resolved = path.resolve(root, path.basename(String(filename)));
+  if (resolved !== path.join(root, path.basename(resolved)) || path.dirname(resolved) !== root) {
+    throw new Error('Invalid backup filename.');
+  }
+  return resolved;
+}
+
 async function createBackupArchive(encrypt = false) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -1867,8 +1892,7 @@ app.post('/api/backup/create', auth, requiresAction('createBackup'), async (req,
 
 app.get('/api/backup/download/:filename', auth, (req, res) => {
   try {
-    assertSafeBackupFilename(req.params.filename);
-    const filePath = path.join(BACKUP_DIR, req.params.filename);
+    const filePath = resolveBackupPath(req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
     res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`);
     res.setHeader('Content-Type', 'application/gzip');
@@ -1878,11 +1902,12 @@ app.get('/api/backup/download/:filename', auth, (req, res) => {
 
 app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (req, res) => {
   const { filename, dryRun, confirmed } = req.body;
+  let filePathChecked;
   try {
-    assertSafeBackupFilename(filename);
+    filePathChecked = resolveBackupPath(filename);
   } catch (e) { return res.status(400).json({ error: e.message }); }
 
-  const filePath = path.join(BACKUP_DIR, filename);
+  const filePath = filePathChecked;
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
 
   if (filename.endsWith('.age')) {
@@ -1965,8 +1990,7 @@ app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (re
 
 app.delete('/api/backup/:filename', auth, requiresAction('restoreBackup'), (req, res) => {
   try {
-    assertSafeBackupFilename(req.params.filename);
-    const filePath = path.join(BACKUP_DIR, req.params.filename);
+    const filePath = resolveBackupPath(req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup not found.' });
     fs.unlinkSync(filePath);
     res.json({ success: true, backups: listBackups() });
@@ -2165,8 +2189,8 @@ app.get('/api/notifications/history', auth, (_req, res) => {
 // ── Phase 2: Data helpers ─────────────────────────────────────────────────────
 
 function loadDevices() {
-  try { return JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveDevices(devices) {
   fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2));
@@ -2175,7 +2199,7 @@ function saveDevices(devices) {
 function loadDnsProfiles() {
   let custom = {};
   try { custom = JSON.parse(fs.readFileSync(DNS_PROFILES_FILE, 'utf8')); } catch { /* seed built-ins */ }
-  return { ...BUILTIN_DNS_PROFILES, ...custom };
+  return nullProtoStore({ ...BUILTIN_DNS_PROFILES, ...custom });
 }
 function saveDnsProfiles(profiles) {
   const custom = {};
@@ -2186,8 +2210,8 @@ function saveDnsProfiles(profiles) {
 }
 
 function loadProxyServices() {
-  try { return JSON.parse(fs.readFileSync(PROXY_SERVICES_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(PROXY_SERVICES_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveProxyServices(services) {
   fs.writeFileSync(PROXY_SERVICES_FILE, JSON.stringify(services, null, 2));
@@ -2855,29 +2879,29 @@ const APP_CATALOG = {
 
 // ── Phase 3: load/save helpers ─────────────────────────────────────────────
 function loadMonitors() {
-  try { return JSON.parse(fs.readFileSync(MONITORS_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(MONITORS_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveMonitors(data) {
   fs.writeFileSync(MONITORS_FILE, JSON.stringify(data, null, 2));
 }
 function loadMonitorHistory() {
-  try { return JSON.parse(fs.readFileSync(MONITOR_HIST_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(MONITOR_HIST_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveMonitorHistory(data) {
   fs.writeFileSync(MONITOR_HIST_FILE, JSON.stringify(data, null, 2));
 }
 function loadApps() {
-  try { return JSON.parse(fs.readFileSync(APPS_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(APPS_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveApps(data) {
   fs.writeFileSync(APPS_FILE, JSON.stringify(data, null, 2));
 }
 function loadFiledropShares() {
-  try { return JSON.parse(fs.readFileSync(FILEDROP_META_FILE, 'utf8')); }
-  catch { return {}; }
+  try { return nullProtoStore(JSON.parse(fs.readFileSync(FILEDROP_META_FILE, 'utf8'))); }
+  catch { return nullProtoStore(null); }
 }
 function saveFiledropShares(data) {
   fs.writeFileSync(FILEDROP_META_FILE, JSON.stringify(data, null, 2));

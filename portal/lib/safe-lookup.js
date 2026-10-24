@@ -26,4 +26,18 @@ function safeLookup(store, key) {
   return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : undefined;
 }
 
-module.exports = { safeLookup, FORBIDDEN_KEYS };
+// Build a record store that has no prototype chain to reach.
+//
+// This is the root fix for the prototype-pollution class: on a null-prototype
+// object, `store["__proto__"]` is an ordinary (absent) key rather than
+// Object.prototype, so there is nothing for a user-supplied id to walk into
+// and nothing for a later assignment to corrupt. safeLookup() stays as a
+// second line, and JSON.stringify / Object.entries / spread all behave
+// normally on these objects.
+function nullProtoStore(obj) {
+  const store = Object.create(null);
+  if (obj && typeof obj === 'object') Object.assign(store, obj);
+  return store;
+}
+
+module.exports = { safeLookup, nullProtoStore, FORBIDDEN_KEYS };
