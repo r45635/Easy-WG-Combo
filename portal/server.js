@@ -15,6 +15,7 @@ const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
 const archiveGuards = require('./lib/archive-guards');
 const updateCheck = require('./lib/update-check');
+const { safeLookup } = require('./lib/safe-lookup');
 
 const app  = express();
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
@@ -2433,7 +2434,7 @@ app.post('/api/devices', auth, async (req, res) => {
 app.get('/api/devices/:id', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     let wgClient = null;
     try { wgClient = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}`)).json(); } catch { /* ok */ }
@@ -2444,7 +2445,7 @@ app.get('/api/devices/:id', auth, async (req, res) => {
 app.patch('/api/devices/:id', auth, (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     for (const key of ['name', 'owner', 'type', 'expiresAt', 'tags', 'notes']) {
       if (req.body[key] !== undefined) dev[key] = req.body[key];
@@ -2457,7 +2458,7 @@ app.patch('/api/devices/:id', auth, (req, res) => {
 app.post('/api/devices/:id/enable', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     if (dev.revokedAt) return res.status(400).json({ error: 'Cannot re-enable a revoked device' });
     await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/enable`, { method: 'POST' });
@@ -2470,7 +2471,7 @@ app.post('/api/devices/:id/enable', auth, async (req, res) => {
 app.post('/api/devices/:id/disable', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' });
     res.json({ ok: true });
@@ -2481,7 +2482,7 @@ app.post('/api/devices/:id/revoke', auth, async (req, res) => {
   if (!req.body.confirmed) return res.status(400).json({ error: 'Requires confirmed: true' });
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     dev.revokedAt = new Date().toISOString();
     await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/disable`, { method: 'POST' });
@@ -2496,7 +2497,7 @@ app.delete('/api/devices/:id', auth, async (req, res) => {
   if (!confirmed) return res.status(400).json({ error: 'Requires confirmed: true' });
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     if (!dev.revokedAt) return res.status(400).json({ error: 'Device must be revoked before deletion' });
     if (deleteWgPeer) {
@@ -2512,7 +2513,7 @@ app.delete('/api/devices/:id', auth, async (req, res) => {
 app.get('/api/devices/:id/config', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     const configText = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/configuration`)).text();
     res.type('text/plain').send(patchClientConfig(configText, dev));
@@ -2522,7 +2523,7 @@ app.get('/api/devices/:id/config', auth, async (req, res) => {
 app.get('/api/devices/:id/qr', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     const configText = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/configuration`)).text();
     const patched = patchClientConfig(configText, dev);
@@ -2535,7 +2536,7 @@ app.get('/api/devices/:id/xray-qr', auth, async (req, res) => {
   if (!XRAY_ENABLED) return res.json({ enabled: false });
   try {
     const devices = loadDevices();
-    const dev = devices[req.params.id];
+    const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     if (dev.revokedAt) return res.status(403).json({ error: 'Device is revoked' });
     if (!dev.xrayUuid) {
@@ -2577,7 +2578,7 @@ app.post('/api/dns-profiles', auth, (req, res) => {
 
 app.delete('/api/dns-profiles/:id', auth, (req, res) => {
   const profiles = loadDnsProfiles();
-  const profile  = profiles[req.params.id];
+  const profile  = safeLookup(profiles, req.params.id);
   if (!profile) return res.status(404).json({ error: 'Profile not found' });
   if (profile.type === 'managed') return res.status(400).json({ error: 'Built-in profiles cannot be deleted' });
   delete profiles[req.params.id];
@@ -2590,7 +2591,7 @@ app.post('/api/devices/:id/dns-profile', auth, async (req, res) => {
   if (!profileId) return res.status(400).json({ error: 'profileId is required' });
   try {
     const devices  = loadDevices();
-    const dev      = devices[req.params.id];
+    const dev      = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     if (!loadDnsProfiles()[profileId]) return res.status(400).json({ error: 'Unknown DNS profile' });
     dev.dnsProfile  = profileId;
@@ -2610,7 +2611,7 @@ app.post('/api/devices/:id/dns-bypass', auth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid duration. Use: 15m, 1h, 4h, 24h, permanent' });
   try {
     const devices = loadDevices();
-    const dev     = devices[req.params.id];
+    const dev     = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     dev.bypassUntil = duration === 'permanent'
       ? 'permanent'
@@ -2626,7 +2627,7 @@ app.post('/api/devices/:id/dns-bypass', auth, async (req, res) => {
 app.delete('/api/devices/:id/dns-bypass', auth, async (req, res) => {
   try {
     const devices = loadDevices();
-    const dev     = devices[req.params.id];
+    const dev     = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     dev.bypassUntil = null;
     saveDevices(devices);
@@ -2650,7 +2651,7 @@ app.patch('/api/devices/:id/routing-mode', auth, (req, res) => {
     return res.status(400).json({ error: 'customAllowedIps must be a non-empty array of valid CIDRs' });
   try {
     const devices = loadDevices();
-    const dev     = devices[req.params.id];
+    const dev     = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     dev.routingMode = mode;
     if (mode === 'custom') dev.customAllowedIps = customAllowedIps;
@@ -2699,7 +2700,7 @@ app.post('/api/proxy/services', auth, requiresAction('publicGateway'), async (re
 app.patch('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
-    const svc      = services[req.params.id];
+    const svc      = safeLookup(services, req.params.id);
     if (!svc) return res.status(404).json({ error: 'Service not found' });
     if (req.body.ipAllowlist !== undefined) {
       if (!Array.isArray(req.body.ipAllowlist) || !req.body.ipAllowlist.every(ip => isValidIpOrCidr(ip))) {
@@ -2719,7 +2720,7 @@ app.patch('/api/proxy/services/:id', auth, requiresAction('publicGateway'), asyn
 app.delete('/api/proxy/services/:id', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
-    const svc      = services[req.params.id];
+    const svc      = safeLookup(services, req.params.id);
     if (!svc) return res.status(404).json({ error: 'Service not found' });
     if (svc.exposure === 'vpn_only') {
       try { await agFetch('/control/rewrite/delete', { method: 'POST', body: JSON.stringify({ domain: svc.domain, answer: VPN_DNS_IP }) }); } catch { /* non-fatal */ }
@@ -2735,7 +2736,7 @@ app.delete('/api/proxy/services/:id', auth, requiresAction('publicGateway'), asy
 app.post('/api/proxy/services/:id/enable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
-    const svc      = services[req.params.id];
+    const svc      = safeLookup(services, req.params.id);
     if (!svc) return res.status(404).json({ error: 'Service not found' });
     svc.enabled = true;
     const reload = await writeCaddyServices(services);
@@ -2748,7 +2749,7 @@ app.post('/api/proxy/services/:id/enable', auth, requiresAction('publicGateway')
 app.post('/api/proxy/services/:id/disable', auth, requiresAction('publicGateway'), async (req, res) => {
   try {
     const services = loadProxyServices();
-    const svc      = services[req.params.id];
+    const svc      = safeLookup(services, req.params.id);
     if (!svc) return res.status(404).json({ error: 'Service not found' });
     svc.enabled = false;
     const reload = await writeCaddyServices(services);
@@ -3140,7 +3141,7 @@ app.get('/api/monitors', auth, (req, res) => {
 
 app.get('/api/monitors/:id', auth, (req, res) => {
   const monitors = loadMonitors();
-  const m = monitors[req.params.id];
+  const m = safeLookup(monitors, req.params.id);
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   res.json(m);
 });
@@ -3174,7 +3175,7 @@ app.post('/api/monitors', auth, requiresAction('manageMonitors'), (req, res) => 
 
 app.patch('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
-  const m = monitors[req.params.id];
+  const m = safeLookup(monitors, req.params.id);
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   // Built-in monitors may not have their type/target rewritten (they probe local services).
   if (m.builtin && (req.body.type !== undefined || req.body.target !== undefined || req.body.resolver !== undefined)) {
@@ -3204,7 +3205,7 @@ app.delete('/api/monitors/:id', auth, requiresAction('manageMonitors'), (req, re
 
 app.post('/api/monitors/:id/enable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
-  const m = monitors[req.params.id];
+  const m = safeLookup(monitors, req.params.id);
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   m.enabled = true;
   if (m.lastStatus === 'disabled') m.lastStatus = 'unknown';
@@ -3215,7 +3216,7 @@ app.post('/api/monitors/:id/enable', auth, requiresAction('manageMonitors'), (re
 
 app.post('/api/monitors/:id/disable', auth, requiresAction('manageMonitors'), (req, res) => {
   const monitors = loadMonitors();
-  const m = monitors[req.params.id];
+  const m = safeLookup(monitors, req.params.id);
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   m.enabled = false;
   m.lastStatus = 'disabled';
@@ -3225,7 +3226,7 @@ app.post('/api/monitors/:id/disable', auth, requiresAction('manageMonitors'), (r
 
 app.post('/api/monitors/:id/check', auth, requiresAction('manageMonitors'), async (req, res) => {
   const monitors = loadMonitors();
-  const m = monitors[req.params.id];
+  const m = safeLookup(monitors, req.params.id);
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   m.nextCheckAt = new Date().toISOString(); // mark as due immediately
   saveMonitors(monitors);
@@ -3257,7 +3258,7 @@ app.get('/api/apps', auth, async (req, res) => {
 });
 
 app.post('/api/apps/:id/install', auth, requiresAction('appsLifecycle'), async (req, res) => {
-  const catalogEntry = APP_CATALOG[req.params.id];
+  const catalogEntry = safeLookup(APP_CATALOG, req.params.id);
   if (!catalogEntry) return res.status(404).json({ error: 'App not in catalog' });
   const apps = loadApps();
   if (apps[req.params.id]) return res.status(400).json({ error: 'App already installed' });
@@ -3401,7 +3402,7 @@ app.get('/api/apps/:id/logs', auth, requiresAction('appsLifecycle'), async (req,
 app.post('/api/apps/:id/update', auth, requiresAction('appsLifecycle'), async (req, res) => {
   try {
     const cName = encodeURIComponent('easywg-' + req.params.id);
-    const catalogEntry = APP_CATALOG[req.params.id];
+    const catalogEntry = safeLookup(APP_CATALOG, req.params.id);
     if (!catalogEntry) return res.status(404).json({ error: 'App not in catalog' });
     // Pull new image
     const pull = await dockerPost(`/images/create?fromImage=${encodeURIComponent(catalogEntry.image)}`, null);
@@ -3415,7 +3416,7 @@ app.post('/api/apps/:id/remove', auth, requiresAction('appsLifecycle'), async (r
   const { confirmed, deleteData } = req.body;
   if (!confirmed) return res.status(400).json({ error: 'requires confirmed:true' });
   const apps = loadApps();
-  const appRec = apps[req.params.id];
+  const appRec = safeLookup(apps, req.params.id);
   const cName = encodeURIComponent('easywg-' + req.params.id);
   try {
     // Stop + remove container
@@ -3423,7 +3424,7 @@ app.post('/api/apps/:id/remove', auth, requiresAction('appsLifecycle'), async (r
     await dockerDelete(`/containers/${cName}?force=true`);
     // Remove named volumes if deleteData
     if (deleteData === true) {
-      const catalogEntry = APP_CATALOG[req.params.id];
+      const catalogEntry = safeLookup(APP_CATALOG, req.params.id);
       if (catalogEntry) {
         for (const v of (catalogEntry.namedVolumes || [])) {
           await dockerDelete(`/volumes/${encodeURIComponent(v.name)}`);
@@ -3538,7 +3539,7 @@ app.post('/api/filedrop/upload', auth, requiresAction('fileDropPublic'), (req, r
 
 app.delete('/api/filedrop/:id', auth, (req, res) => {
   const shares = loadFiledropShares();
-  const share = shares[req.params.id];
+  const share = safeLookup(shares, req.params.id);
   if (!share) return res.status(404).json({ error: 'Share not found' });
   try { fs.unlinkSync(path.join(FILEDROP_DIR, share.storedName)); } catch {}
   delete shares[req.params.id];

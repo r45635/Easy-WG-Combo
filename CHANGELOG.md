@@ -15,6 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   The path is now collapsed to a single leading slash and the resolved origin is checked against the backend's, in `netGuards.resolveUpstreamUrl()` — a request that would leave the backend is refused with 400. Four regression tests cover protocol-relative, multi-slash, backslash and absolute-URL forms.
 
   **If you ran 0.5.0 or earlier with the admin portal exposed, rotate the AdGuard password.**
+- **Prototype pollution through record lookups (CodeQL `js/prototype-polluting-assignment`, 20 alerts).** Every store is a plain object keyed by id, and the routes read `store[req.params.id]`. For `id=__proto__` that returns `Object.prototype` — truthy, so the `if (!rec) return 404` guard let it through and the next field assignment wrote onto `Object.prototype` for the lifetime of the process; `constructor` and `prototype` behave the same. All 28 lookup sites now go through `safeLookup()`, which rejects those keys and resolves own properties only. Authenticated routes, so admin-only — fixed anyway: the guard costs one function call.
 
 ## [0.5.0] — 2026-10-24 — security hardening
 
