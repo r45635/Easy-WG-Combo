@@ -822,8 +822,18 @@ app.post('/api/settings/server-endpoint', auth, requiresAction('advancedSecurity
 
   const reload = await reloadCaddy();
   if (!reload.ok) {
-    if (prevCaddy !== null) { fs.writeFileSync(CADDY_FILE, prevCaddy); await reloadCaddy(); }
-    return res.status(500).json({ error: `Caddy reload failed: ${reload.error || 'unknown error'}. Reverted to the previous configuration.` });
+    // Report what actually happened. Saying "reverted" when the revert itself
+    // failed to reload would leave Caddy serving the broken config while the
+    // UI claims otherwise.
+    let revertMsg = ' The previous configuration was left in place.';
+    if (prevCaddy !== null) {
+      fs.writeFileSync(CADDY_FILE, prevCaddy);
+      const back = await reloadCaddy();
+      revertMsg = back.ok
+        ? ' Reverted to the previous configuration.'
+        : ` ⚠ The revert ALSO failed to reload (${back.error || 'unknown error'}) — Caddy may still be running the broken configuration. Check "docker exec caddy caddy validate --config /etc/caddy/Caddyfile" on the host.`;
+    }
+    return res.status(500).json({ error: `Caddy reload failed: ${reload.error || 'unknown error'}.${revertMsg}` });
   }
 
   res.json({ ok: true, message: `Endpoint saved, Caddy reloaded.${dnsWarn}${portMsg} Portal restarting…` });
@@ -3169,10 +3179,6 @@ app.get('/api/monitors/:id', auth, (req, res) => {
   if (!m) return res.status(404).json({ error: 'Monitor not found' });
   res.json(m);
 });
-
-const MONITOR_VALID_TYPES = ['http', 'https', 'tcp', 'dns', 'docker', 'tls'];
-const MONITOR_SAFE_CONTAINER_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/;
-const MONITOR_SAFE_DOMAIN_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
 app.post('/api/monitors', auth, requiresAction('manageMonitors'), (req, res) => {
   const { name, type, target, expectedStatus, resolver, intervalSeconds, timeoutSeconds, retries, notify, notifyAfterFailures, tags, notes } = req.body;
