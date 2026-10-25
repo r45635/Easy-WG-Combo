@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-10-25
+
+### Added
+- **`docker-compose.override.yml`** — local customisations (an extra volume, a mounted certificate, a changed port) now have a home that git ignores and `compose.sh` loads automatically. Editing `docker-compose.yml` instead makes `easywg update` refuse to run, because it will not update a dirty checkout; an installation that needs one tracked change therefore ends up updated by hand forever. One of the two servers this project runs on had been in exactly that state for months. Compose only auto-loads an override when no `-f` is passed, and `compose.sh` always passes `-f`, so it names the file explicitly.
+
 ## [0.5.4] — 2026-10-25
 
 ### Fixed
@@ -131,6 +136,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.1...v0.5.2

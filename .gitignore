@@ -13,3 +13,7 @@ caddy/config/
 caddy/logs/
 .claude/
 Local.MD
+
+# Local compose customisations (see compose.sh) — never tracked, so that
+# `easywg update` keeps working on a customised installation.
+docker-compose.override.yml

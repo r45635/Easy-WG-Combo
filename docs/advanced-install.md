@@ -83,6 +83,21 @@ echo "export PASSWORD_HASH='<hash>'" > .env.secrets
 
 **Always use `./compose.sh`**, never `docker compose` directly. `compose.sh` injects `PASSWORD_HASH` from `.env.secrets` (docker-compose would mangle the bcrypt `$` signs) and derives the portal image tag from the `VERSION` file. This is no longer just advice: `docker compose` on its own now stops with an error naming `compose.sh`, rather than quietly rendering an image with an empty tag.
 
+## Local customisations — `docker-compose.override.yml`
+
+Need an extra volume, a mounted certificate, a changed port? Put it in `docker-compose.override.yml`, which `compose.sh` loads when it exists and git ignores:
+
+```yaml
+services:
+  caddy:
+    volumes:
+      - /etc/acme/cert:/etc/caddy/certs:ro
+```
+
+**Do not edit `docker-compose.yml` instead.** A tracked edit makes `easywg update` refuse to run — it will not update a dirty checkout — and the installation ends up being updated by hand forever. The override keeps your change and keeps the update working.
+
+(Compose auto-loads an override only when no `-f` is passed, and `compose.sh` always passes `-f`, so it names the file explicitly.)
+
 ## HTTPS / admin exposure
 
 The admin portal is **local-only by default**: it is bound to localhost and reachable only through an SSH tunnel. Public HTTPS is **opt-in**.

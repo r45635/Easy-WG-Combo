@@ -32,5 +32,15 @@ if [ "${XRAY_ENABLED:-no}" = "yes" ] && [ -f "$SCRIPT_DIR/docker-compose.xray.ym
   COMPOSE_FILES="$COMPOSE_FILES -f $SCRIPT_DIR/docker-compose.xray.yml"
 fi
 
+# Local, untracked customisations — an extra volume, a mounted certificate,
+# a changed port. Put them here rather than editing docker-compose.yml:
+# a tracked edit makes `easywg update` refuse to run (dirty checkout), which
+# is how an installation ends up updated by hand forever.
+# Compose only auto-loads an override file when no -f is given, and we always
+# pass -f, so it has to be named explicitly.
+if [ -f "$SCRIPT_DIR/docker-compose.override.yml" ]; then
+  COMPOSE_FILES="$COMPOSE_FILES -f $SCRIPT_DIR/docker-compose.override.yml"
+fi
+
 # shellcheck disable=SC2086
 exec docker compose $COMPOSE_FILES "$@"
