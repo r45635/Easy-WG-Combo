@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-10-25
+
+### Security
+- **Five preview-feature endpoints were reachable from any interface mode.** File Drop delete and cleanup, the notification test send, and the two migration endpoints carried authentication but no capability check, so a session in User or Super User mode could call them even though the features are not offered there. They now use the capability their sibling endpoints already use — `fileDropPublic`, `configureNotifications`, and a new `migrationTools` (Advanced only). Interface modes are a guardrail against session hijacking and mistakes rather than multi-user access control, but a guardrail with five holes in it is worth closing. Covered by three new tests.
+- The capability matrix now lists `migrationTools: false` explicitly for User and Super User. The check denies unknown actions anyway, but a reader should not have to know that to see what a mode may do.
+
 ## [0.5.5] — 2026-10-25
 
 ### Added
@@ -136,6 +142,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.2...v0.5.3

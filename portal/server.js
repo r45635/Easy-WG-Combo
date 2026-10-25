@@ -135,6 +135,7 @@ const UI_CAPABILITIES = {
       configureNotifications: false, viewSecurityScore: false,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
       rawLogs: false, advancedSecurity: false, manageMonitors: false,
+      migrationTools: false,
     },
   },
   super_user: {
@@ -147,6 +148,7 @@ const UI_CAPABILITIES = {
       viewSecurityScore: true, viewMonitoring: true,
       publicGateway: false, fileDropPublic: false, appsLifecycle: false,
       rawLogs: false, advancedSecurity: false, manageMonitors: true,
+      migrationTools: false,
     },
   },
   advanced: {
@@ -2166,7 +2168,7 @@ app.post('/api/notifications/config', auth, requiresAction('configureNotificatio
   res.json(maskSecrets(merged));
 });
 
-app.post('/api/notifications/test', auth, async (_req, res) => {
+app.post('/api/notifications/test', auth, requiresAction('configureNotifications'), async (_req, res) => {
   const results = [];
   try {
     await sendEmailNotif('Test notification', `Test from Easy-WG-Combo on ${os.hostname()}`);
@@ -3567,7 +3569,7 @@ app.post('/api/filedrop/upload', auth, requiresAction('fileDropPublic'), (req, r
   req.pipe(bb);
 });
 
-app.delete('/api/filedrop/:id', auth, (req, res) => {
+app.delete('/api/filedrop/:id', auth, requiresAction('fileDropPublic'), (req, res) => {
   const shares = loadFiledropShares();
   const share = safeLookup(shares, req.params.id);
   if (!share) return res.status(404).json({ error: 'Share not found' });
@@ -3577,7 +3579,7 @@ app.delete('/api/filedrop/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/filedrop/cleanup', auth, (req, res) => {
+app.post('/api/filedrop/cleanup', auth, requiresAction('fileDropPublic'), (req, res) => {
   const cleaned = cleanupExpiredShares();
   res.json({ ok: true, cleaned });
 });
@@ -3695,7 +3697,7 @@ app.get('/api/migration/client-impact', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/migration/export', auth, async (req, res) => {
+app.post('/api/migration/export', auth, requiresAction('migrationTools'), async (req, res) => {
   try {
     const filename = await createBackupArchive(false);
     res.json({ ok: true, filename, path: path.join(BACKUP_DIR, filename) });
@@ -3721,7 +3723,7 @@ app.get('/api/migration/checklist', auth, async (req, res) => {
   res.json({ steps, currentIp: VPS_HOST, domains, endpointType: usesIp ? 'ip' : 'hostname' });
 });
 
-app.post('/api/migration/validate', auth, async (req, res) => {
+app.post('/api/migration/validate', auth, requiresAction('migrationTools'), async (req, res) => {
   const [wg, ag, caddyR] = await Promise.all([
     checkService('wg-easy',  `${WG_URL}/api/session`,    [200, 401]),
     checkService('adguard',  `${AG_URL}/control/status`, [200, 401, 403]),

@@ -36,3 +36,31 @@ test('mode escalation requires the admin password (no self-escalation)', async (
   // downgrade is free
   assert.strictEqual((await post('/api/settings/interface-mode', { interfaceMode: 'user' })).status, 200);
 });
+
+// Preview-feature endpoints that were reachable from any mode until 0.5.6:
+// File Drop delete/cleanup, the notification test send, and the migration
+// tools. Each is now behind the capability its sibling endpoints already use.
+test('File Drop delete and cleanup need fileDropPublic', async () => {
+  h.setInterfaceMode('super_user');
+  assert.strictEqual((await h.api('/api/filedrop/anything', { method: 'DELETE' })).status, 403);
+  assert.strictEqual((await post('/api/filedrop/cleanup')).status, 403);
+  h.setInterfaceMode('advanced');
+  assert.notStrictEqual((await post('/api/filedrop/cleanup')).status, 403);
+});
+
+test('the notification test send needs configureNotifications', async () => {
+  h.setInterfaceMode('user');
+  assert.strictEqual((await post('/api/notifications/test')).status, 403);
+  h.setInterfaceMode('super_user');
+  assert.notStrictEqual((await post('/api/notifications/test')).status, 403);
+});
+
+test('migration tools are Advanced-only', async () => {
+  for (const mode of ['user', 'super_user']) {
+    h.setInterfaceMode(mode);
+    assert.strictEqual((await post('/api/migration/export')).status, 403, `${mode} export`);
+    assert.strictEqual((await post('/api/migration/validate')).status, 403, `${mode} validate`);
+  }
+  h.setInterfaceMode('advanced');
+  assert.notStrictEqual((await post('/api/migration/validate')).status, 403);
+});
