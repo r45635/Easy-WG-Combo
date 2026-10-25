@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-25
+
+### Added
+- **`easywg xray rotate-keys`** — rotates the Reality key pair and short ID when a private key may have leaked, or on a schedule you choose. It refuses to act without `--confirm`, offers `--dry-run`, states plainly that **every client configuration is invalidated at once**, prints how many devices are registered so the size of the re-provisioning job is visible before you decide, and backs up `.env`, `.env.secrets` and `xray/config.json` first. Per-device UUIDs are deliberately left alone: a device keeps its identity and only needs the new URI. WireGuard is untouched.
+
 ### Fixed
 - Three places still described `easywg update` as rebuilding the portal — the README, the step list in the advanced guide, and `easywg help` — three releases after it stopped doing that. The command changed in 0.5.3/0.5.4; the prose did not follow.
 
@@ -145,6 +150,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.3...v0.5.4

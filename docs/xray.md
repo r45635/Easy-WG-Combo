@@ -168,6 +168,8 @@ The SNI target can be changed via `XRAY_SNI_TARGET` in `.env`. Any large HTTPS s
 ./easywg xray status              # service status (running/stopped, port, public key)
 ./easywg xray client-uri [label]  # print VLESS URI for a client
 ./easywg xray restart             # restart the Xray container
+./easywg xray rotate-keys         # rotate the Reality key pair — see below,
+                                  # it invalidates every client config
 ```
 
 ---
@@ -197,6 +199,21 @@ XRAY_ENABLED=no
 Caddy will move back to port 443, the public HTTPS portal returns, and the Xray container is not started.
 
 ---
+
+## Rotating the Reality key pair
+
+```bash
+./easywg xray rotate-keys --dry-run   # show the impact, write nothing
+./easywg xray rotate-keys --confirm   # do it
+```
+
+> ⚠️ **This invalidates every client configuration, at once.** The public key and the short ID are both carried in the VLESS URI, so each device must be given the new one — re-scan its QR code from the Devices tab (⊛), or re-import the URI from `./easywg xray client-uri`.
+>
+> Per-device UUIDs are **not** changed: a device keeps its identity and only needs the new URI. WireGuard is untouched; only VLESS clients are affected.
+
+The command refuses to do anything without `--confirm`, prints how many devices are registered so you know the size of the re-provisioning job, and backs up `.env`, `.env.secrets` and `xray/config.json` with a timestamp before writing. It then recreates the `xray` and `portal` containers — the portal reads the public key from its environment, so a restart alone would keep serving the old URI.
+
+**When to use it:** if the private key may have leaked (it lives in `.env.secrets`; a backup archive contains it), or on a rotation schedule you have chosen. Not casually — the cost is paid by every device, not by the server.
 
 ## Troubleshooting
 

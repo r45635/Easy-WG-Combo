@@ -81,6 +81,9 @@ Commands:
   xray status               Show Xray VLESS+Reality service status
   xray client-uri [label]   Generate VLESS+Reality URI for a client
   xray restart              Restart the Xray container
+  xray rotate-keys          Rotate the Reality key pair
+                            ⚠ invalidates EVERY client config — each device
+                            must be re-provisioned. Needs --confirm.
 
 Options:
   --help, -h                Show this help
