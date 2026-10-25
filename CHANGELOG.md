@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-10-25
+
+### Fixed
+- **`easywg update` never actually pulled in 0.5.3.** The line that extracts the portal image repository from `docker-compose.yml` carried broken quoting, so it returned the **entire compose file** instead of a repository name; `docker pull` was then handed a 6 kB argument, failed, and the command fell back to compiling — silently, since falling back is a legitimate path. The feature announced in 0.5.3 did the opposite of what the notes said. Extraction now uses a single `sed`, and CI runs **that exact line out of the script** and asserts it yields one repository name, so the same mistake fails the build instead of degrading quietly.
+
+  🪤 Worth knowing if you update from 0.5.2 or earlier: the **first** `easywg update` still runs the *old* copy of the script — the one already loaded by the shell — so it compiles once. From the next update on, it pulls.
+
 ## [0.5.3] — 2026-10-24
 
 ### Changed
@@ -124,6 +131,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.5.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.0...v0.5.1

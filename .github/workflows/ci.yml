@@ -23,6 +23,24 @@ jobs:
       - name: Lint shell scripts
         run: shellcheck --severity=warning bootstrap.sh install.sh compose.sh easywg scripts/*.sh
 
+      # `easywg update` decides whether to pull or to compile from this one
+      # line. A quoting mistake in it made the extraction return the whole
+      # compose file, so the pull always failed and the update silently fell
+      # back to building — the exact behaviour the feature exists to avoid,
+      # and nothing failed. Run the real line, not a copy of it.
+      - name: easywg extracts the portal image repository correctly
+        run: |
+          line=$(grep -m1 'portal_repo=' easywg)
+          [ -n "$line" ] || { echo "portal_repo= line not found in easywg"; exit 1; }
+          SCRIPT_DIR=. eval "$line"
+          echo "extracted: [$portal_repo]"
+          case "$portal_repo" in
+            ghcr.io/*/easy-wg-combo-portal) ;;
+            *) echo "expected a ghcr.io repository, got the above"; exit 1 ;;
+          esac
+          words=$(printf '%s' "$portal_repo" | wc -w | tr -d ' ')
+          [ "$words" = "1" ] || { echo "extraction returned $words words, expected 1"; exit 1; }
+
   compose:
     runs-on: ubuntu-latest
     steps:

@@ -120,7 +120,7 @@ case "${1:-}" in
     # does not bump VERSION. Building here is the fallback, not the default:
     # these servers are 1 vCPU / 1 GB and compiling on them is what this
     # project tells you not to do.
-    portal_repo="$(awk -F'"'"':'"'"' '"'"'/image: *ghcr.io\/r45635\/easy-wg-combo-portal/{sub(/^ *image: */,"",$0); split($0,a,":"); print a[1]; exit}'"'"' "$SCRIPT_DIR/docker-compose.yml")"
+    portal_repo="$(sed -n 's#^[[:space:]]*image:[[:space:]]*\(ghcr\.io/[^:[:space:]]*easy-wg-combo-portal\):.*#\1#p' "$SCRIPT_DIR/docker-compose.yml" | head -1)"
     commit_tag="sha-$(git -C "$SCRIPT_DIR" rev-parse HEAD)"
     if [ -n "$portal_repo" ] && docker pull -q "${portal_repo}:${commit_tag}" >/dev/null 2>&1; then
       echo "Published portal image found for this commit — updating without compiling."
