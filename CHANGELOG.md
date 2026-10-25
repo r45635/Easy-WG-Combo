@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+- Three places still described `easywg update` as rebuilding the portal — the README, the step list in the advanced guide, and `easywg help` — three releases after it stopped doing that. The command changed in 0.5.3/0.5.4; the prose did not follow.
+
 ## [0.5.6] — 2026-10-25
 
 ### Security

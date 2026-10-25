@@ -18,7 +18,7 @@ Commands:
   health                    Full system health report
   services                  Show service status only
   doctor                    Check installation health (containers, API, scripts, security)
-  update                    Update to the latest version (git pull + image pull + rebuild)
+  update                    Update to the latest version (git pull + pull the published portal image)
   passwd                    Rotate the admin password everywhere (.env, wg-easy hash, portal)
 
   backup                    Create a configuration backup

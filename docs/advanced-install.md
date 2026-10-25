@@ -193,7 +193,7 @@ The command is safe by construction:
 1. Refuses to run if the checkout has local changes (commit, discard, or `git stash` them first — your `.env`, `.env.secrets` and data directories are gitignored and never affected).
 2. `git pull --ff-only` — never rewrites local history.
 3. `./compose.sh pull` — refreshes the version-pinned container images (images are otherwise **never** updated after install).
-4. `./compose.sh up -d --build` — rebuilds the portal and restarts only what changed.
+4. `./compose.sh up -d --no-build` using the portal image CI published for that commit (`sha-<commit>`); it compiles locally only when no such image exists. `wg-easy` is not recreated when its digest is unchanged, so the VPN is not interrupted.
 5. Runs a service health check.
 
 Re-running the install one-liner does the same update when it detects an existing installation. WireGuard stays pinned to wg-easy v14. See [CHANGELOG.md](../CHANGELOG.md) for version history.

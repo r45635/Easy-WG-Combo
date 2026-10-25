@@ -102,7 +102,9 @@ cd ~/Easy-WG-Combo
 ./easywg update
 ```
 
-This pulls the latest code (refusing if you have local edits — commit or stash them first), refreshes the pinned container images, rebuilds the portal and runs a health check. Version history is in [CHANGELOG.md](CHANGELOG.md).
+This pulls the latest code, then **pulls the portal image CI built for that exact commit** rather than compiling it on your server — which matters on a 1 vCPU / 1 GB VPS. It refreshes the other pinned images and runs a health check. If no image exists for the commit (local commits, a fork, CI still running) it says so and builds instead.
+
+It refuses to run on a checkout with local edits. If you need a permanent local change, put it in `docker-compose.override.yml` rather than editing `docker-compose.yml` — see [local customisations](docs/advanced-install.md#local-customisations--docker-composeoverrideyml). Version history is in [CHANGELOG.md](CHANGELOG.md).
 
 > **Note:** WireGuard is deliberately pinned to wg-easy **v14** — v15 is a breaking rewrite with an incompatible data model. `easywg update` will never cross that major version.
 
