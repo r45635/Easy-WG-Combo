@@ -225,6 +225,8 @@ All features are available from the terminal:
 ./easywg xray status               # Xray service status
 ./easywg xray client-uri [label]   # Print VLESS URI (global)
 ./easywg xray restart              # Restart Xray container
+./easywg xray rotate-keys          # Rotate the Reality key pair (needs --confirm;
+                                   # invalidates every client config)
 ```
 
 Run `./easywg help` for the full command list.
@@ -240,7 +242,7 @@ Run `./easywg help` for the full command list.
 - The Docker socket, even read-only, is sensitive. The Apps module requires a writable socket.
 - Gateway can expose services publicly. Review each service before enabling public access.
 - File Drop public links are accessible without VPN. Use passwords and expiry.
-- Backups may contain secrets (WireGuard keys, API tokens). Store them securely.
+- Backups may contain secrets (WireGuard keys, API tokens, the Xray private key). Store them securely. If one may have leaked, `./easywg xray rotate-keys` replaces the Reality key pair — it tells you how many devices must then be re-provisioned before it does anything.
 - The dashboard checks GitHub once every 6 hours for a newer release. It sends nothing but the request itself. Set `UPDATE_CHECK_ENABLED=no` in `.env` to disable it.
 
 → [Full security model](docs/security-model.md)
