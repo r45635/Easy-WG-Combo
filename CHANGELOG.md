@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-10-28
+
+### Security
+- **Xray image 26.10.17 → 26.10.21.** Upstream withdrew 26.10.10 and 26.10.17: their built-in root certificate store still trusted three roots whose intermediate certificates had trivially weak, now-broken private keys. 26.10.21 removes them and is built with Go 1.27.3, so the bad certificates are rejected even when the host's CA store has not caught up. Installations with Xray enabled should update.
+
+### Changed
+- nodemailer 10.1.7 → 10.2.1 (header-comment parsing fix; no behaviour change for the portal's single SMTP transport).
+
 ## [0.6.0] — 2026-10-25
 
 ### Added
@@ -150,6 +158,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.4...v0.5.5
