@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-11-09
+
+### Security
+- **Xray image 26.10.21 → 26.10.31** and **AdGuard Home v0.107.79 → v0.107.80.** Both now ship with Multipath TCP turned off. A Linux kernel flaw in IPv4 MPTCP handling (CVE-2026-98432) can give a remote attacker root, and Go 1.24+ enables MPTCP on listening sockets by default, so both services were exposing that code path. AdGuard Home is also rebuilt with Go 1.27.3. Updating the images narrows the attack surface; **updating the host kernel is what actually fixes it.** Installations should update.
+
+### Changed
+- express-rate-limit 8.7.1 → 8.7.2 and nodemailer 10.2.1 → 10.3.1 (patch/minor, no behaviour change for the portal).
+- CI: `docker/build-push-action` 6 → 7, `docker/login-action` 3 → 4, `docker/metadata-action` 5 → 6.
+
 ## [0.6.1] — 2026-10-28
 
 ### Security
