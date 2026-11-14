@@ -66,11 +66,6 @@ The portal has three modes so users are not exposed to unnecessary complexity: *
 **VPN Clients**
 ![Easy-WG-Combo clients view](docs/screenshots/clients.png)
 
-**Security**
-![Easy-WG-Combo security tab](docs/screenshots/security.png)
-![Easy-WG-Combo security — sessions & TLS](docs/screenshots/security-sessions.png)
-![Easy-WG-Combo security — logs](docs/screenshots/security-logs.png)
-
 **WireGuard & AdGuard embedded views**
 ![WireGuard view](docs/screenshots/wireguard-view.png)
 ![AdGuard Home view](docs/screenshots/adguard-view.png)

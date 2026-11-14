@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Lint shell scripts
-        run: shellcheck --severity=warning bootstrap.sh install.sh compose.sh easywg scripts/*.sh
+        run: shellcheck --severity=warning bootstrap.sh install.sh compose.sh easywg scripts/*.sh docs/screenshots/*.sh
 
       # `easywg update` decides whether to pull or to compile from this one
       # line. A quoting mistake in it made the extraction return the whole
