@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.4] — 2026-11-19
+
+### Added
+- **The project has an icon.** `index.html` carried no `<link rel="icon">` at all, so every browser asked for the bare `/favicon.ico` and got a **404** — on both reference hosts. The mark is the hexagon the portal already shows as its logo, in the UI's own colours. `docs/brand/icon.svg` is the single source; `docs/brand/make-icons.sh` regenerates `favicon.svg`, a 16/32/48 `favicon.ico` and `apple-touch-icon.png` from it, and `png2ico.py` builds the `.ico` with the Python standard library so no image package is needed.
+
+### Fixed
+- **The device "Config" button did nothing when the browser blocked the pop-up** — the twin of the QR bug fixed in 0.6.3, one line away from it. It now downloads through a link, which cannot be pop-up blocked, so the failure mode is removed rather than reported. The server sends the config as an attachment named after the device, using the RFC 5987 + ASCII fallback already used by File Drop, so a hostile device name cannot inject a response header, and a private key is saved as a file instead of rendered as a web page.
+
+### Documentation
+- **Correction to the 0.6.3 notes.** They said the removed Security screenshots "advertised an 80% score on a host with SSH root login and password authentication enabled". The score was right, the conclusion was wrong: SSH on both hosts is hardened (`PermitRootLogin prohibit-password`, `PasswordAuthentication no`, confirmed with `sshd -T`), and the host-side `easywg security check` scores **100/100**. The portal shows 80% because it is given only `/etc/ssh/sshd_config` and never `/etc/ssh/sshd_config.d/`, where the hardening lives — so the **UI and the CLI disagree by 20 points on the same check**. The screenshots were still right to go; the reason stated for removing them was not.
+
 ## [0.6.3] — 2026-11-18
 
 ### Fixed
@@ -180,6 +191,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.0...v0.6.1
