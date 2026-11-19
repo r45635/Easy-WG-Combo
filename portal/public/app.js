@@ -191,6 +191,7 @@ const I18N = {
     'nav.gateway': 'Gateway',
     // devices
     'devices.add': '+ Add Device',
+    'devices.qrPopupBlocked': 'Your browser blocked the QR code window. Allow pop-ups for this page, or use "Download config" instead.',
     'devices.col.name': 'Name',
     'devices.col.owner': 'Owner',
     'devices.col.status': 'Status',
@@ -571,6 +572,7 @@ const I18N = {
     'nav.dnsProfiles': 'Profils DNS',
     'nav.gateway': 'Passerelle',
     'devices.add': '+ Ajouter',
+    'devices.qrPopupBlocked': 'Votre navigateur a bloqué la fenêtre du QR code. Autorisez les pop-ups pour ce site, ou utilisez « Télécharger la config ».',
     'devices.col.name': 'Nom',
     'devices.col.owner': 'Propriétaire',
     'devices.col.status': 'Statut',
@@ -945,6 +947,7 @@ const I18N = {
     'nav.dnsProfiles': 'DNS 配置',
     'nav.gateway': '网关',
     'devices.add': '+ 添加设备',
+    'devices.qrPopupBlocked': '浏览器拦截了二维码窗口。请为本站允许弹出窗口，或改用“下载配置”。',
     'devices.col.name': '名称',
     'devices.col.owner': '用户',
     'devices.col.status': '状态',
@@ -2954,6 +2957,10 @@ document.getElementById('devices-tbody').addEventListener('click', async e => {
   }
   if (action === 'dev-qr') {
     const w = window.open('', '_blank');
+    // A blocked pop-up returns null. Writing to it threw, so the click did
+    // nothing at all and the only trace was a console error the user never
+    // sees — the QR button simply looked broken.
+    if (!w) { window.alert(t('devices.qrPopupBlocked')); return; }
     w.document.write(`<html><body style="background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="/api/devices/${id}/qr" style="max-width:400px"></body></html>`);
     return;
   }
