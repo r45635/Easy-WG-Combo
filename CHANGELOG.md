@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-11-18
+
+### Fixed
+- **The WireGuard QR button did nothing when the browser blocked the pop-up.** It called `window.open()` and wrote into whatever came back; a blocked pop-up returns `null`, so the next line threw and the click produced no window, no message and no clue — only a console error. It now says what happened, in all three UI languages, and points at **Download config** as the way through.
+
+### Changed
+- Xray image **26.10.31 → 26.11.9**.
+- express-rate-limit 8.7.2 → 8.7.4, nodemailer 10.3.1 → 10.5.0.
+
+### Documentation
+- The published screenshots are regenerated from a **throwaway demo stack with fictitious data** instead of a live installation, which is how real device names ended up in a public repository. `docs/screenshots/demo-stack.sh` builds the stack, `capture.js` takes the images and `promo.js` records the demo clip; both blur QR codes and URIs in the page before the pixels are read, and abort if the blur matched nothing.
+- Three Security screenshots removed from the README: two were the same file under different captions, and all three advertised an 80% score on a host with SSH root login and password authentication enabled.
+
 ## [0.6.2] — 2026-11-09
 
 ### Security
@@ -167,6 +180,8 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.5.5...v0.5.6
