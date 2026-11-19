@@ -13,6 +13,7 @@ const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
 const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
+const { parseSshConfig } = require('./lib/sshd-config');
 const archiveGuards = require('./lib/archive-guards');
 const updateCheck = require('./lib/update-check');
 const { safeLookup, nullProtoStore } = require('./lib/safe-lookup');
@@ -1617,26 +1618,62 @@ let securityCache = null;
 let securityCacheAt = 0;
 const SECURITY_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
-function parseSshConfig(configPath) {
-  const result = {};
-  // Check drop-in dir first
-  const dropin = configPath + '.d';
-  const readConfig = (p) => {
-    try { return fs.readFileSync(p, 'utf8'); } catch { return ''; }
-  };
-  let content = readConfig(configPath);
-  if (fs.existsSync(dropin)) {
-    try {
-      for (const f of fs.readdirSync(dropin).filter(f => f.endsWith('.conf'))) {
-        content += '\n' + readConfig(path.join(dropin, f));
-      }
-    } catch { /* ignore */ }
-  }
+// Which port does Caddy actually serve the admin portal on? Read it from the
+// Caddyfile, not from .env: one of the two reference installs serves 8443 with
+// no CADDY_HTTPS_PORT in its .env at all, so trusting .env would have skipped
+// the host that most needed checking. Returns null when the portal is on the
+// default 443 (shared with any public Gateway service, so a rule for it says
+// nothing about the admin interface) or bound to loopback (UFW is irrelevant).
+// TWIN: scripts/doctor.sh and scripts/security-check.sh do the same in shell.
+function detectAdminPort() {
+  let content;
+  try { content = fs.readFileSync(CADDY_FILE, 'utf8'); } catch { return null; }
   for (const line of content.split('\n')) {
-    const m = line.match(/^\s*([A-Za-z]+)\s+(.+)/);
-    if (m) result[m[1].toLowerCase()] = m[2].trim();
+    const m = line.match(/^([^\s#{]+)\s*\{\s*$/);
+    if (!m) continue;
+    const addr = m[1];
+    const portMatch = addr.match(/:(\d+)$/);
+    if (!portMatch) return null;                       // implicit :443
+    if (/^127\.0\.0\.1:/.test(addr) || /^localhost:/.test(addr)) return null;
+    return portMatch[1] === '443' ? null : portMatch[1];
   }
-  return result;
+  return null;
+}
+
+// Is the admin port allowed from anywhere? Read from UFW's own rule file
+// rather than from .env or from what bootstrap intended, because the rule is
+// what the kernel enforces. The '### tuple ###' lines are UFW's canonical form:
+//   ### tuple ### allow tcp 8443 0.0.0.0/0 any 172.16.0.0/12 in comment=<hex>
+//                 action proto dport  daddr  sport    saddr    dir
+function ufwAdminExposure(adminPort) {
+  const files = [
+    { path: '/etc/ufw/user.rules',  any: '0.0.0.0/0' },
+    { path: '/etc/ufw/user6.rules', any: '::/0' },
+  ];
+  const sources = [];
+  let readAny = false;
+  for (const { path: file, any } of files) {
+    let content;
+    try { content = fs.readFileSync(file, 'utf8'); } catch { continue; }
+    readAny = true;
+    for (const line of content.split('\n')) {
+      if (!line.startsWith('### tuple ###')) continue;
+      const f = line.slice('### tuple ###'.length).trim().split(/\s+/);
+      const [action, , dport, , , saddr] = f;
+      if (!/^allow/.test(action) || dport !== adminPort) continue;
+      sources.push({ saddr, isAnywhere: saddr === any });
+    }
+  }
+  if (!readAny) {
+    return { status: 'warn', note: '/etc/ufw is not readable from the portal — exposure unknown' };
+  }
+  if (sources.some(s => s.isAnywhere)) {
+    return { status: 'fail', note: 'allowed from Anywhere — close it on the host: ./easywg admin lock' };
+  }
+  if (!sources.length) {
+    return { status: 'pass', note: 'no firewall rule — reachable over the VPN or an SSH tunnel only' };
+  }
+  return { status: 'pass', note: `allowed from: ${sources.map(s => s.saddr).join(', ')}` };
 }
 
 async function computeSecurityScore() {
@@ -1649,17 +1686,31 @@ async function computeSecurityScore() {
 
   let score = 0;
 
-  // SSH checks
+  // SSH checks. These read FILES, not the running daemon: the container cannot
+  // run `sshd -T`. Every note therefore names the file the value came from, and
+  // says so when it is falling back to sshd's built-in default.
   const sshCfg = parseSshConfig(SSH_CONFIG_PATH);
-  const rootLogin = (sshCfg['permitrootlogin'] || 'yes').toLowerCase();
+  const sshNote = (key, label, fallback) => {
+    const hit = sshCfg[key];
+    if (!hit) {
+      // An Include that matched nothing is the signature of the drop-in
+      // directory not being mounted — the bug this check used to have.
+      const unmatched = (sshCfg._includes || []).filter(i => i.matched === 0).map(i => i.pattern);
+      return `${label}: ${fallback} (sshd default — not set in any file read)` +
+        (unmatched.length ? `; Include matched no file: ${unmatched.join(' ')}` : '');
+    }
+    return `${label}: ${hit.value} (from ${hit.source})`;
+  };
+
+  const rootLogin = (sshCfg['permitrootlogin']?.value || 'yes').toLowerCase();
   score += check('ssh_root', 'SSH root login restricted', 10,
     (rootLogin === 'no' || rootLogin === 'prohibit-password') ? 'pass' : 'fail',
-    `PermitRootLogin: ${sshCfg['permitrootlogin'] || 'yes (default)'}`);
+    sshNote('permitrootlogin', 'PermitRootLogin', 'yes'));
 
-  const pwAuth = (sshCfg['passwordauthentication'] || 'yes').toLowerCase();
+  const pwAuth = (sshCfg['passwordauthentication']?.value || 'yes').toLowerCase();
   score += check('ssh_password', 'SSH password auth disabled', 10,
     pwAuth === 'no' ? 'pass' : 'fail',
-    `PasswordAuthentication: ${sshCfg['passwordauthentication'] || 'yes (default)'}`);
+    sshNote('passwordauthentication', 'PasswordAuthentication', 'yes'));
 
   // UFW
   let ufwActive = false;
@@ -1736,7 +1787,25 @@ async function computeSecurityScore() {
   const portalBoundLocally = (process.env.PORTAL_HOST || '127.0.0.1') === '127.0.0.1';
   score += check('portal_exposure', 'Admin portal bound to localhost', 15,
     portalBoundLocally ? 'pass' : 'fail',
-    `PORTAL_HOST=${process.env.PORTAL_HOST || '127.0.0.1'}`);
+    portalBoundLocally
+      // Said plainly, because this check passing is not the same as the portal
+      // being unreachable: Caddy is what publishes it. The admin_exposure check
+      // below is the one that answers "who can actually reach it".
+      ? `PORTAL_HOST=${process.env.PORTAL_HOST || '127.0.0.1'} — Caddy still publishes it; see the firewall check`
+      : `PORTAL_HOST=${process.env.PORTAL_HOST || '127.0.0.1'}`);
+
+  // Who can reach the admin port, read from UFW's own rule file (mounted at
+  // /etc/ufw). The portal holds the Docker socket, the host network and
+  // NET_ADMIN: open to Anywhere, it is one password away from root here.
+  const adminPort = detectAdminPort();
+  if (adminPort) {
+    const adminExposure = ufwAdminExposure(adminPort);
+    score += check('admin_exposure', `Admin port ${adminPort}/tcp not open to the internet`, 10,
+      adminExposure.status, adminExposure.note);
+  } else {
+    check('admin_exposure', 'Admin port not open to the internet', 10, 'warn',
+      'no dedicated admin port in the Caddyfile — the portal is on :443 or bound to loopback');
+  }
 
   const maxScore = checks.reduce((s, c) => s + (c.status !== 'warn' ? c.pts : 0), 0);
   const pct = maxScore > 0 ? Math.round(score / maxScore * 100) : 0;
@@ -1806,6 +1875,25 @@ function resolveBackupPath(filename) {
   return resolved;
 }
 
+// Top-level view of a staged backup tree (two levels, like the CLI's
+// `find -maxdepth 2`): enough to see what an archive holds without listing
+// every WireGuard peer file.
+function listStagedEntries(stage) {
+  const out = [];
+  const walk = (dir, prefix, depth) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (prefix === '' && e.name === 'manifest.json') continue;
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      out.push(rel);
+      if (e.isDirectory() && depth < 2) walk(path.join(dir, e.name), rel, depth + 1);
+    }
+  };
+  walk(stage, '', 1);
+  return out;
+}
+
 async function createBackupArchive(encrypt = false) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -1813,24 +1901,8 @@ async function createBackupArchive(encrypt = false) {
   const archivePath = path.join(BACKUP_DIR, archiveName);
 
   const stage = fs.mkdtempSync('/tmp/ewg-backup-');
+  let omittedForCaller = [];
   try {
-    // Manifest
-    const manifest = {
-      project: 'Easy-WG-Combo',
-      backup_version: '1',
-      created_at: new Date().toISOString(),
-      hostname: os.hostname(),
-      os: os.type() + ' ' + os.release(),
-      components: {
-        wg_easy:     fs.existsSync(path.join(BACKUP_SRC_DIR, 'wireguard')),
-        adguard_home: fs.existsSync(path.join(BACKUP_SRC_DIR, 'adguard')),
-        caddy:       fs.existsSync(path.join(BACKUP_SRC_DIR, 'caddy')),
-        fail2ban:    true,
-        portal:      true,
-      },
-    };
-    fs.writeFileSync(path.join(stage, 'manifest.json'), JSON.stringify(manifest, null, 2));
-
     // Copy from mounted backup source
     const copyDir = (src, dst) => {
       if (!fs.existsSync(src)) return;
@@ -1856,9 +1928,53 @@ async function createBackupArchive(encrypt = false) {
       if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(stage, f));
     }
 
+    // Xray's config.json holds the Reality key pair and the per-device client
+    // list, and nothing regenerates it. It reaches the portal through the Xray
+    // overlay's ./xray:/xray-config mount, not through /backup-src.
+    if (fs.existsSync(XRAY_CONFIG_PATH)) {
+      fs.mkdirSync(path.join(stage, 'xray'), { recursive: true });
+      fs.copyFileSync(XRAY_CONFIG_PATH, path.join(stage, 'xray', 'config.json'));
+    }
+
     // Portal data
     const dataSrc = DATA_DIR;
     if (fs.existsSync(dataSrc)) copyDir(dataSrc, path.join(stage, 'portal', 'data'));
+
+    // Manifest, written last so `files` lists what the archive actually holds.
+    // `omitted` is the honest half: the portal cannot see
+    // docker-compose.override.yml (it is not mounted, and mounting a file that
+    // may not exist would make Docker create a DIRECTORY of that name on the
+    // host, which would then shadow the real file). `./easywg backup` on the
+    // host does include it — which is why that one, not this, is the backup a
+    // deploy relies on.
+    const omitted = omittedForCaller;
+    if (!fs.existsSync(path.join(stage, 'xray', 'config.json')) && XRAY_ENABLED) {
+      omitted.push({ path: 'xray/config.json', reason: 'Xray is enabled but /xray-config/config.json is not readable' });
+    }
+    omitted.push({
+      path: 'docker-compose.override.yml',
+      reason: 'not visible to the portal container — use ./easywg backup on the host for a complete archive',
+    });
+    const manifest = {
+      project: 'Easy-WG-Combo',
+      backup_version: '1',
+      created_at: new Date().toISOString(),
+      created_by: 'portal',
+      hostname: os.hostname(),
+      os: os.type() + ' ' + os.release(),
+      components: {
+        wg_easy:      fs.existsSync(path.join(stage, 'wireguard')),
+        adguard_home: fs.existsSync(path.join(stage, 'adguard')),
+        caddy:        fs.existsSync(path.join(stage, 'caddy')),
+        xray:         fs.existsSync(path.join(stage, 'xray', 'config.json')),
+        compose_override: false,
+        fail2ban:     true,
+        portal:       true,
+      },
+      files: listStagedEntries(stage),
+      omitted,
+    };
+    fs.writeFileSync(path.join(stage, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     await runCmd('tar', ['-czf', archivePath, '-C', stage, '.'], { timeout: 60000 });
     fs.chmodSync(archivePath, 0o600);
@@ -1881,7 +1997,9 @@ async function createBackupArchive(encrypt = false) {
 
   // Fire notification
   sendNotification('backup_success', { filename: archiveName }).catch(() => {});
-  return archiveName;
+  // `omitted` travels with the name: every caller that reports a backup as done
+  // also reports what it could not include.
+  return { filename: archiveName, omitted: omittedForCaller };
 }
 
 app.get('/api/backup', auth, (_req, res) => {
@@ -1894,8 +2012,8 @@ app.get('/api/backup', auth, (_req, res) => {
 app.post('/api/backup/create', auth, requiresAction('createBackup'), async (req, res) => {
   const encrypt = req.body.encrypt === true;
   try {
-    const filename = await createBackupArchive(encrypt);
-    res.json({ success: true, filename, backups: listBackups() });
+    const { filename, omitted } = await createBackupArchive(encrypt);
+    res.json({ success: true, filename, omitted, backups: listBackups() });
   } catch (e) {
     sendNotification('backup_failure', { error: e.message }).catch(() => {});
     res.status(500).json({ error: e.message });
@@ -1954,7 +2072,7 @@ app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (re
   // Create pre-restore backup
   let preRestoreFile = null;
   try {
-    preRestoreFile = await createBackupArchive(false);
+    preRestoreFile = (await createBackupArchive(false)).filename;
   } catch { /* non-fatal */ }
 
   // Treat the archive as untrusted: validate every entry (no absolute paths,
@@ -1983,15 +2101,32 @@ app.post('/api/backup/restore', auth, requiresAction('restoreBackup'), async (re
       const srcDir = path.join(stage, d);
       if (fs.existsSync(srcDir)) restoreDir(srcDir, path.join(BACKUP_SRC_DIR, d));
     }
-    for (const f of ['.env', 'docker-compose.yml']) {
+    for (const f of ['.env']) {
       const srcFile = path.join(stage, f);
       if (fs.existsSync(srcFile)) fs.copyFileSync(srcFile, path.join(BACKUP_SRC_DIR, f));
+    }
+    // Xray: same file the backup now carries. The portal reconciles per-device
+    // clients from devices.json on its next start (syncXrayClients).
+    const xraySrc = path.join(stage, 'xray', 'config.json');
+    if (fs.existsSync(xraySrc) && fs.existsSync(path.dirname(XRAY_CONFIG_PATH))) {
+      fs.copyFileSync(xraySrc, XRAY_CONFIG_PATH);
     }
     const portalData = path.join(stage, 'portal', 'data');
     if (fs.existsSync(portalData)) restoreDir(portalData, DATA_DIR);
 
+    // The compose files are deliberately NOT restored here. They are executed
+    // by `compose.sh up`, so restoring them from an archive is code execution —
+    // the CLI gates that behind --use-archive-compose, and the portal has no
+    // equivalent confirmation. (It could not do it anyway: /backup-src/docker-
+    // compose.yml is a read-only mount, so the copy threw EROFS and failed the
+    // whole restore AFTER wireguard, adguard and caddy had already been
+    // written — a half-applied restore reported as an error.)
+    const skipped = ['docker-compose.yml', 'docker-compose.override.yml']
+      .filter(f => fs.existsSync(path.join(stage, f)))
+      .map(f => ({ path: f, reason: 'not restored from the portal — apply with ./easywg restore --use-archive-compose on the host' }));
+
     sendNotification('restore_success', { filename }).catch(() => {});
-    res.json({ success: true, manifest, preRestoreFile });
+    res.json({ success: true, manifest, preRestoreFile, skipped });
   } catch (e) {
     sendNotification('restore_failure', { filename, error: e.message }).catch(() => {});
     res.status(500).json({ error: `Restore failed: ${e.message}` });
@@ -3705,8 +3840,8 @@ app.get('/api/migration/client-impact', auth, async (req, res) => {
 
 app.post('/api/migration/export', auth, requiresAction('migrationTools'), async (req, res) => {
   try {
-    const filename = await createBackupArchive(false);
-    res.json({ ok: true, filename, path: path.join(BACKUP_DIR, filename) });
+    const { filename, omitted } = await createBackupArchive(false);
+    res.json({ ok: true, filename, omitted, path: path.join(BACKUP_DIR, filename) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

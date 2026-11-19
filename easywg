@@ -28,6 +28,13 @@ Commands:
   restore <file>            Restore from a backup archive
   restore --dry-run <file>  Validate backup without applying
 
+  admin status              Show who can reach the admin portal right now
+  admin open --from-ssh     Open the admin port for this SSH session's IP
+  admin open --from <ip>    Open it for one address or range
+             [--for 30m]    How long before it closes itself (default 30m)
+  admin close               Remove the temporary rule now
+  admin lock                Apply the default: no 'Anywhere' rule, VPN + ADMIN_ALLOW_FROM only
+
   security check            Run security scan
   security status           Show last security scan result
   security harden-ssh       Harden SSH configuration (with safety checks)
@@ -216,6 +223,10 @@ case "${1:-}" in
   restore)
     shift
     bash "$SCRIPTS_DIR/restore.sh" "$@"
+    ;;
+  admin)
+    shift
+    bash "$SCRIPTS_DIR/admin.sh" "$@"
     ;;
   security)
     shift

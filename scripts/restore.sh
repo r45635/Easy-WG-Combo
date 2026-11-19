@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 DRY_RUN=false
 USE_ARCHIVE_COMPOSE=false
+SKIPPED_OVERRIDE=false
 ARCHIVE=""
 
 while [[ $# -gt 0 ]]; do
@@ -127,13 +128,29 @@ restore_if_exists "caddy"
 restore_if_exists "portal/data"
 restore_if_exists ".env"
 restore_if_exists ".env.secrets"
-# docker-compose.yml from an archive is executed by 'compose.sh up' below, i.e.
+# The Reality key pair and the per-device client list. Without it an Xray
+# install comes back with keys that no existing client config matches.
+if [ -e "$RESTORE_STAGE/xray/config.json" ]; then
+  restore_if_exists "xray/config.json"
+  log "Xray config restored — the portal reconciles per-device clients from devices.json on its next start."
+fi
+# Both compose files from an archive are executed by 'compose.sh up' below, i.e.
 # code execution. Keep the repo's version unless the operator explicitly opts in.
+# docker-compose.override.yml is not in the repo at all, so skipping it can lose
+# a local customisation (a mounted certificate, a changed port): say so, loudly,
+# rather than leaving the operator to discover it when TLS fails to come back.
 if [ "$USE_ARCHIVE_COMPOSE" = true ]; then
-  warn "Restoring docker-compose.yml from the archive (--use-archive-compose)."
+  warn "Restoring compose files from the archive (--use-archive-compose)."
   restore_if_exists "docker-compose.yml"
+  restore_if_exists "docker-compose.override.yml"
 else
   [ -e "$RESTORE_STAGE/docker-compose.yml" ] && log "Keeping the repo docker-compose.yml (use --use-archive-compose to override)."
+  if [ -e "$RESTORE_STAGE/docker-compose.override.yml" ] && \
+     ! cmp -s "$RESTORE_STAGE/docker-compose.override.yml" "$PROJECT_DIR/docker-compose.override.yml" 2>/dev/null; then
+    SKIPPED_OVERRIDE=true
+    warn "NOT restored: docker-compose.override.yml — the archive holds local customisation this host does not have (or has differently). Review it and apply by hand, or re-run with --use-archive-compose:"
+    warn "  tar -xzOf \"$ARCHIVE\" ./docker-compose.override.yml"
+  fi
 fi
 
 # ── Restart services ──────────────────────────────────────────────────────────
@@ -149,4 +166,8 @@ log "Checking service status…"
 bash "$SCRIPT_DIR/health.sh" --services-only
 
 echo ""
+if [ "$SKIPPED_OVERRIDE" = true ]; then
+  warn "Restore completed, but docker-compose.override.yml was NOT applied (see above) — this host is not identical to the one that was backed up."
+  exit 3
+fi
 ok "Restore completed successfully."

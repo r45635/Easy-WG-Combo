@@ -121,11 +121,25 @@ ssh -i ~/.ssh/your_key -L 19080:localhost:8080 -N root@YOUR_VPS_IP
 
 ### Public HTTPS mode
 
-The portal can be exposed over HTTPS through Caddy by setting `PUBLIC_HTTPS_ENABLED=yes` in `.env`.
+The portal can be served over HTTPS through Caddy by setting `PUBLIC_HTTPS_ENABLED=yes` in `.env`.
 
-This is convenient but increases the attack surface. If you enable it: use a strong password, keep Fail2Ban enabled, and consider restricting by IP.
+Serving it is not the same as opening it to the internet. Since 0.6.5 the admin port is **never** opened to Anywhere by the installer. What reaches it:
 
-> The installer defaults to **local-only** (admin via SSH tunnel / VPN). Set `PUBLIC_HTTPS_ENABLED=yes` in `.env` (or answer the install prompt) to expose the portal. The portal is a root-equivalent control plane — only expose it deliberately.
+| Who | How |
+|---|---|
+| You, on the VPN | Nothing to do — wg-easy puts VPN clients on the Docker bridge, which is allowed |
+| You, over SSH | `ssh -L 8443:127.0.0.1:8443 -N root@YOUR_VPS_IP` |
+| A fixed address (home, office) | `ADMIN_ALLOW_FROM=203.0.113.9 198.51.100.0/24` in `.env`, then re-run bootstrap or `./easywg admin lock` |
+| You, from somewhere else, once | `./easywg admin open --from-ssh --for 30m` — the rule removes itself |
+
+```bash
+./easywg admin status    # who can reach the portal right now
+./easywg admin open --from-ssh --for 30m
+./easywg admin close     # or just wait
+./easywg admin lock      # apply the default on an older install
+```
+
+Upgrading an install made before 0.6.5? It still carries an `allow 8443/tcp` (Anywhere) rule. `./easywg admin lock` converts it, and `./easywg doctor` fails until it is gone.
 
 → [Security model](docs/security-model.md)
 
@@ -222,6 +236,11 @@ All features are available from the terminal:
 ./easywg xray restart              # Restart Xray container
 ./easywg xray rotate-keys          # Rotate the Reality key pair (needs --confirm;
                                    # invalidates every client config)
+
+./easywg admin status              # Who can reach the admin portal right now
+./easywg admin open --from-ssh     # Open it for this SSH session's IP, for 30 min
+./easywg admin close               # Close it now
+./easywg admin lock                # Apply the default (VPN + ADMIN_ALLOW_FROM only)
 ```
 
 Run `./easywg help` for the full command list.
@@ -231,7 +250,7 @@ Run `./easywg help` for the full command list.
 ## Security Notes
 
 - The portal is a **root-equivalent** local admin component (it controls Docker, the firewall and certificates). Treat access to it accordingly — compromise of the portal is compromise of the host.
-- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt); when enabled, keep Fail2Ban enabled and prefer restricting by IP. Admin passwords must be at least 12 characters (16+ recommended) and must not contain `$`.
+- The admin portal is **local-only by default** (reachable via SSH tunnel / VPN). Public HTTPS is opt-in (`PUBLIC_HTTPS_ENABLED=yes` or the install prompt), and even then the admin port is never opened to Anywhere: VPN clients and `ADMIN_ALLOW_FROM` only, plus `./easywg admin open` for a one-off. `doctor` and the Security Center both fail on an "Anywhere" rule. Admin passwords must be at least 12 characters (16+ recommended) and must not contain `$`.
 - Rotate the admin password with `./easywg passwd` — it updates the portal, the wg-easy hash and `.env` together (the in-portal password change only affects the portal login).
 - See [SECURITY.md](SECURITY.md) for the accepted-risk model.
 - The Docker socket, even read-only, is sensitive. The Apps module requires a writable socket.

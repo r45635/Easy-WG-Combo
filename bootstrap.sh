@@ -13,6 +13,14 @@ log() {
   printf '%s\n' "$*"
 }
 
+# Was missing until 0.6.5 while three call sites already used it — and under
+# `set -e` an undefined command exits 127, so bootstrap would have died on the
+# spot instead of printing a warning. All three sit on the DNS-does-not-resolve
+# path, which is why it was never hit.
+warn() {
+  printf 'WARNING: %s\n' "$*" >&2
+}
+
 die() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
@@ -213,6 +221,11 @@ print_final_summary() {
     else
       log "  → Admin portal: https://${admin_domain:-$wg_host}:${caddy_https_port} (self-signed cert — accept the browser warning)"
       log "     ℹ For a warning-free cert, set a real ADMIN_DOMAIN (FQDN pointing here) + TLS_EMAIL in .env and re-run bootstrap."
+    fi
+    if [ "$local_only" != "yes" ]; then
+      log "     🔒 That port is NOT open to the internet. Reach it over the VPN, or:"
+      log "        ./easywg admin open --from-ssh --for 30m     (one-off, expires by itself)"
+      log "        ADMIN_ALLOW_FROM=<ip|cidr> in .env           (permanent, re-run bootstrap)"
     fi
   fi
   log "GitHub: ${BOOTSTRAP_REPO_URL}"
@@ -832,8 +845,6 @@ configure_firewall() {
     # Xray always needs :443 for VLESS+Reality.
     run_root ufw allow 443/tcp
     if is_truthy "$public_https_enabled"; then
-      # Portal exposed publicly on caddy_https_port.
-      run_root ufw allow "${caddy_https_port}/tcp"
       if [ "$use_public_tls" = "yes" ]; then
         # Xray owns :443, so Caddy validates its cert via HTTP-01 on :80 — keep it open.
         run_root ufw allow 80/tcp
@@ -855,7 +866,57 @@ configure_firewall() {
   # Allow AdGuard DNS from Docker bridge (wg-easy DNAT forwards VPN client DNS here)
   run_root ufw allow from 172.16.0.0/12 to any port 53 proto udp comment "AdGuard DNS from Docker"
   run_root ufw allow from 172.16.0.0/12 to any port 53 proto tcp comment "AdGuard DNS from Docker"
+
+  # The admin portal: never opened to Anywhere, on any path through this
+  # function. Until 0.6.5 the Xray + PUBLIC_HTTPS branch above ran
+  # `ufw allow ${caddy_https_port}/tcp`, which put the most privileged component
+  # of the stack — Docker socket, host network, NET_ADMIN — behind one password
+  # on the open internet. Worse, an operator who restricted it by hand lost that
+  # restriction on the next bootstrap run, silently.
+  #
+  # Restricting it is NOT a downgrade for VPN users: wg-easy MASQUERADEs their
+  # traffic onto the Docker bridge, so they reach the portal through the
+  # 172.16.0.0/12 rule below, exactly like their DNS.
+  if is_truthy "$public_https_enabled" && is_truthy "$xray_enabled"; then
+    configure_admin_access "$caddy_https_port"
+  fi
+
   run_root ufw --force enable
+}
+
+# Standing rules for the admin port. Idempotent, and it only ever touches rules
+# that name that port — SSH, WireGuard and :443 are never considered.
+configure_admin_access() {
+  local admin_port="$1"
+  local admin_allow_from
+  # bootstrap never sources .env; read the value the same way as everything else.
+  admin_allow_from="$(sed -n 's/^ADMIN_ALLOW_FROM=//p' "$ENV_FILE" 2>/dev/null | head -n 1 | tr -d "\"'" || true)"
+
+  # Remove any "Anywhere" rule for the admin port (v4 and v6), highest number
+  # first so the earlier numbers stay valid.
+  local nums num
+  nums="$(run_root ufw status numbered 2>/dev/null \
+    | grep -E "^\[[ 0-9]+\].*(^|[^0-9])${admin_port}(/tcp|[^0-9]|$)" \
+    | grep -E 'ALLOW IN[[:space:]]+Anywhere' \
+    | sed -E 's/^\[[[:space:]]*([0-9]+)\].*/\1/' | sort -rn || true)"
+  for num in $nums; do
+    warn "Removing an 'Anywhere' rule for the admin port ${admin_port}/tcp (rule ${num})."
+    run_root ufw --force delete "$num" >/dev/null || true
+  done
+
+  # VPN clients (via the Docker bridge), then each explicitly allowed source.
+  run_root ufw allow from 172.16.0.0/12 to any port "$admin_port" proto tcp comment "easywg-admin-vpn"
+  local src
+  for src in $admin_allow_from; do
+    if [[ "$src" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}(/[0-9]{1,2})?$ ]] || [[ "$src" == *:* ]]; then
+      run_root ufw allow from "$src" to any port "$admin_port" proto tcp comment "easywg-admin-allow"
+    else
+      warn "ADMIN_ALLOW_FROM entry ignored (not an IP or CIDR): $src"
+    fi
+  done
+
+  log "Admin portal ${admin_port}/tcp: reachable over the VPN${admin_allow_from:+ and from ${admin_allow_from}}, closed to the internet."
+  log "Off-VPN access when you need it:  ./easywg admin open --from-ssh --for 30m"
 }
 
 configure_sysctl() {

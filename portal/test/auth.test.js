@@ -9,6 +9,18 @@ function sidFrom(res) {
   for (const c of cookies) { const m = c.match(/portal\.sid=([^;]+)/); if (m) return m[1]; }
   return null;
 }
+// A login that returns no cookie used to surface as `assert.ok(cookieA && cookieB)`
+// failing — true for a 429, a 500 and a genuinely cookie-less 200 alike, which
+// is no help at all when it happens once in five runs on a loaded CI machine.
+// Assert the status here, where the status is still in hand.
+async function sid(res) {
+  const id = sidFrom(res);
+  if (!id) {
+    const body = await res.text().catch(() => '<unreadable>');
+    throw new Error(`login returned no session cookie: HTTP ${res.status} ${body.slice(0, 200)}`);
+  }
+  return id;
+}
 function login(pw, extraHeaders) {
   return fetch(h.base() + '/api/login', {
     method: 'POST',
@@ -19,12 +31,18 @@ function login(pw, extraHeaders) {
 }
 const me = (cookie) => fetch(h.base() + '/api/me', { headers: { Cookie: `portal.sid=${cookie}` } }).then(r => r.json());
 
+// Every test uses its own source IP. The portal counts failed logins per IP and
+// that counter lives for the whole file, so without this a failed login in one
+// test can rate-limit a later one — the only shared state between these tests,
+// and the only plausible reading of the flake seen in CI.
+const from = (ip) => ({ 'X-Forwarded-For': ip });
+
 test('login issues a session cookie and rotates the id (session fixation)', async () => {
-  const r1 = await login(h.ADMIN_PASSWORD);
+  const ip = from('198.51.100.1');
+  const r1 = await login(h.ADMIN_PASSWORD, ip);
   assert.strictEqual(r1.status, 200);
-  const s1 = sidFrom(r1); assert.ok(s1, 'first login sets portal.sid');
-  const s2 = sidFrom(await login(h.ADMIN_PASSWORD));
-  assert.ok(s2);
+  const s1 = await sid(r1);
+  const s2 = await sid(await login(h.ADMIN_PASSWORD, ip));
   assert.notStrictEqual(s1, s2, 'session id changes across logins');
 });
 
@@ -38,8 +56,9 @@ test('login rate limiting: 429 after repeated failures, per source IP', async ()
 });
 
 test('CSRF: cross-origin state-changing request is rejected', async () => {
-  assert.strictEqual((await login('whatever', { Origin: 'https://evil.example' })).status, 403);
-  assert.notStrictEqual((await login('whatever')).status, 403); // no Origin -> passes gate
+  const ip = '198.51.100.2';
+  assert.strictEqual((await login('whatever', { Origin: 'https://evil.example', 'X-Forwarded-For': ip })).status, 403);
+  assert.notStrictEqual((await login('whatever', from(ip))).status, 403); // no Origin -> passes gate
 });
 
 test('password change enforces the 12-char minimum policy', async () => {
@@ -61,9 +80,9 @@ test('password change rejects a "$" (Docker Compose env unsafe)', async () => {
 
 // LAST: rotates the admin password, which invalidates Basic-auth for later tests.
 test('password change revokes other sessions', async () => {
-  const cookieA = sidFrom(await login(h.ADMIN_PASSWORD));
-  const cookieB = sidFrom(await login(h.ADMIN_PASSWORD));
-  assert.ok(cookieA && cookieB);
+  const ip = from('198.51.100.3');
+  const cookieA = await sid(await login(h.ADMIN_PASSWORD, ip));
+  const cookieB = await sid(await login(h.ADMIN_PASSWORD, ip));
   const chg = await fetch(h.base() + '/api/auth/password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `portal.sid=${cookieA}` },

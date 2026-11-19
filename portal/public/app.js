@@ -256,6 +256,7 @@ const I18N = {
     'backup.selectFile': 'Select a backup file…',
     'backup.noBackups': 'No backups found.',
     'backup.creating': 'Creating backup…',
+    'backup.omitted': 'Not included (run ./easywg backup on the host for a complete archive):',
     'backup.restoring': 'Restoring…',
     'backup.restoreSelect': 'Please select a backup file.',
     'backup.restoreConfirm': 'Please check the confirmation checkbox.',
@@ -632,6 +633,7 @@ const I18N = {
     'backup.selectFile': 'Sélectionner un fichier de sauvegarde…',
     'backup.noBackups': 'Aucune sauvegarde trouvée.',
     'backup.creating': 'Création de la sauvegarde…',
+    'backup.omitted': 'Non inclus (lancez ./easywg backup sur l\'hôte pour une archive complète) :',
     'backup.restoring': 'Restauration…',
     'backup.restoreSelect': 'Veuillez sélectionner un fichier de sauvegarde.',
     'backup.restoreConfirm': 'Veuillez cocher la case de confirmation.',
@@ -1007,6 +1009,7 @@ const I18N = {
     'backup.selectFile': '选择备份文件…',
     'backup.noBackups': '未找到备份文件。',
     'backup.creating': '正在创建备份…',
+    'backup.omitted': '未包含（在主机上运行 ./easywg backup 以获得完整归档）：',
     'backup.restoring': '正在还原…',
     'backup.restoreSelect': '请选择备份文件。',
     'backup.restoreConfirm': '请勾选确认复选框。',
@@ -2161,7 +2164,17 @@ async function doCreateBackup(encrypt = false) {
     if (msgEl) { msgEl.textContent = data?.error || 'Error'; msgEl.style.color = 'var(--red)'; }
     return;
   }
-  if (msgEl) { msgEl.textContent = `Created: ${data.filename}`; msgEl.style.color = 'var(--green)'; }
+  if (msgEl) {
+    // A backup the portal could not take in full is not a green success. The
+    // server says what it left out; show it here rather than only in the
+    // archive's manifest, which nobody reads until a restore goes wrong.
+    msgEl.textContent = `Created: ${data.filename}`;
+    msgEl.style.color = 'var(--green)';
+    if (Array.isArray(data.omitted) && data.omitted.length) {
+      msgEl.style.color = 'var(--orange)';
+      msgEl.textContent += ` — ${t('backup.omitted')} ${data.omitted.map(o => o.path).join(', ')}`;
+    }
+  }
   state.backups = data.backups || [];
   renderBackupList(state.backups);
   populateRestoreSelect(state.backups);

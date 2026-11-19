@@ -20,6 +20,29 @@ fail()   { echo -e "  ${RED}✗${RESET} $1"; }
 info()   { echo -e "  ${CYAN}·${RESET} $1"; }
 header() { echo -e "\n${BOLD}$1${RESET}"; }
 
+# Which port does Caddy actually serve the admin portal on? Read the Caddyfile,
+# not .env: one of the two reference installs serves 8443 with no
+# CADDY_HTTPS_PORT in its .env at all. Prints nothing when the portal is on the
+# default :443 (shared with public Gateway services) or bound to loopback.
+# TWIN: detectAdminPort() in portal/server.js. Change both.
+detect_admin_port() {
+  local caddyfile="$1" addr
+  [ -f "$caddyfile" ] || return 0
+  addr="$(grep -m1 -E '^[^[:space:]#{]+[[:space:]]*\{[[:space:]]*$' "$caddyfile" 2>/dev/null | sed -E 's/[[:space:]]*\{[[:space:]]*$//')"
+  [ -n "$addr" ] || return 0
+  case "$addr" in
+    127.0.0.1:*|localhost:*) return 0 ;;
+  esac
+  case "$addr" in
+    *:[0-9]*) ;;
+    *) return 0 ;;
+  esac
+  local port="${addr##*:}"
+  [ "$port" = "443" ] && return 0
+  printf '%s\n' "$port"
+}
+
+
 SCORE=0
 MAX=0
 
@@ -43,16 +66,68 @@ header "SSH"
 SSH_CFG="/etc/ssh/sshd_config"
 SSH_CFG_D="/etc/ssh/sshd_config.d"
 
+# This runs on the HOST, where sshd itself can be asked. `sshd -T` prints the
+# effective configuration — includes expanded, precedence applied, defaults
+# filled in — which no amount of file reading reproduces exactly. Use it, and
+# fall back to the files only when it is unavailable (no sshd binary, or a
+# config it refuses to load).
+#
+# TWIN: portal/lib/sshd-config.js reimplements the file-reading half for the
+# portal, which cannot run sshd -T from inside a container. Change both.
+SSH_EFFECTIVE=""
+if command -v sshd &>/dev/null; then
+  SSH_EFFECTIVE=$(sshd -T 2>/dev/null || true)
+fi
+
 get_ssh_val() {
   local key="$1" val=""
-  # Check sshd_config.d first (higher priority), then main file
-  if [ -d "$SSH_CFG_D" ]; then
-    val=$(grep -rhi "^${key}[[:space:]]" "$SSH_CFG_D" 2>/dev/null | tail -1 | awk '{print $2}')
+  if [ -n "$SSH_EFFECTIVE" ]; then
+    # sshd -T lowercases keywords and prints one directive per line.
+    echo "$SSH_EFFECTIVE" | awk -v k="${key,,}" 'tolower($1)==k {print $2; exit}'
+    return
   fi
-  if [ -z "$val" ] && [ -f "$SSH_CFG" ]; then
-    val=$(grep -i "^${key}[[:space:]]" "$SSH_CFG" 2>/dev/null | tail -1 | awk '{print $2}')
-  fi
+  # Fallback: read the files the way sshd does — Include expanded where the
+  # directive appears, FIRST value wins. Reading the drop-ins first, or letting
+  # the last line win, gives the wrong answer on a stock Debian/Ubuntu layout.
+  val=$(ssh_first_value_from_file "$SSH_CFG" "$key" 0)
   echo "${val:-}"
+}
+
+# Prints the first value for $2 found while reading $1 in order, following
+# Include. $3 is the recursion depth.
+ssh_first_value_from_file() {
+  local file="$1" key="$2" depth="${3:-0}" line lkey lval sub inc hit
+  [ "$depth" -gt 8 ] && return 0
+  [ -f "$file" ] || return 0
+  local in_match=0
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -z "$line" ] && continue
+    lkey="$(echo "${line%%[[:space:]=]*}" | tr '[:upper:]' '[:lower:]')"
+    lval="$(echo "${line#"${line%%[[:space:]=]*}"}" | sed 's/^[[:space:]=]*//')"
+    if [ "$lkey" = "match" ]; then
+      if [ "${lval,,}" = "all" ]; then in_match=0; else in_match=1; fi
+      continue
+    fi
+    [ "$in_match" -eq 1 ] && continue
+    if [ "$lkey" = "include" ]; then
+      for inc in $lval; do
+        case "$inc" in /*) ;; *) inc="$(dirname "$file")/$inc" ;; esac
+        for sub in $inc; do
+          [ -f "$sub" ] || continue
+          hit="$(ssh_first_value_from_file "$sub" "$key" $((depth + 1)))"
+          if [ -n "$hit" ]; then echo "$hit"; return 0; fi
+        done
+      done
+      continue
+    fi
+    if [ "$lkey" = "${key,,}" ]; then
+      echo "${lval%%[[:space:]]*}"
+      return 0
+    fi
+  done < "$file"
+  return 0
 }
 
 if [ -f "$SSH_CFG" ]; then
@@ -60,6 +135,11 @@ if [ -f "$SSH_CFG" ]; then
   PW_AUTH=$(get_ssh_val PasswordAuthentication)
   SSH_PORT=$(get_ssh_val Port)
   SSH_PORT="${SSH_PORT:-22}"
+  if [ -n "$SSH_EFFECTIVE" ]; then
+    info "Read from the running daemon's effective config (sshd -T)"
+  else
+    warn "sshd -T unavailable — values read from config files, which may differ from what sshd actually applies"
+  fi
 
   if [[ "${ROOT_LOGIN,,}" == "no" || "${ROOT_LOGIN,,}" == "prohibit-password" ]]; then
     add_check 10 "pass" "SSH root login restricted (${ROOT_LOGIN:-not set})"
@@ -162,6 +242,26 @@ else
   add_check 15 "fail" "Admin portal may be publicly exposed (PORTAL_HOST=$PORTAL_HOST_VAL)"
 fi
 
+# "Bound to localhost" passes on every install, because Caddy is what publishes
+# the portal — so on its own it says nothing about who can reach it. Read the
+# live firewall rules for the port Caddy listens on.
+ADMIN_PORT_VAL="$(detect_admin_port "$(dirname "$0")/../caddy/Caddyfile")"
+if [ -z "$ADMIN_PORT_VAL" ]; then
+  info "No dedicated admin port in the Caddyfile — the portal is on :443 or bound to loopback"
+elif command -v ufw &>/dev/null; then
+  ADMIN_RULES="$(ufw status numbered 2>/dev/null | grep -E "^\[[ 0-9]+\].*(^|[^0-9])${ADMIN_PORT_VAL}(/tcp|[^0-9]|$)" || true)"
+  if echo "$ADMIN_RULES" | grep -qE 'ALLOW IN[[:space:]]+Anywhere'; then
+    add_check 10 "fail" "Admin port ${ADMIN_PORT_VAL}/tcp is open to Anywhere — close it: ./easywg admin lock"
+  else
+    add_check 10 "pass" "Admin port ${ADMIN_PORT_VAL}/tcp is not open to Anywhere"
+  fi
+  if echo "$ADMIN_RULES" | grep -q 'easywg-admin-temp'; then
+    info "A temporary admin rule is active (./easywg admin status for its expiry)"
+  fi
+else
+  add_check 10 "warn" "Cannot read firewall rules for the admin port"
+fi
+
 # ── Score ─────────────────────────────────────────────────────────────────────
 PCT=0
 if [ "$MAX" -gt 0 ]; then PCT=$(( SCORE * 100 / MAX )); fi
@@ -235,7 +335,8 @@ if $HARDEN_SSH; then
     exit 0
   fi
 
-  cp "$SSH_CFG" "${SSH_CFG}.easywg.bak.$(date +%Y%m%d%H%M%S)"
+  BACKUP_CFG="${SSH_CFG}.easywg.bak.$(date +%Y%m%d%H%M%S)"
+  cp "$SSH_CFG" "$BACKUP_CFG"
   for change in "${CHANGES[@]}"; do
     KEY="${change%% *}"
     if grep -qi "^#*\s*${KEY}\s" "$SSH_CFG"; then
@@ -246,8 +347,42 @@ if $HARDEN_SSH; then
   done
 
   if command -v sshd &>/dev/null; then
-    sshd -t && systemctl reload sshd && echo -e "  ${GREEN}✓${RESET} SSH config reloaded." || echo -e "  ${RED}✗${RESET} Config test failed — reverted."
+    if ! sshd -t; then
+      cp "$BACKUP_CFG" "$SSH_CFG"
+      fail "Config test failed — $SSH_CFG restored from $BACKUP_CFG. SSH was not reloaded."
+      exit 1
+    fi
+    if ! systemctl reload sshd && ! systemctl reload ssh; then
+      fail "Config is valid but reloading sshd failed — the running daemon still has the OLD settings. Reload it by hand."
+      exit 1
+    fi
+    pass "SSH config reloaded."
+
+    # Writing the directive is not the same as sshd applying it. On a stock
+    # Debian/Ubuntu the drop-in directory is Included at the TOP of the file and
+    # sshd keeps the FIRST value it sees, so a line appended at the bottom can
+    # be overridden by a drop-in and change nothing at all. Ask the daemon.
+    EFFECTIVE_AFTER=$(sshd -T 2>/dev/null || true)
+    if [ -n "$EFFECTIVE_AFTER" ]; then
+      STILL_WRONG=()
+      for change in "${CHANGES[@]}"; do
+        KEY="$(echo "${change%% *}" | tr '[:upper:]' '[:lower:]')"
+        WANT="$(echo "${change#* }" | tr '[:upper:]' '[:lower:]')"
+        GOT="$(echo "$EFFECTIVE_AFTER" | awk -v k="$KEY" 'tolower($1)==k {print tolower($2); exit}')"
+        [ "$GOT" = "$WANT" ] || STILL_WRONG+=("${change%% *}: wanted ${WANT}, sshd applies ${GOT:-<unset>}")
+      done
+      if [ "${#STILL_WRONG[@]}" -gt 0 ]; then
+        fail "sshd does NOT apply the change(s) just written to $SSH_CFG:"
+        for w in "${STILL_WRONG[@]}"; do echo "      $w"; done
+        echo "      A drop-in in ${SSH_CFG_D}/ is Included earlier and wins (sshd keeps the FIRST value)."
+        echo "      Set it there instead, in a file that sorts first — e.g. ${SSH_CFG_D}/01-hardening.conf"
+        exit 1
+      fi
+      pass "Verified against the running daemon (sshd -T)."
+    else
+      warn "Could not run 'sshd -T' to confirm the daemon applies the change — verify by hand."
+    fi
   else
-    echo -e "  ${YELLOW}⚠${RESET} Please reload SSH manually."
+    warn "Please reload SSH manually."
   fi
 fi

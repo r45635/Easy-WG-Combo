@@ -18,6 +18,29 @@ ok()   { echo "[OK]   $*"; }
 warn() { echo "[WARN] $*"; WARNS=$((WARNS + 1)); }
 fail() { echo "[FAIL] $*"; FAILS=$((FAILS + 1)); }
 
+# Which port does Caddy actually serve the admin portal on? Read the Caddyfile,
+# not .env: one of the two reference installs serves 8443 with no
+# CADDY_HTTPS_PORT in its .env at all. Prints nothing when the portal is on the
+# default :443 (shared with public Gateway services) or bound to loopback.
+# TWIN: detectAdminPort() in portal/server.js. Change both.
+detect_admin_port() {
+  local caddyfile="$1" addr
+  [ -f "$caddyfile" ] || return 0
+  addr="$(grep -m1 -E '^[^[:space:]#{]+[[:space:]]*\{[[:space:]]*$' "$caddyfile" 2>/dev/null | sed -E 's/[[:space:]]*\{[[:space:]]*$//')"
+  [ -n "$addr" ] || return 0
+  case "$addr" in
+    127.0.0.1:*|localhost:*) return 0 ;;
+  esac
+  case "$addr" in
+    *:[0-9]*) ;;
+    *) return 0 ;;
+  esac
+  local port="${addr##*:}"
+  [ "$port" = "443" ] && return 0
+  printf '%s\n' "$port"
+}
+
+
 echo "Easy-WG-Combo Doctor"
 echo "Checking installation at: $SCRIPT_DIR"
 echo ""
@@ -126,6 +149,30 @@ if command -v ufw &>/dev/null; then
   else
     warn "UFW is installed but not active — enable with: ufw enable"
   fi
+
+  # The admin portal, read from the LIVE rules rather than from .env or from
+  # bootstrap's intentions. The portal container holds the Docker socket, the
+  # host network and NET_ADMIN: reachable from Anywhere, it is one password
+  # away from root on this VPS.
+  admin_port="$(detect_admin_port "$SCRIPT_DIR/caddy/Caddyfile")"
+  admin_rules=""
+  if [ -z "$admin_port" ]; then
+    ok "No dedicated admin port in the Caddyfile (portal on :443 or loopback)"
+  else
+    admin_rules="$(ufw status numbered 2>/dev/null | grep -E "^\[[ 0-9]+\].*(^|[^0-9])${admin_port}(/tcp|[^0-9]|$)" || true)"
+    if echo "$admin_rules" | grep -qE 'ALLOW IN[[:space:]]+Anywhere'; then
+      fail "The admin portal (${admin_port}/tcp) is open to Anywhere. Close it: ./easywg admin lock"
+    else
+      ok "Admin portal (${admin_port}/tcp) is not open to Anywhere"
+    fi
+  fi
+  if echo "$admin_rules" | grep -q 'easywg-admin-temp'; then
+    if systemctl list-timers --all 2>/dev/null | grep -q 'easywg-admin-close'; then
+      warn "A temporary admin rule is open (it has an expiry timer)"
+    else
+      fail "A temporary admin rule is open with NO expiry timer — it will stay open. Close it: ./easywg admin close"
+    fi
+  fi
 else
   warn "UFW is not installed — consider installing a firewall"
 fi
@@ -168,10 +215,45 @@ else
   warn "systemctl not found — could not check Fail2Ban status"
 fi
 
-if sshd -T 2>/dev/null | grep -q 'passwordauthentication yes'; then
-  warn "SSH password authentication is enabled — consider disabling it (PasswordAuthentication no)"
+sshd_effective="$(sshd -T 2>/dev/null || true)"
+if [ -z "$sshd_effective" ]; then
+  warn "Could not read the effective SSH config (sshd -T) — SSH checks below are skipped"
 else
-  ok "SSH password authentication is disabled"
+  if echo "$sshd_effective" | grep -q '^passwordauthentication yes'; then
+    warn "SSH password authentication is enabled — consider disabling it (PasswordAuthentication no)"
+  else
+    ok "SSH password authentication is disabled"
+  fi
+
+  # The Security Center grades SSH by READING FILES inside the container: it
+  # cannot run sshd -T. If the container is not given the drop-in directory it
+  # sees only the stub main file, and reports a hardened host as unhardened —
+  # which is exactly what happened on both production VPS until 0.6.5 (−20
+  # points, no regression, no symptom other than the number itself).
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx portal; then
+    if [ -d /etc/ssh/sshd_config.d ] && ! docker exec portal test -d /etc/ssh/sshd_config.d 2>/dev/null; then
+      fail "The portal cannot see /etc/ssh/sshd_config.d — the Security Center grades SSH from the main file alone and will under-report. Fix: add the mount (docker-compose.yml) and ./compose.sh up -d portal"
+    fi
+
+    # Then check the answer, not just the mount: the portal's verdict must agree
+    # with the daemon. A green mount with a red verdict is still a wrong score.
+    sec_json="$(curl -s -u "admin:${PORTAL_PASS}" "${PORTAL_URL}/api/security" 2>/dev/null || true)"
+    if [ -n "$sec_json" ]; then
+      for pair in "ssh_root:permitrootlogin" "ssh_password:passwordauthentication"; do
+        check_id="${pair%%:*}"; directive="${pair##*:}"
+        portal_status="$(echo "$sec_json" | grep -o "\"id\":\"${check_id}\"[^}]*" | grep -o '"status":"[a-z_]*"' | cut -d'"' -f4)"
+        host_val="$(echo "$sshd_effective" | awk -v k="$directive" '$1==k {print $2; exit}')"
+        host_ok=no
+        case "$directive:$host_val" in
+          permitrootlogin:no|permitrootlogin:prohibit-password) host_ok=yes ;;
+          passwordauthentication:no) host_ok=yes ;;
+        esac
+        if [ -n "$portal_status" ] && [ "$host_ok" = yes ] && [ "$portal_status" != "pass" ]; then
+          fail "Security Center disagrees with the daemon on ${directive}: sshd applies '${host_val}' (hardened) but the portal scores '${portal_status}'. The score is wrong, not the host — check what the portal can read (it caches this for 5 min, so re-check after a restart)"
+        fi
+      done
+    fi
+  fi
 fi
 
 echo ""

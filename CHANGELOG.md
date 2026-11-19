@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.5] — 2026-11-19
+
+### Security
+- **The admin portal is no longer opened to the whole internet.** With Xray and `PUBLIC_HTTPS_ENABLED=yes`, `bootstrap.sh` ran `ufw allow 8443/tcp` — Anywhere — putting the one component that holds the Docker socket, the host network and `NET_ADMIN` behind a single password. It now allows the Docker bridge (`172.16.0.0/12`, where wg-easy puts VPN clients, so being on the VPN is enough) and each entry of the new `ADMIN_ALLOW_FROM`, and it **removes** an "Anywhere" rule for that port if it finds one. Re-running bootstrap can no longer widen access, which is how an operator's manual restriction used to disappear without a word.
+- **`./easywg admin`** opens the port deliberately and temporarily: `admin open --from-ssh --for 30m` (or `--from <ip|cidr>`) adds a rule tagged `easywg-admin-temp` and a `systemd-run` timer that removes it; `admin close` removes it now; `admin status` shows who can reach the portal; `admin lock` converts an older install to the new default. If the expiry timer cannot be created, the command says the rule will stay open instead of leaving it to be discovered later.
+- **`doctor` and the Security Center fail on an "Anywhere" rule** for the admin port, and on a temporary rule left without an expiry timer. Both read the live UFW rules — `doctor` from `ufw status`, the portal from `/etc/ufw/user.rules` — not from `.env` or from what bootstrap intended. They also take the admin port **from the Caddyfile**, because one of the two reference installs serves 8443 with no `CADDY_HTTPS_PORT` in its `.env` at all: trusting `.env` would have skipped exactly the host that needed checking.
+
+### Fixed
+- **The Security Center under-reported SSH by 20 points on every stock Debian/Ubuntu host.** The portal container was given `/etc/ssh/sshd_config` but never `/etc/ssh/sshd_config.d/`, where the distribution's `Include` sends all hardening — so it read the stub's `PermitRootLogin yes` and scored 80% on hosts where `sshd -T` says `prohibit-password` and the host CLI scores 100/100. The directory is now mounted read-only, and the parser applies sshd's real precedence: `Include` expanded where the directive appears, **first value wins** (it previously appended drop-ins at the end and let the last line win — the opposite), `Match` blocks skipped as conditional. Each check now names the file its value came from, and says when an `Include` matched nothing. `portal/lib/sshd-config.js` carries the rules, with tests for every case that bit us.
+- **`./easywg security check` now reads `sshd -T`** — the effective configuration — instead of guessing from files, and falls back to the same precedence-correct parse only when sshd cannot be asked. It says which of the two it used.
+- **`security harden-ssh` no longer reports success for a change sshd ignores.** It appends to the main config file, which on a stock layout is read *after* the drop-ins that override it; it now asks the daemon whether the setting actually took effect and fails, pointing at `sshd_config.d/`, when it did not. A failed `sshd -t` now really does restore the backup it takes (the message claimed a revert that never happened), and a failed reload is reported instead of being swallowed.
+- **`./easywg doctor` compares the portal's SSH verdict with the daemon's** and fails when they disagree — the class of bug above is invisible otherwise, since both sides look healthy on their own.
+- **Backups were missing two files nothing can regenerate**: `xray/config.json` (the Reality key pair and the per-device client list) and `docker-compose.override.yml` (untracked local customisation — on one reference install it is what makes TLS work). Every archive made before this is incomplete for an Xray install. `restore` applies the Xray config, and treats the override like `docker-compose.yml` — not restored unless `--use-archive-compose`, and **said out loud**, with a non-zero exit, when it is skipped and differs from what the host has.
+- **A portal-initiated restore always failed at the last step.** It copied `docker-compose.yml` onto a read-only mount, so every restore threw `EROFS` *after* WireGuard, AdGuard and Caddy had been written: a half-applied restore reported as an error. The portal no longer restores compose files at all (they are executed by `compose.sh up`, and the CLI gates that behind an explicit flag) and lists what it skipped.
+- **A backup the portal cannot take in full no longer looks complete.** `docker-compose.override.yml` is not visible from the container, so the manifest and the API response carry an `omitted` list and the Backups tab turns amber and names the file, instead of a green "Created".
+- `bootstrap.sh` called `warn` on three paths without ever defining it — under `set -euo pipefail` that exits 127, so a DNS warning would have killed the installer rather than printing. All three sit on the "domain does not resolve" path, which is why it was never hit.
+
+### Changed
+- The backup manifest gains `created_by` (`cli` or `portal`) and `files`, the list of what the archive actually holds. A restore that leaves something out should not be indistinguishable from a complete one.
+- The security score gains a 10-point check for the admin port's real exposure (so the maximum becomes 110 where a dedicated admin port exists, and stays 100 where the portal is on :443 or loopback, where the check reports `warn` and scores nothing). The existing "bound to localhost" check now says in its own note that Caddy publishes the portal regardless — it was passing on every install and answering a question nobody asked.
+- `portal/test/auth.test.js` gives each test its own source IP (failed logins are counted per IP and the counter is shared for the whole file) and reports the HTTP status when a login returns no session cookie. The test failed about one run in five under load with `cookieA && cookieB` — equally true of a 429, a 500 and a cookie-less 200. The coupling is gone and the next failure will name its cause.
+
 ## [0.6.4] — 2026-11-19
 
 ### Added
@@ -191,6 +213,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.1...v0.6.2

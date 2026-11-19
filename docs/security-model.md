@@ -102,7 +102,16 @@ Each device has its own VLESS UUID. Revoking a device removes its UUID from `xra
 
 ### SSH hardening
 
-The `./easywg security harden-ssh` command modifies `/etc/ssh/sshd_config`. It runs safety checks and prompts for confirmation, but an incorrect configuration could lock you out. Always test SSH access in a new window before closing your existing session.
+The `./easywg security harden-ssh` command modifies `/etc/ssh/sshd_config`. It runs safety checks and prompts for confirmation, but an incorrect configuration could lock you out. Always test SSH access in a new window before closing your existing session. After reloading sshd it asks the daemon (`sshd -T`) whether the change took effect: on a stock Debian/Ubuntu the drop-in directory is `Include`d at the top of the file and **sshd keeps the first value it sees**, so a directive appended at the bottom can be silently overridden by `/etc/ssh/sshd_config.d/`. If that happens the command fails and tells you where to put the setting instead.
+
+How the two SSH checks read the configuration differs by necessity, and it is worth knowing which you are looking at:
+
+| | Reads | Caveat |
+|---|---|---|
+| `./easywg security check` (host) | `sshd -T` — the effective config, includes expanded and defaults filled in | none; this is the truth |
+| Security Center (portal) | the files, mounted read-only: `/etc/ssh/sshd_config` **and** `/etc/ssh/sshd_config.d/` | a container cannot run `sshd -T`; it applies sshd's precedence rules itself and names the file each value came from |
+
+Before 0.6.5 the portal was given only the main file, so on a stock Debian/Ubuntu layout it read the distribution's `PermitRootLogin yes` and never saw the hardening in the drop-in — reporting 80% on hosts the CLI scored 100/100. `./easywg doctor` now compares the two and fails if they disagree.
 
 ---
 
@@ -127,9 +136,24 @@ When Xray is enabled (`XRAY_ENABLED=yes`), the port assignment changes:
 | Port | Purpose |
 |---|---|
 | `443/tcp` | VLESS+Reality tunnel (Xray) — takes over from Caddy |
-| `8443/tcp` | HTTPS admin portal (Caddy moves here when Xray is active) |
+| `8443/tcp` | HTTPS admin portal (Caddy moves here when Xray is active) — **restricted, not open to the internet** |
 
 > When Xray is enabled, Caddy vacates port 443 and listens on `CADDY_HTTPS_PORT` (default `8443`). Port 443 is fully owned by Xray.
+
+### The admin port is closed by default
+
+Caddy listening on `8443` does not mean the internet can reach it. Since 0.6.5 the installer never writes an "Anywhere" rule for that port; what it allows is:
+
+| Source | Why |
+|---|---|
+| `172.16.0.0/12` (the Docker bridge) | wg-easy MASQUERADEs VPN clients onto the bridge, so being on the VPN is enough — the same path the DNS rule uses |
+| each entry of `ADMIN_ALLOW_FROM` | a fixed address you choose (home, office); space-separated IPs or CIDRs in `.env`, empty by default |
+
+For anything else there is `./easywg admin open --from <ip> --for 30m` (`--from-ssh` takes the address of your current SSH session). The rule carries the comment `easywg-admin-temp` and a `systemd-run` timer removes it when the time is up; if the timer cannot be created, the command says so rather than leaving an open port behind. `./easywg admin status` shows who can reach the portal right now.
+
+Why this is worth the inconvenience: the portal container has the Docker socket, the host network and `NET_ADMIN`. A flaw in it — an SSRF was found and fixed in October 2025 — is root on the VPS, which means the WireGuard keys, AdGuard and the Xray private key. One password should not be the only thing between the internet and that.
+
+Re-running `bootstrap.sh` re-applies this; it never widens access, and it removes an "Anywhere" rule it finds. `./easywg doctor` and the Security Center both fail while one exists.
 
 Admin ports are not reachable from the internet. The portal (`8080`) and wg-easy (`51821`) are bound to loopback; the AdGuard UI (`3000`) is kept private by UFW rather than by its bind address — see [the port table in the advanced guide](advanced-install.md#firewall-ufw).
 

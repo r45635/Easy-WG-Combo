@@ -84,8 +84,15 @@ services:
       - /var/log/fail2ban.log:/var/log/fail2ban.log:ro
       # Health module + App Launcher: Docker socket (writable for app lifecycle management)
       - /var/run/docker.sock:/var/run/docker.sock
-      # Security module: read host config files for security checks
+      # Security module: read host config files for security checks.
+      # BOTH paths, always: on Debian/Ubuntu the main file is a stub whose first
+      # line is `Include /etc/ssh/sshd_config.d/*.conf`, and the hardening lives
+      # in there. Mounting only the main file made the portal score two hardened
+      # hosts at 80% while the host CLI scored them 100/100 (fixed in 0.6.5).
+      # The directory is a standard path; Docker creates an empty one on a host
+      # that has none, which reads the same as an empty drop-in set.
       - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
+      - /etc/ssh/sshd_config.d:/etc/ssh/sshd_config.d:ro
       # Security module reads UFW config; the Server Endpoint feature also opens port 80
       # (Let's Encrypt HTTP-01) when switching to a public cert — needs write + NET_ADMIN.
       - /etc/ufw:/etc/ufw
