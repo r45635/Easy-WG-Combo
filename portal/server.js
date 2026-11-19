@@ -2552,6 +2552,12 @@ app.get('/api/devices/:id/config', auth, async (req, res) => {
     const dev = safeLookup(devices, req.params.id);
     if (!dev) return res.status(404).json({ error: 'Device not found' });
     const configText = await (await wgFetch(`/api/wireguard/client/${dev.wgPeerId}/configuration`)).text();
+    // Same shape as the File Drop download: RFC 5987 name + an ASCII fallback,
+    // built by the library-free escape used there. The browser then saves
+    // "<device>.conf" instead of rendering a private key as a web page.
+    const fileName  = `${dev.name || 'device'}.conf`;
+    const asciiName = fileName.replace(/[^\w.\- ]/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     res.type('text/plain').send(patchClientConfig(configText, dev));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

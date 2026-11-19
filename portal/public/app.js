@@ -2952,7 +2952,17 @@ document.getElementById('devices-tbody').addEventListener('click', async e => {
   const { action, id } = btn.dataset;
 
   if (action === 'dev-config') {
-    window.open(`/api/devices/${id}/config`, '_blank');
+    // A download link can never be pop-up blocked. window.open could: a blocked
+    // pop-up returned null, the tab never appeared, and the click did nothing at
+    // all — the same silent failure the QR button had. The server now sends the
+    // config as an attachment, so this saves "<device>.conf" instead of showing
+    // the key material as a page.
+    const a = document.createElement('a');
+    a.href = `/api/devices/${id}/config`;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
     return;
   }
   if (action === 'dev-qr') {
