@@ -17,3 +17,6 @@ Local.MD
 # Local compose customisations (see compose.sh) — never tracked, so that
 # `easywg update` keeps working on a customised installation.
 docker-compose.override.yml
+
+# Generated promo clip (regenerate with docs/screenshots/promo.js)
+docs/screenshots/promo/

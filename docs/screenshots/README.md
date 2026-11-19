@@ -39,6 +39,28 @@ AdGuard dashboard is seeded with DNS traffic so it is not an empty page.
 `capture.js` blurs the VLESS QR code, the client URI and the Reality public key
 **in the page, before the pixels are read**, so the PNG never contains them.
 
+## The promo clip
+
+`promo.js` records the same demo stack as a short captioned walkthrough and
+assembles it with ffmpeg:
+
+```bash
+./demo-stack.sh up
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/ewg-promo-profile --hide-scrollbars about:blank &
+node promo.js            # → promo/easy-wg-combo-demo.gif and .mp4
+./demo-stack.sh down
+```
+
+A dozen frames with per-frame durations, rather than a continuous recording:
+about 30 seconds of walkthrough in roughly half a megabyte, which posts
+anywhere without being re-encoded. The output lands in `promo/`, which is not
+tracked — regenerate it when the interface changes.
+
+The Security tab is deliberately left out: on a container it scores *RISKY*
+for want of a real firewall and real TLS, and dressing that up would be a lie.
+
 ## Before committing an image
 
 Look at each one and name what you see — the checklist that was missed before:
