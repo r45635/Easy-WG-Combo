@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Easy-WG-Combo">
+  <title>Easy-WG-Combo</title>
+  <!-- The portal's own mark: the hexagon it shows as its logo glyph, in the primary violet on the app background.
+       Mitred joins on purpose: round joins blur the six corners into a ring at 16 px. -->
+  <rect width="64" height="64" rx="13" ry="13" fill="#0d1117"/>
+  <path d="M32 11 L50.19 21.5 L50.19 42.5 L32 53 L13.81 42.5 L13.81 21.5 Z"
+        fill="none" stroke="#7c6af7" stroke-width="6"
+        stroke-linejoin="miter" stroke-miterlimit="4"/>
+</svg>

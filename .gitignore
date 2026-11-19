@@ -20,3 +20,7 @@ docker-compose.override.yml
 
 # Generated promo clip (regenerate with docs/screenshots/promo.js)
 docs/screenshots/promo/
+
+# Python bytecode (docs/brand/png2ico.py)
+__pycache__/
+*.pyc
