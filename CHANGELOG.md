@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.6] — 2026-11-19
+
+### Fixed
+- **`PermitRootLogin without-password` was graded as if root could log in with a password.** It is the historical spelling of `prohibit-password` — the same setting — and it is what `sshd -T` prints on OpenSSH as shipped by Ubuntu 22.04. 0.6.5 made `security check` read the daemon instead of the files, which is correct, and that immediately cost a correctly hardened host 10 points: Paris scored **100/110** while its own portal scored 110/110 on the same host. Both spellings are now accepted, and so is `forced-commands-only`, which allows no interactive root session at all. `portal/lib/sshd-config.js` exports the predicate so the portal, `security check`, `harden-ssh` and `doctor` cannot drift apart again.
+- **`harden-ssh` no longer offers to "fix" a host that is already hardened** with the deprecated spelling — it would have appended a directive the drop-ins override anyway.
+- **`doctor`'s two new SSH checks said nothing when they passed.** A check that only speaks on failure is indistinguishable from a check that never ran — which is the exact failure this project keeps meeting. Both now report their result either way, and the UI-vs-daemon comparison says so explicitly when it could not reach `/api/security` instead of skipping in silence.
+- **`doctor` compares the portal's SSH verdict with the daemon's in both directions.** It only looked for a portal that under-reports a hardened host; a portal that passes a host the daemon says is open — the more dangerous error — was invisible to it.
+- `doctor.sh` called `info` without defining it, under `set -euo pipefail`: the same class of bug as the `warn` fixed in `bootstrap.sh` in 0.6.5, introduced by that release's own new checks. Every script is now swept for helpers that are called but never defined.
+
 ## [0.6.5] — 2026-11-19
 
 ### Security
@@ -213,6 +222,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.2...v0.6.3

@@ -130,6 +130,19 @@ ssh_first_value_from_file() {
   return 0
 }
 
+# `PermitRootLogin` has two spellings for the same setting: `without-password`
+# is the historical name of `prohibit-password`, and it is what `sshd -T` prints
+# on OpenSSH as shipped by Ubuntu 22.04. Accepting only the modern spelling made
+# this check score a correctly hardened host (Paris) as if root could log in
+# with a password, the day 0.6.5 started asking the daemon instead of the files.
+# `forced-commands-only` allows no interactive root session at all.
+root_login_restricted() {
+  case "${1,,}" in
+    no|prohibit-password|without-password|forced-commands-only) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ -f "$SSH_CFG" ]; then
   ROOT_LOGIN=$(get_ssh_val PermitRootLogin)
   PW_AUTH=$(get_ssh_val PasswordAuthentication)
@@ -141,7 +154,7 @@ if [ -f "$SSH_CFG" ]; then
     warn "sshd -T unavailable — values read from config files, which may differ from what sshd actually applies"
   fi
 
-  if [[ "${ROOT_LOGIN,,}" == "no" || "${ROOT_LOGIN,,}" == "prohibit-password" ]]; then
+  if root_login_restricted "${ROOT_LOGIN:-yes}"; then
     add_check 10 "pass" "SSH root login restricted (${ROOT_LOGIN:-not set})"
   else
     add_check 10 "fail" "SSH root login enabled (PermitRootLogin=${ROOT_LOGIN:-yes})"
@@ -308,7 +321,7 @@ if $HARDEN_SSH; then
   CURRENT_ROOT=$(get_ssh_val PermitRootLogin)
   CURRENT_PW=$(get_ssh_val PasswordAuthentication)
 
-  if [[ "${CURRENT_ROOT,,}" != "no" && "${CURRENT_ROOT,,}" != "prohibit-password" ]]; then
+  if ! root_login_restricted "${CURRENT_ROOT:-yes}"; then
     CHANGES+=("PermitRootLogin prohibit-password")
   fi
   if [[ "${CURRENT_PW,,}" != "no" ]]; then

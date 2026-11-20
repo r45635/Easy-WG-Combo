@@ -17,6 +17,7 @@ FAILS=0
 ok()   { echo "[OK]   $*"; }
 warn() { echo "[WARN] $*"; WARNS=$((WARNS + 1)); }
 fail() { echo "[FAIL] $*"; FAILS=$((FAILS + 1)); }
+info() { echo "[INFO] $*"; }
 
 # Which port does Caddy actually serve the admin portal on? Read the Caddyfile,
 # not .env: one of the two reference installs serves 8443 with no
@@ -231,28 +232,52 @@ else
   # which is exactly what happened on both production VPS until 0.6.5 (−20
   # points, no regression, no symptom other than the number itself).
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx portal; then
-    if [ -d /etc/ssh/sshd_config.d ] && ! docker exec portal test -d /etc/ssh/sshd_config.d 2>/dev/null; then
+    if [ ! -d /etc/ssh/sshd_config.d ]; then
+      info "This host has no /etc/ssh/sshd_config.d — nothing for the portal to miss"
+    elif docker exec portal test -d /etc/ssh/sshd_config.d 2>/dev/null; then
+      ok "The portal can see /etc/ssh/sshd_config.d (where the hardening lives)"
+    else
       fail "The portal cannot see /etc/ssh/sshd_config.d — the Security Center grades SSH from the main file alone and will under-report. Fix: add the mount (docker-compose.yml) and ./compose.sh up -d portal"
     fi
 
     # Then check the answer, not just the mount: the portal's verdict must agree
     # with the daemon. A green mount with a red verdict is still a wrong score.
+    # Compared BOTH WAYS: a portal that passes a host the daemon says is open is
+    # the more dangerous of the two errors, and the asymmetric version of this
+    # check could not see it.
     sec_json="$(curl -s -u "admin:${PORTAL_PASS}" "${PORTAL_URL}/api/security" 2>/dev/null || true)"
-    if [ -n "$sec_json" ]; then
+    if [ -z "$sec_json" ]; then
+      warn "Could not read ${PORTAL_URL}/api/security — the UI-vs-daemon SSH comparison did NOT run (check ADMIN_PASSWORD)"
+    else
+      compared=0
       for pair in "ssh_root:permitrootlogin" "ssh_password:passwordauthentication"; do
         check_id="${pair%%:*}"; directive="${pair##*:}"
         portal_status="$(echo "$sec_json" | grep -o "\"id\":\"${check_id}\"[^}]*" | grep -o '"status":"[a-z_]*"' | cut -d'"' -f4)"
         host_val="$(echo "$sshd_effective" | awk -v k="$directive" '$1==k {print $2; exit}')"
+        if [ -z "$portal_status" ]; then
+          warn "The portal did not report a '${check_id}' check — could not compare it with the daemon"
+          continue
+        fi
         host_ok=no
         case "$directive:$host_val" in
           permitrootlogin:no|permitrootlogin:prohibit-password) host_ok=yes ;;
+          permitrootlogin:without-password|permitrootlogin:forced-commands-only) host_ok=yes ;;
           passwordauthentication:no) host_ok=yes ;;
         esac
-        if [ -n "$portal_status" ] && [ "$host_ok" = yes ] && [ "$portal_status" != "pass" ]; then
+        if [ "$host_ok" = yes ] && [ "$portal_status" != "pass" ]; then
           fail "Security Center disagrees with the daemon on ${directive}: sshd applies '${host_val}' (hardened) but the portal scores '${portal_status}'. The score is wrong, not the host — check what the portal can read (it caches this for 5 min, so re-check after a restart)"
+        elif [ "$host_ok" = no ] && [ "$portal_status" = "pass" ]; then
+          fail "Security Center passes ${directive} but sshd applies '${host_val:-unset}' — the portal is reporting this host as hardened when the daemon says it is not. Trust the daemon."
+        else
+          compared=$((compared + 1))
         fi
       done
+      if [ "$compared" -gt 0 ]; then
+        ok "Security Center agrees with the daemon on ${compared} SSH check(s)"
+      fi
     fi
+  else
+    info "The portal container is not running — skipped the UI-vs-daemon SSH comparison"
   fi
 fi
 

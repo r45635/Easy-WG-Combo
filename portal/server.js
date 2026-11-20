@@ -13,7 +13,7 @@ const { Readable } = require('stream');
 const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
 const rateLimit = require('express-rate-limit');
 const netGuards = require('./lib/net-guards');
-const { parseSshConfig } = require('./lib/sshd-config');
+const { parseSshConfig, isRootLoginRestricted } = require('./lib/sshd-config');
 const archiveGuards = require('./lib/archive-guards');
 const updateCheck = require('./lib/update-check');
 const { safeLookup, nullProtoStore } = require('./lib/safe-lookup');
@@ -1702,9 +1702,9 @@ async function computeSecurityScore() {
     return `${label}: ${hit.value} (from ${hit.source})`;
   };
 
-  const rootLogin = (sshCfg['permitrootlogin']?.value || 'yes').toLowerCase();
+  const rootLogin = sshCfg['permitrootlogin']?.value || 'yes';
   score += check('ssh_root', 'SSH root login restricted', 10,
-    (rootLogin === 'no' || rootLogin === 'prohibit-password') ? 'pass' : 'fail',
+    isRootLoginRestricted(rootLogin) ? 'pass' : 'fail',
     sshNote('permitrootlogin', 'PermitRootLogin', 'yes'));
 
   const pwAuth = (sshCfg['passwordauthentication']?.value || 'yes').toLowerCase();

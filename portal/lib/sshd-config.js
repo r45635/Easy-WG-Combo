@@ -84,4 +84,23 @@ function parseSshConfig(configPath) {
   return result;
 }
 
-module.exports = { parseSshConfig, expandSshInclude };
+// `PermitRootLogin` has five accepted values and TWO of them mean the same
+// thing: `without-password` is the historical spelling of `prohibit-password`,
+// and `sshd -T` still prints it on OpenSSH as shipped by Ubuntu 22.04 — so a
+// host hardened with `prohibit-password` reports `without-password` when asked
+// what it actually applies. A check that accepts only the modern spelling
+// grades that host as if root could log in with a password. It happened on
+// Paris the day 0.6.5 started reading `sshd -T` (0.6.6).
+// `forced-commands-only` is stricter still: no interactive root session at all.
+const ROOT_LOGIN_RESTRICTED = new Set([
+  'no',
+  'prohibit-password',
+  'without-password',
+  'forced-commands-only',
+]);
+
+function isRootLoginRestricted(value) {
+  return ROOT_LOGIN_RESTRICTED.has(String(value || '').trim().toLowerCase());
+}
+
+module.exports = { parseSshConfig, expandSshInclude, isRootLoginRestricted };

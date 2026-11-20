@@ -5,7 +5,7 @@ const assert    = require('node:assert');
 const fs        = require('fs');
 const os        = require('os');
 const path      = require('path');
-const { parseSshConfig, expandSshInclude } = require('../lib/sshd-config');
+const { parseSshConfig, expandSshInclude, isRootLoginRestricted } = require('../lib/sshd-config');
 
 // Builds a throwaway /etc/ssh: { 'sshd_config': '…', 'sshd_config.d/10-x.conf': '…' }
 function etcSsh(files) {
@@ -106,4 +106,25 @@ test('expandSshInclude matches only files, in order', () => {
   fs.mkdirSync(path.join(dir, 'sshd_config.d', 'adir.conf'), { recursive: true });
   const got = expandSshInclude('sshd_config.d/*.conf', dir).map(f => path.basename(f));
   assert.deepStrictEqual(got, ['a.conf', 'b.conf'], 'sorted, no directory, no .txt');
+});
+
+// ── PermitRootLogin's two spellings ──────────────────────────────────────────
+// `without-password` is the historical synonym of `prohibit-password`, and it
+// is what `sshd -T` prints on Ubuntu 22.04. Rejecting it grades a hardened
+// host as wide open.
+test('isRootLoginRestricted accepts every value that forbids a root password login', () => {
+  for (const v of ['no', 'prohibit-password', 'without-password', 'forced-commands-only']) {
+    assert.equal(isRootLoginRestricted(v), true, v);
+  }
+});
+
+test('isRootLoginRestricted rejects yes, and anything unknown', () => {
+  for (const v of ['yes', 'YES', 'maybe', '', null, undefined]) {
+    assert.equal(isRootLoginRestricted(v), false, String(v));
+  }
+});
+
+test('isRootLoginRestricted ignores case and surrounding space', () => {
+  assert.equal(isRootLoginRestricted('  Without-Password '), true);
+  assert.equal(isRootLoginRestricted('PROHIBIT-PASSWORD'), true);
 });
