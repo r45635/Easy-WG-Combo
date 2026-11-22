@@ -16,6 +16,7 @@ const netGuards = require('./lib/net-guards');
 const { parseSshConfig, isRootLoginRestricted } = require('./lib/sshd-config');
 const archiveGuards = require('./lib/archive-guards');
 const updateCheck = require('./lib/update-check');
+const brand = require('./lib/brand');
 const { safeLookup, nullProtoStore } = require('./lib/safe-lookup');
 
 const app  = express();
@@ -472,6 +473,34 @@ app.use(express.json());
 // Express 5 / body-parser 2 leave req.body undefined when no JSON body was
 // parsed (Express 4 gave {}); handlers destructure req.body unguarded.
 app.use((req, _res, next) => { req.body ??= {}; next(); });
+// ── This install's own icons ─────────────────────────────────────────────────
+// BEFORE express.static, so the generated copies win over the defaults bundled
+// in the image. They are generated once into the persistent data directory and
+// kept across updates; portal/lib/brand.js explains why (a shared favicon hash
+// lists every install of this public repo in one Shodan query).
+const BRAND_DIR = path.join(DATA_DIR, 'brand');
+const brandAssets = brand.ensureBrandAssets({
+  sourceDir: path.join(__dirname, 'public'),
+  outDir: BRAND_DIR,
+});
+if (brandAssets.generated.length) {
+  console.log(`[brand] generated this installation's icons: ${brandAssets.generated.join(', ')}`);
+}
+for (const f of brandAssets.failed) {
+  console.error(`[brand] FAILED to generate ${f.name}: ${f.error}`);
+  console.error('[brand] it will answer 404 — serving the bundled default would re-expose the shared fingerprint');
+}
+for (const f of brand.BRAND_FILES) {
+  app.get(`/${f.name}`, (_req, res) => {
+    const file = path.join(BRAND_DIR, f.name);
+    // Never fall back to public/: that file ships in the public repository and
+    // is exactly the fingerprint this route exists to remove.
+    if (!fs.existsSync(file)) return res.status(404).type('txt').send('Not found');
+    res.type(f.contentType);
+    res.sendFile(file);
+  });
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
 // Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
 // SSH-tunnel access stays plain HTTP and must still receive the cookie.

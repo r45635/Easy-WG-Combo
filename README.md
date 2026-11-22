@@ -257,6 +257,7 @@ Run `./easywg help` for the full command list.
 - Gateway can expose services publicly. Review each service before enabling public access.
 - File Drop public links are accessible without VPN. Use passwords and expiry.
 - Backups may contain secrets (WireGuard keys, API tokens, the Xray private key). Store them securely. If one may have leaked, `./easywg xray rotate-keys` replaces the Reality key pair — it tells you how many devices must then be re-provisioned before it does anything.
+- **Each installation serves its own icons.** Shodan, FOFA and Censys index a favicon by hashing it, so one query lists every host serving the same file — and the defaults ship in this public repository, which makes the file in git the fingerprint. At first start the portal derives its own `favicon.ico`, `favicon.svg` and `apple-touch-icon.png` into `portal/data/brand/`: visually identical, different bytes, different hash. They are kept across updates (a hash that moved on every update would be pointless), they are included in backups, and if generation ever fails the icons answer **404** rather than falling back to the shared default. `./easywg doctor` verifies what the server actually serves. Note that the page title and the exact security-header set remain searchable fingerprints of their own.
 - The dashboard checks GitHub once every 6 hours for a newer release. It sends nothing but the request itself. Set `UPDATE_CHECK_ENABLED=no` in `.env` to disable it.
 
 → [Full security model](docs/security-model.md)

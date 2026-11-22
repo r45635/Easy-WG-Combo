@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.7] — 2026-11-22
+
+### Security
+- **Each installation now serves its own icons, so a favicon hash no longer lists them all.** Shodan, FOFA and Censys index a favicon by hashing it (mmh3 of the base64 of the bytes), and the icons ship in this **public** repository — which makes the file in git the fingerprint. Measured on 2026-11-22: both reference installs answered `/favicon.ico` with mmh3 `-2025595950`, the same value as the repo, so `http.favicon.hash:-2025595950` enumerated them together with every other install. `favicon.svg` and `apple-touch-icon.png` were equally shared, and both were being served. At first start the portal now derives all three into `portal/data/brand/` — an XML comment in the SVG, a `tEXt` chunk in the PNG, bytes appended after the ICO's last image, with a payload of random length so neither the bytes nor the file size is constant. The rendered pixels are identical (verified against the defaults through the system thumbnailer); the hashes are not.
+  - The copies live in the **persistent data directory**, never in git and never in an image layer, which is what keeps the hash stable across `./easywg update` — one that moved on every update would be harmless but pointless. Being under `portal/data`, they are already part of every backup and restore.
+  - An existing install heals itself: the first portal start after the update generates what is missing, once. No bootstrap or firewall change.
+  - **No fallback.** If generation fails, the routes answer `404` and the portal says why on stderr — serving the bundled default would put back the fingerprint the feature exists to remove.
+  - `./easywg doctor` fetches the three icons and **fails** if any is byte-identical to the one in this repository. It checks what the server serves, not what it intended to generate.
+
+### Known fingerprints this does not address
+- The page title (`<title>Easy-WG-Combo</title>`) and the exact security-header set are full-text searchable and identical on every install; the whole login page is byte-identical across hosts, so a body hash groups them just as a favicon hash did. `X-Powered-By: Express` is still sent, and the 404 page is Express's default. Left as they are on purpose — changing them is a separate decision, not a side effect of this one.
+
 ## [0.6.6] — 2026-11-19
 
 ### Fixed
@@ -222,6 +234,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.7]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.3...v0.6.4

@@ -216,6 +216,33 @@ else
   warn "systemctl not found — could not check Fail2Ban status"
 fi
 
+# A favicon that every installation shares is a single search query that lists
+# them all (Shodan/FOFA `http.favicon.hash`), and the defaults ship in a PUBLIC
+# repository — so the file in git is the fingerprint. The portal derives its own
+# copies at first start, into the persistent data directory. Check what the
+# server SERVES, not what it meant to generate.
+if command -v sha256sum >/dev/null 2>&1; then
+  brand_shared=0 brand_checked=0
+  for icon in favicon.ico favicon.svg apple-touch-icon.png; do
+    [ -f "$SCRIPT_DIR/portal/public/$icon" ] || continue
+    served="$(curl -s -o - "${PORTAL_URL}/$icon" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+    shipped="$(sha256sum "$SCRIPT_DIR/portal/public/$icon" | cut -d' ' -f1)"
+    [ -n "$served" ] || continue
+    brand_checked=$((brand_checked + 1))
+    if [ "$served" = "$shipped" ]; then
+      brand_shared=$((brand_shared + 1))
+      fail "/$icon is byte-identical to the one in the public repo — every install of Easy-WG-Combo shares this fingerprint. Restart the portal so it generates its own (./compose.sh up -d portal); it writes them to portal/data/brand/"
+    fi
+  done
+  if [ "$brand_checked" -eq 0 ]; then
+    warn "Could not fetch the icons from ${PORTAL_URL} — did NOT check whether this install serves the shared favicon"
+  elif [ "$brand_shared" -eq 0 ]; then
+    ok "This install serves its own icons ($brand_checked checked, none matching the public repo)"
+  fi
+else
+  warn "sha256sum not found — did NOT check whether this install serves the shared favicon"
+fi
+
 sshd_effective="$(sshd -T 2>/dev/null || true)"
 if [ -z "$sshd_effective" ]; then
   warn "Could not read the effective SSH config (sshd -T) — SSH checks below are skipped"
