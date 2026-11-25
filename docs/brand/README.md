@@ -23,24 +23,30 @@ needs no image package. The `<link>` tags live in `portal/public/index.html`.
 
 ## What browsers actually receive is NOT these files
 
-Since 0.6.7 the three files above are **templates**. At first start the portal copies each one into
-`portal/data/brand/` with a harmless per-install difference — an XML comment in the SVG, a `tEXt`
-chunk in the PNG, bytes appended after the last image in the ICO — and serves *those*. The rendered
-pixels are identical; the bytes, the file sizes and therefore the Shodan/FOFA favicon hash are not.
+Since 0.6.7 the three files above are **templates**. The portal derives its own copy of each, with a
+harmless difference — an XML comment in the SVG, a `tEXt` chunk in the PNG, bytes appended after the
+last image in the ICO — and serves *those*. The rendered pixels are identical; the bytes, the file
+sizes and therefore the Shodan/FOFA favicon hash are not.
 
 The reason: a favicon hash is a search key. Before 0.6.7 both reference installs answered
 `/favicon.ico` with mmh3 `-2025595950`, the same value as this repository and as every other install
 of it, so one query listed them all. Because the repo is public, a per-install file can never come
-from git — hence generation at runtime, into the data volume.
+from git — hence derivation at runtime.
 
-Consequences when changing the mark here:
+Since 0.6.8 the difference comes from **one seed** in `portal/data/brand/install-id`, and the files
+are derived **in memory** at every start rather than written to the data directory. That matters when
+changing the mark here:
 
-- Regenerating and committing the defaults changes nothing for existing installs. They keep the
-  copies in their data directory on purpose: that is what makes the hash stable across updates.
-- To adopt a new mark on a live install, delete `portal/data/brand/` and restart the portal; it
-  regenerates from the new templates, with a new hash.
-- `portal/lib/brand.js` holds the generation (and `portal/test/brand.test.js` the proof that two
-  fresh installs differ). `./easywg doctor` fails if a host serves a file identical to the one here.
+- **A new mark committed here does reach existing installs** — on their next update, with their own
+  hash. Under 0.6.7 it did not: the generated file already existed in their data directory, so it was
+  kept, and the install would have served the old icon forever. Nothing to delete by hand any more.
+- Deleting `portal/data/brand/install-id` is only for *changing a host's fingerprint*; it is not part
+  of adopting a new mark. The install derives a fresh seed, and all of its hashes move.
+- Derivation is deterministic in (seed, file), so an update that does not touch a file leaves that
+  file's hash exactly where it was.
+- `portal/lib/brand.js` holds the derivation (and `portal/test/brand.test.js` the proof that two
+  fresh installs differ, that the same install reproduces its bytes, and that a changed source does
+  propagate). `./easywg doctor` fails if a host serves a file identical to the one here.
 
 ## Two things that look like mistakes and are not
 

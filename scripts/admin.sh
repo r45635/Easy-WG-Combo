@@ -28,7 +28,41 @@ env_val() {
   sed -n "s/^$1=//p" "$ENV_FILE" | head -n 1 | tr -d '"' | tr -d "'"
 }
 
-ADMIN_PORT="$(env_val CADDY_HTTPS_PORT)"; ADMIN_PORT="${ADMIN_PORT:-8443}"
+# Which port does Caddy actually serve the admin portal on? Read the Caddyfile,
+# not .env: the UI rewrites the Caddyfile, and one of the two reference installs
+# serves 8443 with no CADDY_HTTPS_PORT in its .env at all — this call site only
+# managed the right port there because 8443 is also the fallback. 0.6.5 fixed
+# the same divergence in doctor.sh and security-check.sh and missed this one.
+# Prints nothing when the portal is on the default :443 or bound to loopback.
+# TWIN: detect_admin_port() in doctor.sh / security-check.sh, detectAdminPort()
+# in portal/server.js. Change them together.
+detect_admin_port() {
+  local caddyfile="$1" addr
+  [ -f "$caddyfile" ] || return 0
+  addr="$(grep -m1 -E '^[^[:space:]#{]+[[:space:]]*\{[[:space:]]*$' "$caddyfile" 2>/dev/null | sed -E 's/[[:space:]]*\{[[:space:]]*$//')"
+  [ -n "$addr" ] || return 0
+  case "$addr" in
+    127.0.0.1:*|localhost:*) return 0 ;;
+  esac
+  case "$addr" in
+    *:[0-9]*) ;;
+    *) return 0 ;;
+  esac
+  local port="${addr##*:}"
+  [ "$port" = "443" ] && return 0
+  printf '%s\n' "$port"
+}
+
+ADMIN_PORT="$(detect_admin_port "$PROJECT_DIR/caddy/Caddyfile")"
+ENV_ADMIN_PORT="$(env_val CADDY_HTTPS_PORT)"
+if [ -z "$ADMIN_PORT" ]; then
+  # No dedicated admin port in the Caddyfile (portal on :443, or loopback-only).
+  # Keep the historical behaviour rather than start managing 443 by surprise.
+  ADMIN_PORT="${ENV_ADMIN_PORT:-8443}"
+elif [ -n "$ENV_ADMIN_PORT" ] && [ "$ENV_ADMIN_PORT" != "$ADMIN_PORT" ]; then
+  warn "caddy/Caddyfile serves the portal on ${ADMIN_PORT}; .env says CADDY_HTTPS_PORT=${ENV_ADMIN_PORT}."
+  warn "Managing ${ADMIN_PORT} — the Caddyfile is what Caddy listens on."
+fi
 ADMIN_ALLOW_FROM="$(env_val ADMIN_ALLOW_FROM)"
 # Dedicated comments: `close` deletes only what this script added, and leaves
 # any rule the operator wrote by hand alone.

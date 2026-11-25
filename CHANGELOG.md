@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.8] — 2026-11-25
+
+### Security
+- **The login page, the title and the 404 page stop being identical on every install, and the icon mechanism stops freezing a changed logo.** 0.6.7 individualised the three icons, and said what it left alone: the login page was byte-identical across both reference hosts (58253 B, mmh3 `1672648119`), so a hash of the response body grouped them exactly as `http.favicon.hash` had. That is now covered, along with two cheaper hints.
+  - **One seed instead of generated files.** 0.6.7 wrote the derived icons into `portal/data/brand/` and kept whichever file was already there. That made the hash stable, but it also meant a genuine change to an icon — a new logo in a later release — would never have reached an existing install: its file existed, so it was kept. The portal now keeps a single random seed (`portal/data/brand/install-id`, mode `600`) and derives every static response from it **in memory** at startup. Derivation is deterministic, so the hash is still stable across `./easywg update`; a changed source file now propagates immediately; and nothing is cached on disk to go stale. The seed is not a credential — what the responses expose is a prefix of `sha256(seed:name)`, which cannot be inverted — but it is install-identifying, so it is never logged. It lives under `portal/data`, hence inside every backup, which is what carries the fingerprint across a restore.
+  - **The login page is individualised**, by an HTML comment before `</html>`. `/` and `/index.html` are served from the derived copy, and `express.static` is mounted with `index: false` so it cannot hand out the bundled page behind those routes.
+  - **`PORTAL_TITLE`** (new, in `.env`) sets the browser/page title. Empty keeps `Easy-WG-Combo`, which is full-text searchable and identical on every install of this public repo; your own value is one more string that no longer groups this host with the others. It is escaped before it reaches the page.
+  - **`X-Powered-By` is no longer sent** (`app.disable('x-powered-by')`), and unknown paths get the portal's own 404 instead of Express's default page — a constant 167-byte body that names the framework and echoes the requested path back. `/api/*` still answers JSON, so clients are unaffected.
+  - **The asymmetry is deliberate and declared per asset.** An icon that cannot be individualised answers `404`; the UI is served as shipped, loudly, because an unreachable portal is worse than a recognisable one. Both paths log what happened and why.
+  - `./easywg doctor` now compares the **login page** as well as the three icons against the files in this repository, and separately checks that `X-Powered-By` is absent and that the 404 page is not Express's. Each one reports positively when it passes and warns when it could not run, so silence never stands for "verified".
+  - **On upgrade the icon hashes change once.** The files 0.6.7 wrote are removed at first start (they are no longer read) and every response is re-derived from the new seed. The values are not published anywhere, so nothing depends on them; `./easywg doctor` confirms the new ones are still unshared.
+
+### Fixed
+- `./easywg admin` read the admin port from `.env` while `doctor` and `security-check` read it from `caddy/Caddyfile`. The UI rewrites the Caddyfile, and one of the two reference installs serves 8443 with no `CADDY_HTTPS_PORT` in its `.env` at all — so this command managed the right port there only because 8443 is also its fallback. It now reads the Caddyfile like the others, falls back to `.env` when the portal is on `:443` or loopback, and says so when the two disagree. 0.6.5 fixed this divergence in the other two call sites and missed this one.
+
+### Known fingerprints this does not address
+- The exact set of security headers is still identical on every install, and the TLS certificate still names the host (one SAN, searchable on crt.sh). Both are visible to any scanner; neither is changed here.
+
 ## [0.6.7] — 2026-11-22
 
 ### Security
@@ -234,6 +252,7 @@ learning to tell you when it is behind. **Update any instance running
 
 Initial public alpha: WireGuard device management (wg-easy v14), AdGuard Home DNS filtering with per-device presets, admin portal with three interface modes (User / Super User / Advanced), Security Center, backups, monitoring, notifications, gateway/apps/filedrop previews.
 
+[0.6.8]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/r45635/Easy-WG-Combo/compare/v0.6.4...v0.6.5

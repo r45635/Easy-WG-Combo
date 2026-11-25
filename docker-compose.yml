@@ -56,6 +56,9 @@ services:
     environment:
       - PORTAL_PORT=${PORTAL_PORT:-8080}
       - PORTAL_HOST=${PORTAL_HOST:-127.0.0.1}
+      # Empty keeps the page title shipped in the image. Setting it also
+      # removes one more string that is identical on every install.
+      - PORTAL_TITLE=${PORTAL_TITLE:-}
       - WG_EASY_URL=http://127.0.0.1:${WG_EASY_PORT:-51821}
       - ADGUARD_URL=http://127.0.0.1:${ADGUARD_PORT:-3000}
       - SERVER_NAME=${SERVER_NAME:-vpn-server}

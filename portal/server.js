@@ -20,6 +20,9 @@ const brand = require('./lib/brand');
 const { safeLookup, nullProtoStore } = require('./lib/safe-lookup');
 
 const app  = express();
+// One fewer free hint for a scanner; also part of the header set that
+// identifies this stack as surely as a favicon hash does.
+app.disable('x-powered-by');
 const PORT = parseInt(process.env.PORTAL_PORT  || '8080', 10);
 const HOST = process.env.PORTAL_HOST || '127.0.0.1';
 
@@ -473,35 +476,49 @@ app.use(express.json());
 // Express 5 / body-parser 2 leave req.body undefined when no JSON body was
 // parsed (Express 4 gave {}); handlers destructure req.body unguarded.
 app.use((req, _res, next) => { req.body ??= {}; next(); });
-// ── This install's own icons ─────────────────────────────────────────────────
-// BEFORE express.static, so the generated copies win over the defaults bundled
-// in the image. They are generated once into the persistent data directory and
-// kept across updates; portal/lib/brand.js explains why (a shared favicon hash
-// lists every install of this public repo in one Shodan query).
+// ── This install's own static responses ──────────────────────────────────────
+// BEFORE express.static, so the derived copies win over the defaults bundled in
+// the image. Everything is derived in memory from one seed kept in the
+// persistent data directory; portal/lib/brand.js explains why (one hash of a
+// favicon — or of the login page body — lists every install of this public
+// repo in a single Shodan query).
 const BRAND_DIR = path.join(DATA_DIR, 'brand');
-const brandAssets = brand.ensureBrandAssets({
+const derived = brand.deriveAssets({
   sourceDir: path.join(__dirname, 'public'),
-  outDir: BRAND_DIR,
+  dataDir: BRAND_DIR,
+  title: process.env.PORTAL_TITLE || '',
 });
-if (brandAssets.generated.length) {
-  console.log(`[brand] generated this installation's icons: ${brandAssets.generated.join(', ')}`);
+if (derived.seedCreated) {
+  console.log("[brand] created this installation's seed — its static responses are now unique to it");
 }
-for (const f of brandAssets.failed) {
-  console.error(`[brand] FAILED to generate ${f.name}: ${f.error}`);
-  console.error('[brand] it will answer 404 — serving the bundled default would re-expose the shared fingerprint');
+// 0.6.7 wrote the generated icons to disk; 0.6.8 derives them instead.
+const legacy = brand.removeLegacyFiles(BRAND_DIR);
+if (legacy.length) {
+  console.log(`[brand] removed files kept on disk by 0.6.7 (now derived): ${legacy.join(', ')}`);
 }
-for (const f of brand.BRAND_FILES) {
-  app.get(`/${f.name}`, (_req, res) => {
-    const file = path.join(BRAND_DIR, f.name);
-    // Never fall back to public/: that file ships in the public repository and
-    // is exactly the fingerprint this route exists to remove.
-    if (!fs.existsSync(file)) return res.status(404).type('txt').send('Not found');
-    res.type(f.contentType);
-    res.sendFile(file);
-  });
+for (const f of derived.failed) {
+  console.error(`[brand] FAILED to individualise ${f.name}: ${f.error}`);
+  console.error(f.fallback === 'source'
+    ? `[brand] serving the bundled ${f.name} as-is — a recognisable UI beats an unreachable one, but this host IS fingerprintable`
+    : `[brand] /${f.name} will answer 404 — serving the bundled default would re-expose the shared fingerprint`);
 }
+for (const a of Object.values(derived.assets)) {
+  for (const route of a.routes) {
+    app.get(route, (_req, res) => {
+      res.type(a.contentType);
+      if (a.cacheControl) res.set('Cache-Control', a.cacheControl);
+      res.send(a.body);
+    });
+  }
+}
+// Any asset that failed with fallback 'none' has no route above, so it must not
+// be picked up by express.static either — that is the file in the public repo.
+const WITHHELD = new Set(brand.ASSETS.filter(a => !derived.assets[a.name]).flatMap(a => a.routes));
+app.use((req, res, next) => (WITHHELD.has(req.path) ? res.status(404).type('txt').send('Not found') : next()));
 
-app.use(express.static(path.join(__dirname, 'public')));
+// index:false — '/' is served by the route above; express.static must never
+// hand out the bundled index.html, which is byte-identical on every install.
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 // Behind Caddy (TLS) X-Forwarded-Proto marks the connection secure; direct
 // SSH-tunnel access stays plain HTTP and must still receive the cookie.
 // 'loopback' (not 1): trust X-Forwarded-* only when the socket peer is
@@ -4019,6 +4036,15 @@ app.post('/api/xray/restart', auth, requiresAction('advancedSecurity'), async (_
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Not found ────────────────────────────────────────────────────────────────
+// Last, so it only runs when nothing above matched. Express's own 404 page is a
+// constant 167-byte body that names the framework and the path — one more
+// response identical on every install of this public repo.
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
+  res.status(404).type('txt').send('Not found');
 });
 
 // ── Start (skipped when the module is require()'d, e.g. by the test suite) ────

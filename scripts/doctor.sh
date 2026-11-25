@@ -216,31 +216,55 @@ else
   warn "systemctl not found — could not check Fail2Ban status"
 fi
 
-# A favicon that every installation shares is a single search query that lists
-# them all (Shodan/FOFA `http.favicon.hash`), and the defaults ship in a PUBLIC
-# repository — so the file in git is the fingerprint. The portal derives its own
-# copies at first start, into the persistent data directory. Check what the
-# server SERVES, not what it meant to generate.
+# A response that every installation shares is a single search query that lists
+# them all — Shodan/FOFA `http.favicon.hash`, or a plain hash of the login page
+# body — and the defaults ship in a PUBLIC repository, so the file in git IS the
+# fingerprint. The portal derives its own from a seed in the persistent data
+# directory. Check what the server SERVES, not what it meant to derive.
 if command -v sha256sum >/dev/null 2>&1; then
   brand_shared=0 brand_checked=0
-  for icon in favicon.ico favicon.svg apple-touch-icon.png; do
-    [ -f "$SCRIPT_DIR/portal/public/$icon" ] || continue
-    served="$(curl -s -o - "${PORTAL_URL}/$icon" 2>/dev/null | sha256sum | cut -d' ' -f1)"
-    shipped="$(sha256sum "$SCRIPT_DIR/portal/public/$icon" | cut -d' ' -f1)"
+  for asset in favicon.ico favicon.svg apple-touch-icon.png index.html; do
+    [ -f "$SCRIPT_DIR/portal/public/$asset" ] || continue
+    case "$asset" in
+      index.html) url="${PORTAL_URL}/" ;;
+      *)          url="${PORTAL_URL}/$asset" ;;
+    esac
+    served="$(curl -s -o - "$url" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+    shipped="$(sha256sum "$SCRIPT_DIR/portal/public/$asset" | cut -d' ' -f1)"
     [ -n "$served" ] || continue
     brand_checked=$((brand_checked + 1))
     if [ "$served" = "$shipped" ]; then
       brand_shared=$((brand_shared + 1))
-      fail "/$icon is byte-identical to the one in the public repo — every install of Easy-WG-Combo shares this fingerprint. Restart the portal so it generates its own (./compose.sh up -d portal); it writes them to portal/data/brand/"
+      fail "$url returns bytes identical to $asset in the public repo — every install of Easy-WG-Combo shares this fingerprint. Restart the portal so it derives its own (./compose.sh up -d portal)"
     fi
   done
   if [ "$brand_checked" -eq 0 ]; then
-    warn "Could not fetch the icons from ${PORTAL_URL} — did NOT check whether this install serves the shared favicon"
+    warn "Could not fetch anything from ${PORTAL_URL} — did NOT check whether this install serves the shared responses"
   elif [ "$brand_shared" -eq 0 ]; then
-    ok "This install serves its own icons ($brand_checked checked, none matching the public repo)"
+    ok "This install serves its own icons and login page ($brand_checked checked, none matching the public repo)"
   fi
 else
   warn "sha256sum not found — did NOT check whether this install serves the shared favicon"
+fi
+
+# Two more responses that were identical on every install. Both are cheap for a
+# scanner to collect, so a regression here must not pass silently.
+brand_hdr="$(curl -sI "${PORTAL_URL}/" 2>/dev/null | tr -d '\r' || true)"
+if [ -z "$brand_hdr" ]; then
+  warn "Could not read the headers from ${PORTAL_URL}/ — did NOT check X-Powered-By"
+elif printf '%s\n' "$brand_hdr" | grep -qi '^x-powered-by:'; then
+  fail "The portal still sends X-Powered-By ($(printf '%s\n' "$brand_hdr" | grep -i '^x-powered-by:')) — it names the framework to every scanner"
+else
+  ok "No X-Powered-By header"
+fi
+
+brand_404="$(curl -s "${PORTAL_URL}/easywg-doctor-probe-404" 2>/dev/null || true)"
+if [ -z "$brand_404" ]; then
+  warn "Could not probe an unknown path on ${PORTAL_URL} — did NOT check the 404 page"
+elif printf '%s\n' "$brand_404" | grep -q 'Cannot GET'; then
+  fail "Unknown paths return Express's default 404 page, identical on every install and naming the framework"
+else
+  ok "Unknown paths return the portal's own 404"
 fi
 
 sshd_effective="$(sshd -T 2>/dev/null || true)"
